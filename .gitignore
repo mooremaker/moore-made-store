@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# Next.js generated files
+.next/
+out/
+
+# Local environment variables
+.env*
+!.env.example
+
+# Vercel
+.vercel/
+
+# TypeScript generated files
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db

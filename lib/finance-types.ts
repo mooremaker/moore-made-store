@@ -1,0 +1,89 @@
+export type FinancialPaymentRow = {
+  id: string;
+  request_id: string;
+  quote_id: string;
+  payment_kind: "full" | "deposit" | "balance";
+  amount_cents: number;
+  currency: string;
+  status: "pending" | "paid" | "failed" | "refunded";
+  payment_method: "stripe" | "cashapp" | "cash" | "check" | "other";
+  manual_reference: string | null;
+  paid_at: string | null;
+  created_at: string;
+  receipt_number: number | null;
+  receipt_token: string | null;
+};
+
+export type BusinessExpenseCategory =
+  | "materials"
+  | "shipping"
+  | "equipment"
+  | "software"
+  | "advertising"
+  | "fees"
+  | "office"
+  | "travel"
+  | "other";
+
+export const EXPENSE_CATEGORY_LABELS: Record<BusinessExpenseCategory, string> = {
+  materials: "Materials / blanks",
+  shipping: "Shipping / postage",
+  equipment: "Equipment",
+  software: "Software / subscriptions",
+  advertising: "Advertising / marketing",
+  fees: "Processing / bank fees",
+  office: "Office / supplies",
+  travel: "Travel / mileage",
+  other: "Other",
+};
+
+export const EXPENSE_RECEIPT_BUCKET = "business-expense-receipts";
+
+export type BusinessExpenseReceipt = {
+  id: string;
+  expense_id: string;
+  storage_path: string;
+  original_filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+  url?: string | null;
+};
+
+export type BusinessExpenseRow = {
+  id: string;
+  expense_date: string;
+  vendor: string;
+  category: BusinessExpenseCategory;
+  description: string | null;
+  amount_cents: number;
+  payment_method: string | null;
+  note: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
+  receipts?: BusinessExpenseReceipt[];
+};
+
+export function receiptLabel(receiptNumber: number | null | undefined) {
+  if (!receiptNumber) return "Receipt";
+  return `MM-R-${String(receiptNumber).padStart(6, "0")}`;
+}
+
+export function paymentMethodLabel(method: FinancialPaymentRow["payment_method"] | string) {
+  if (method === "stripe") return "Card / Stripe";
+  if (method === "cashapp") return "Cash App";
+  if (method === "cash") return "Cash";
+  if (method === "check") return "Check";
+  return "Other";
+}
+
+export type FinancialOrderSummary = {
+  id: string;
+  request_number: number;
+  customer_name: string;
+  product: string;
+  amount_paid_cents: number;
+  payment_status: "unpaid" | "deposit_paid" | "paid";
+  status: "new" | "reviewing" | "quote_sent" | "approved" | "in_production" | "ready" | "shipped" | "completed" | "cancelled";
+};
