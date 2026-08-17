@@ -18,15 +18,48 @@ button, input, select, textarea { font: inherit; }
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: 0;
   color: var(--ink);
   line-height: 1;
   white-space: nowrap;
 }
-.brandLogo {
-  display: block;
-  width: 190px;
+
+.brandWord {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+/* Pull MOORE slightly toward the stylus */
+.brandWord:first-child {
+  margin-right: -0.10rem;
+}
+
+/* Give MADE enough room so the stylus does not overlap it */
+.brandWord:last-child {
+  margin-left: 0.20rem;
+}
+
+.brandStylusWrap {
+  position: relative;
+  width: 0.92rem;
+  height: 1.72rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  overflow: visible;
+  margin-left: -0.05rem;
+}
+
+.brandStylus {
+  width: 2.10rem;
+  max-width: none;
   height: auto;
+  display: block;
   object-fit: contain;
+  transform: rotate(-61deg);
+  transform-origin: center;
 }
 .nav { margin-left: auto; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
 .nav a { color: #454545; font-size: .95rem; }
@@ -379,27 +412,38 @@ p { line-height: 1.65; }
     padding: 0;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     position: relative;
   }
   .brand {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: calc(100% - 68px);
-    white-space: nowrap;
+    gap: 0;
   }
-  .brandLogo {
-    display: block;
-    width: min(215px, 100%);
-    max-width: 100%;
-    height: auto;
-    max-height: 54px;
-    object-fit: contain;
+
+  .brandWord {
+    font-size: 1.04rem;
+    letter-spacing: .13em;
+  }
+
+  .brandWord:first-child {
+    margin-right: -0.08rem;
+  }
+
+  .brandWord:last-child {
+    margin-left: 0.16rem;
+  }
+
+  .brandStylusWrap {
+    width: 0.74rem;
+    height: 1.35rem;
+    margin-left: -0.04rem;
+  }
+
+  .brandStylus {
+    width: 1.68rem;
+    transform: rotate(-61deg);
   }
   .menuButton {
     display: inline-flex;
-    flex: 0 0 auto;
   }
   .nav {
     display: none;
@@ -918,7 +962,7 @@ p { line-height: 1.65; }
 .adminTopbarRedesign h1 { font-size: clamp(2.6rem, 5.5vw, 4.8rem); }
 .adminTopbarRedesign p { margin: 8px 0 0; color: var(--muted); max-width: 680px; }
 
-.adminStatsModern { grid-template-columns: repeat(7, minmax(0,1fr)); gap: 9px; margin-bottom: 18px; }
+.adminStatsModern { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
 .adminStatButton {
   appearance: none;
   text-align: left;
@@ -937,11 +981,11 @@ p { line-height: 1.65; }
 .adminStatShowcase { background: #f6f1e9; }
 
 .adminWorkspaceTabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
   padding: 5px;
-  width: min(100%, 640px);
+  width: fit-content;
+  max-width: 100%;
   background: #ece7df;
   border-radius: 999px;
   margin: 8px 0 22px;
@@ -1077,7 +1121,7 @@ p { line-height: 1.65; }
 .adminShowcaseCompact .adminShowcasePhotos { margin: 0 0 14px; }
 
 @media (max-width: 1050px) {
-  .adminStatsModern { grid-template-columns: repeat(4,1fr); }
+  .adminStatsModern { grid-template-columns: repeat(3,1fr); }
   .adminRequestSummary { grid-template-columns: minmax(220px,1fr) minmax(250px,.9fr); }
   .adminRequestQuickActions { grid-column: 1 / -1; grid-template-columns: minmax(180px,240px) 160px; justify-content: end; }
 }
@@ -1086,6 +1130,7 @@ p { line-height: 1.65; }
   .adminPageRedesign { width: min(100% - 20px, 1220px); padding-top: 24px; }
   .adminStatsModern { grid-template-columns: repeat(2,1fr); }
   .adminWorkspaceTabs { width: 100%; }
+  .adminWorkspaceTabs button { flex: 1; }
   .adminInboxToolbar { grid-template-columns: 1fr; }
   .adminSort { grid-template-columns: 48px 1fr; }
   .adminRequestSummary { grid-template-columns: 1fr; gap: 12px; }
@@ -1104,7 +1149,7 @@ p { line-height: 1.65; }
   .adminStatButton { padding: 13px; }
   .adminStatButton strong { font-size: 1.45rem; }
   .adminStatButton small { display: none; }
-  .adminWorkspaceTabs { grid-template-columns: repeat(2,minmax(0,1fr)); border-radius: 14px; }
+  .adminWorkspaceTabs { border-radius: 14px; }
   .adminWorkspaceTabs button { font-size: .78rem; padding: 9px 8px; }
   .adminRequestSummary { padding: 13px; }
   .adminRequestSummaryFacts { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
@@ -2155,263 +2200,31 @@ p { line-height: 1.65; }
   .cashAdminManagement { align-items: stretch; flex-direction: column; }
 }
 
-/* Phase 5 — customer/admin messaging */
-.accountMessagesPage { max-width: 1180px; padding-bottom: 70px; }
-.accountMessagesHero { max-width: 820px; padding-bottom: 20px; }
-.messagesWorkspace { display: grid; grid-template-columns: minmax(250px, .72fr) minmax(0, 1.7fr); gap: 14px; align-items: stretch; }
-.messageInbox, .messageConversation { padding: 0; overflow: hidden; min-height: 620px; }
-.messageInboxHead { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px; border-bottom: 1px solid var(--border); }
-.messageInboxHead h2 { margin: 3px 0 0; font-size: 1.4rem; }
-.messageNewButton { min-height: 38px; padding: 9px 12px; font-size: .8rem; }
-.messageThreadList { display: grid; }
-.messageThreadRow { appearance: none; width: 100%; border: 0; border-bottom: 1px solid #eee9e2; background: #fff; color: inherit; padding: 13px 14px; text-align: left; cursor: pointer; display: grid; gap: 4px; }
-.messageThreadRow:hover, .messageThreadRow.active { background: #f7f3ed; }
-.messageThreadRowTop { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.messageThreadRowTop strong { font-size: .9rem; overflow-wrap: anywhere; }
-.messageThreadRow > span { color: #4d4944; font-size: .77rem; overflow-wrap: anywhere; }
-.messageThreadRow > small { color: var(--muted); font-size: .7rem; }
-.messageUnreadBadge { min-width: 21px; height: 21px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-dark); color: #fff; font-size: .68rem; font-weight: 900; }
-.messageInboxEmpty { padding: 18px; }
-.messageConversation { display: flex; flex-direction: column; background: #fff; }
-.messageConversationHead, .adminMessageConversationHead { padding: 17px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-.messageConversationHead h2, .adminMessageConversationHead h3 { margin: 4px 0 4px; font-size: 1.35rem; }
-.messageConversationHead p, .adminMessageConversationHead p { margin: 0; color: var(--muted); font-size: .82rem; }
-.messageOrderLink { flex: 0 0 auto; padding: 9px 12px; font-size: .78rem; }
-.messageHistory, .adminMessageHistory { flex: 1; min-height: 280px; max-height: 560px; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: #fbfaf7; }
-.messageBubble { width: min(82%, 680px); padding: 11px 13px; border-radius: 14px; border: 1px solid var(--border); background: #fff; }
-.messageBubble.fromCustomer { align-self: flex-end; background: #f0e9df; border-color: #d6c6b2; }
-.messageBubble.fromAdmin { align-self: flex-start; }
-.messageBubble.internalNote { align-self: stretch; width: 100%; background: #fff6df; border-color: #e5c985; border-style: dashed; }
-.messageBubbleMeta { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 5px; }
-.messageBubbleMeta strong { font-size: .76rem; }
-.messageBubbleMeta span { color: var(--muted); font-size: .68rem; }
-.messageBubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .87rem; line-height: 1.55; }
-.messageAttachments { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
-.messageAttachments a { border: 1px solid var(--border); border-radius: 999px; padding: 6px 9px; background: #fff; font-size: .72rem; font-weight: 800; }
-.messageComposer, .messageCreateForm, .adminMessageComposer { padding: 16px 18px; border-top: 1px solid var(--border); display: grid; gap: 11px; background: #fff; }
-.messageCreateForm { border-top: 0; padding: 18px; }
-.messageCreateForm .messageConversationHead { margin: -18px -18px 5px; }
-.messageComposer textarea, .adminMessageComposer textarea { min-height: 88px; }
-.messageComposerBottom, .messageComposerActions, .adminMessageComposerOptions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.messageAttachButton { position: relative; display: inline-flex; align-items: center; min-height: 38px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-size: .76rem; font-weight: 850; cursor: pointer; }
-.messageAttachButton input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.accountOrderActions { display: flex; gap: 9px; flex-wrap: wrap; }
-
-.adminStatMessages { background: #f7f3ed; }
-.adminMessageUnreadTotal { display: inline-flex; padding: 8px 11px; border-radius: 999px; background: var(--accent-dark); color: #fff; font-size: .75rem; font-weight: 900; white-space: nowrap; }
-.adminMessageToolbar { display: grid; gap: 9px; }
-.adminMessageFilters { padding-bottom: 0; }
-.adminMessageWorkspace { display: grid; grid-template-columns: minmax(250px, .72fr) minmax(0, 1.7fr); min-height: 650px; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: #fff; }
-.adminMessageList { border-right: 1px solid var(--border); overflow-y: auto; max-height: 760px; background: #fff; }
-.adminMessageRow { appearance: none; width: 100%; border: 0; border-bottom: 1px solid #eee9e2; background: #fff; padding: 13px 14px; display: grid; gap: 4px; text-align: left; color: inherit; cursor: pointer; }
-.adminMessageRow:hover, .adminMessageRow.active { background: #f7f3ed; }
-.adminMessageRowTop { display: flex; gap: 9px; justify-content: space-between; align-items: center; }
-.adminMessageRowTop strong { font-size: .88rem; overflow-wrap: anywhere; }
-.adminMessageRow > span { color: #46413c; font-size: .76rem; overflow-wrap: anywhere; }
-.adminMessageRow > small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); font-size: .72rem; line-height: 1.35; }
-.adminMessageRow > time { color: #8a8179; font-size: .66rem; }
-.adminMessageEmpty { margin: 12px; padding: 28px 12px; }
-.adminMessageConversation { min-width: 0; display: flex; flex-direction: column; }
-.adminMessageConversationHead { background: #fff; }
-.adminMessageContactActions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
-.adminMessageContactActions .btn { min-height: 36px; padding: 8px 11px; font-size: .74rem; }
-.adminMessageSettings { display: flex; align-items: end; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: #faf8f4; flex-wrap: wrap; }
-.adminMessageSettings label { display: grid; gap: 4px; min-width: 150px; }
-.adminMessageSettings label > span { font-size: .66rem; color: var(--muted); font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-.adminMessageSettings select { min-height: 36px; border: 1px solid var(--border); border-radius: 9px; background: #fff; padding: 7px 9px; }
-.adminMessageHistory { max-height: 520px; }
-.adminMessageComposer { border-top: 1px solid var(--border); }
-.adminInternalToggle { margin: 0; max-width: 430px; padding: 10px 11px; }
-.adminInternalToggle span { display: grid; gap: 2px; }
-.adminInternalToggle small { color: var(--muted); font-weight: 500; }
-.message-status-open { background: #e0ebdf; color: #315536; }
-.message-status-resolved { background: #ececec; color: #555; }
-.message-status-archived { background: #f0e9df; color: #68594a; }
-
-@media (max-width: 860px) {
-  .messagesWorkspace, .adminMessageWorkspace { grid-template-columns: 1fr; }
-  .messageInbox, .messageConversation { min-height: auto; }
-  .messageThreadList { max-height: 280px; overflow-y: auto; }
-  .adminMessageList { border-right: 0; border-bottom: 1px solid var(--border); max-height: 300px; }
-  .adminMessageConversationHead { flex-direction: column; }
-  .adminMessageContactActions { justify-content: flex-start; }
-}
-@media (max-width: 560px) {
-  .accountMessagesPage { width: min(100% - 18px, 1180px); }
-  .accountMessagesHero { padding-top: 28px; }
-  .messageInboxHead { align-items: flex-start; }
-  .messageNewButton { width: auto; }
-  .messageConversationHead { flex-direction: column; }
-  .messageBubble { width: 92%; }
-  .messageComposerBottom, .messageComposerActions, .adminMessageComposerOptions { align-items: stretch; flex-direction: column; }
-  .messageAttachButton, .messageComposerActions .btn, .adminMessageComposerOptions .messageAttachButton { width: 100%; justify-content: center; }
-  .messageNewMeta { grid-template-columns: 1fr; }
-  .adminMessageSettings { align-items: stretch; flex-direction: column; }
-  .adminMessageSettings label { width: 100%; }
-  .adminMessageContactActions { width: 100%; }
-  .adminMessageContactActions .btn { flex: 1 1 auto; }
-  .accountOrderActions { display: grid; grid-template-columns: 1fr; }
-  .accountOrderActions .btn { width: 100%; }
-}
-
-/* Phase 6 — financials + printable receipts */
-.adminStatFinancials { background: #f4f0e7; }
-.financeExportActions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-.financeExportActions .btn { min-height:40px; padding:9px 13px; font-size:.78rem; }
-.financeMetricGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-.financeMetric { background:#fff; border:1px solid var(--border); border-radius:15px; padding:16px; display:grid; gap:6px; }
-.financeMetric span { color:var(--muted); font-size:.72rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
-.financeMetric strong { font-size:1.55rem; line-height:1.1; }
-.financeMetric small { color:var(--muted); font-size:.74rem; }
-.financeTwoCol { display:grid; grid-template-columns:.8fr 1.2fr; gap:12px; }
-.financePanelCard { padding:18px; }
-.financePanelHead h3, .financeExpenseForm h3, .financeTableHead h3 { margin:4px 0 0; font-size:1.2rem; }
-.financeMethodList { display:grid; margin-top:13px; }
-.financeMethodList > div { display:flex; justify-content:space-between; gap:14px; padding:10px 0; border-top:1px solid #eee9e2; }
-.financeMethodList > div:first-child { border-top:0; }
-.financeExpenseForm > summary { cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.financeExpenseForm > summary::-webkit-details-marker { display:none; }
-.financeExpenseForm > summary > span { font-size:1.4rem; }
-.financeExpenseForm[open] > summary { padding-bottom:14px; border-bottom:1px solid var(--border); margin-bottom:14px; }
-.financeExpenseForm form { display:grid; gap:12px; }
-.financeReceiptUploadField > span { display:flex; align-items:baseline; gap:8px; }
-.financeReceiptUploadField > span small { color:var(--muted); font-size:.72rem; font-weight:700; }
-.financeReceiptUploadField input[type="file"] { width:100%; border:1px dashed #cfc7bb; border-radius:11px; padding:10px; background:#fbfaf7; }
-.financeTableError { margin:0 0 12px; }
-.financeExpenseTable { min-width:980px; }
-.expenseReceiptCell { min-width:190px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-.expenseReceiptChip { display:inline-flex; align-items:center; overflow:hidden; border:1px solid var(--border); border-radius:999px; background:#f8f5f0; font-size:.72rem; }
-.expenseReceiptChip a, .expenseReceiptChip > span { display:inline-flex; align-items:center; min-height:30px; padding:6px 8px 6px 10px; font-weight:800; white-space:nowrap; }
-.expenseReceiptChip button { width:28px; height:30px; border:0; border-left:1px solid var(--border); background:transparent; color:#7a5047; cursor:pointer; font-size:1rem; line-height:1; }
-.expenseReceiptChip button:hover { background:#f2e7e3; }
-.expenseReceiptChip button:disabled { opacity:.45; cursor:wait; }
-.expenseReceiptAdd { position:relative; display:inline-flex; align-items:center; min-height:31px; padding:6px 10px; border:1px dashed #b9afa2; border-radius:999px; background:#fff; color:var(--accent-dark); font-size:.72rem; font-weight:850; cursor:pointer; white-space:nowrap; }
-.expenseReceiptAdd:hover { border-color:var(--accent-dark); background:#fbf6ee; }
-.expenseReceiptAdd.isBusy { opacity:.6; cursor:wait; }
-.expenseReceiptAdd input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
-.financeTableSection { background:#fff; border:1px solid var(--border); border-radius:15px; padding:16px; overflow:hidden; }
-.financeTableHead { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:13px; }
-.financeTableHead > span { color:var(--muted); font-size:.78rem; }
-.financeTableWrap { overflow-x:auto; }
-.financeTable { width:100%; border-collapse:collapse; min-width:760px; font-size:.82rem; }
-.financeTable th { text-align:left; color:var(--muted); font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; padding:9px 10px; border-bottom:1px solid var(--border); }
-.financeTable td { padding:11px 10px; border-bottom:1px solid #eee9e2; vertical-align:middle; }
-.financeTable tbody tr:last-child td { border-bottom:0; }
-.financeTable td small { display:block; margin-top:3px; color:var(--muted); }
-.financeReceiptButton { min-height:34px; padding:7px 10px; font-size:.72rem; white-space:nowrap; }
-.financeDeleteButton { color:#8a3e39; }
-.financeDisclaimer { margin:0; color:var(--muted); font-size:.76rem; line-height:1.55; }
-
-.accountReceipts { margin-top:14px; padding:14px; border:1px solid var(--border); border-radius:12px; background:#fff; }
-.accountReceipts > strong { display:block; margin-bottom:9px; }
-.accountReceipts > div { display:flex; flex-wrap:wrap; gap:8px; }
-.accountReceipts a { display:grid; gap:2px; border:1px solid var(--border); border-radius:10px; padding:9px 11px; background:#f8f5f0; }
-.accountReceipts a span { font-weight:850; font-size:.8rem; }
-.accountReceipts a small { color:var(--muted); font-size:.72rem; }
-
-.receiptPage { max-width:900px; padding-top:46px; padding-bottom:70px; }
-.receiptActions { display:flex; justify-content:flex-end; gap:9px; margin-bottom:16px; }
-.receiptPaper { background:#fff; border:1px solid var(--border); border-radius:22px; padding:clamp(24px,5vw,52px); box-shadow:0 18px 50px rgba(0,0,0,.05); }
-.receiptHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:30px; }
-.receiptLogo { width:190px; height:auto; object-fit:contain; }
-.receiptTitle { text-align:right; }
-.receiptTitle h1 { margin:5px 0 4px; font-size:clamp(2rem,4vw,3rem); letter-spacing:-.04em; }
-.receiptTitle p { margin:0; color:var(--muted); }
-.receiptRule { height:2px; background:var(--ink); margin:30px 0; }
-.receiptCustomerGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-.receiptCustomerGrid > div, .receiptPaymentBox > div { background:#fff; padding:14px; display:grid; gap:4px; }
-.receiptCustomerGrid span, .receiptPaymentBox span, .receiptTotals span { color:var(--muted); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; font-weight:850; }
-.receiptPaymentBox { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; margin-top:18px; background:var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-.receiptTotals { width:min(100%,430px); margin:28px 0 0 auto; display:grid; gap:9px; }
-.receiptTotals > div { display:flex; justify-content:space-between; gap:18px; }
-.receiptBalance { border-top:2px solid var(--ink); padding-top:12px; margin-top:4px; font-size:1.1rem; }
-.receiptBalance span { color:var(--ink); }
-.receiptFooter { margin-top:40px; padding-top:22px; border-top:1px solid var(--border); }
-.receiptFooter p { margin:6px 0 12px; color:#4d4a45; }
-.receiptFooter small { color:var(--muted); }
-
+/* =========================================================
+   FINAL MOBILE HERO OVERRIDE
+   Keep each hero phrase on exactly one line on phones.
+   This must remain at the very bottom of globals.css.
+   ========================================================= */
 @media (max-width: 760px) {
-  .financeExportActions { justify-content:flex-start; }
-  .financeMetricGrid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .financeTwoCol { grid-template-columns:1fr; }
-  .receiptPage { padding-top:24px; }
-  .receiptHeader { flex-direction:column; }
-  .receiptTitle { text-align:left; }
-  .receiptPaymentBox { grid-template-columns:1fr; }
+  .heroTitle {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 11px 0 18px !important;
+    font-size: clamp(2rem, 10.8vw, 3.2rem) !important;
+    line-height: .91 !important;
+    letter-spacing: -.055em !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+
+  .heroTitle span {
+    white-space: nowrap !important;
+  }
 }
 
-@media (max-width: 480px) {
-  .financeMetricGrid { grid-template-columns:1fr; }
-  .receiptActions { display:grid; grid-template-columns:1fr 1fr; }
-  .receiptActions .btn { width:100%; }
-  .receiptCustomerGrid { grid-template-columns:1fr; }
-  .receiptLogo { width:165px; }
+@media (max-width: 370px) {
+  .heroTitle {
+    font-size: 10.4vw !important;
+  }
 }
-
-@media print {
-  .siteHeader, .siteFooter, .receiptActions { display:none !important; }
-  body { background:#fff !important; }
-  .receiptPage { width:100%; max-width:none; padding:0; }
-  .receiptPaper { border:0; border-radius:0; box-shadow:none; padding:18mm; }
-  a { color:inherit !important; text-decoration:none !important; }
-}
-.manualPaymentSuccess { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.manualPaymentSuccess .btn { min-height:36px; padding:8px 11px; font-size:.76rem; }
-
-/* Phase 6.3 — final-sale payment gate + custom-order terms */
-.paymentPolicyGate { display: grid; gap: 16px; }
-.paymentPolicyCard {
-  border: 1px solid #d7c3a8;
-  border-radius: 18px;
-  background: #fffaf2;
-  padding: 20px;
-  display: grid;
-  gap: 16px;
-}
-.paymentPolicyHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
-.paymentPolicyHeader h3 { margin: 5px 0 6px; font-size: 1.25rem; }
-.paymentPolicyHeader p { margin: 0; color: #5f574f; max-width: 680px; }
-.paymentPolicyVersion { flex: 0 0 auto; padding: 6px 9px; border: 1px solid #d7c3a8; border-radius: 999px; font-size: .68rem; font-weight: 900; color: #6f543d; background: #fff; }
-.paymentPolicyNotice { padding: 14px 15px; border-radius: 13px; background: #f1e5d5; color: #49392d; }
-.paymentPolicyNotice strong { display: block; margin-bottom: 5px; }
-.paymentPolicyNotice p { margin: 0; font-size: .9rem; line-height: 1.55; }
-.paymentPolicyChecks { display: grid; gap: 9px; }
-.paymentPolicyChecks label { display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px; border: 1px solid #ded9d1; border-radius: 12px; background: #fff; cursor: pointer; line-height: 1.48; font-size: .9rem; }
-.paymentPolicyChecks input { width: 19px; height: 19px; flex: 0 0 19px; margin: 1px 0 0; }
-.paymentPolicyActions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.paymentPolicyActions .btn:disabled { opacity: .45; cursor: not-allowed; }
-.paymentPolicyAccepted { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 14px 16px; border: 1px solid #c7d8c4; border-radius: 14px; background: #edf5eb; }
-.paymentPolicyAccepted > div { display: grid; gap: 3px; }
-.paymentPolicyAccepted p { margin: 0; color: #4e654b; font-size: .82rem; }
-.paymentPolicyUnlocked { display: grid; gap: 16px; }
-.manualPaymentPolicyAccepted { margin: 10px 0 0; color: #315536; font-size: .8rem; font-weight: 800; }
-
-.policyPage { max-width: 920px; padding-bottom: 60px; }
-.policyHero { max-width: 760px; }
-.policyDocument { padding: clamp(22px, 4vw, 40px); display: grid; gap: 0; }
-.policyDocument section { padding: 22px 0; border-top: 1px solid var(--border); }
-.policyDocument section:first-child { border-top: 0; padding-top: 0; }
-.policyDocument h2 { font-size: clamp(1.65rem, 4vw, 2.4rem); }
-.policyDocument h3 { margin: 0 0 8px; font-size: 1.08rem; }
-.policyDocument p { margin: 0; color: #4d4944; }
-.policyAcknowledgmentList { display: grid; gap: 9px; }
-.policyAcknowledgmentList p { padding: 10px 12px; border-radius: 10px; background: #f7f5f0; font-size: .9rem; }
-.policyDocumentFooter { padding-top: 22px; margin-top: 4px; border-top: 2px solid var(--ink); display: grid; gap: 10px; align-items: start; }
-.policyDocumentFooter .btn { width: fit-content; margin-top: 5px; }
-
-@media (max-width: 680px) {
-  .paymentPolicyCard { padding: 16px; }
-  .paymentPolicyHeader { display: grid; gap: 10px; }
-  .paymentPolicyVersion { width: fit-content; }
-  .paymentPolicyActions { display: grid; grid-template-columns: 1fr; }
-  .paymentPolicyActions .btn { width: 100%; }
-  .paymentPolicyAccepted { align-items: flex-start; flex-direction: column; }
-  .policyPage { width: min(100% - 24px, 920px); }
-}
-
-@media print {
-  .receiptFooter .receiptFinalSaleNotice { display: block; }
-}
-.footerLegal { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; justify-content: flex-end; }
-.footerLegal a { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 680px) { .footerLegal { justify-content: flex-start; } }

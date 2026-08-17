@@ -28,8 +28,8 @@ export function Header() {
             className="brandLogo"
             src="/moore-made-header-logo.png"
             alt="Moore Made"
-            width={1741}
-            height={576}
+            width={190}
+            height={63}
             priority
           />
         </Link>
