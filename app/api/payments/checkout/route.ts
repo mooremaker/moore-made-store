@@ -5,6 +5,7 @@ import { nextPaymentAmount, type PaymentTerms } from "@/lib/payment-types";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { siteUrl } from "@/lib/email";
+import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 function text(value: unknown, max = 200) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data: quote, error: quoteError } = await supabase
       .from("quotes")
-      .select("id,request_id,public_token,status,total_cents,payment_terms,deposit_amount_cents,custom_requests(id,request_number,customer_name,email,product,payment_status,amount_paid_cents)")
+      .select("id,request_id,public_token,status,total_cents,payment_terms,deposit_amount_cents,proof_version,custom_requests(id,request_number,customer_name,email,product,payment_status,amount_paid_cents)")
       .eq("public_token", token)
       .single();
     if (quoteError || !quote) return NextResponse.json({ error: "Quote not found." }, { status: 404 });
@@ -28,6 +29,17 @@ export async function POST(request: Request) {
 
     const requestRow = Array.isArray(quote.custom_requests) ? quote.custom_requests[0] : quote.custom_requests;
     if (!requestRow) return NextResponse.json({ error: "Order details are unavailable." }, { status: 500 });
+
+    const { data: policyAcceptance, error: policyError } = await supabase
+      .from("order_policy_acceptances")
+      .select("id")
+      .eq("quote_id", quote.id)
+      .eq("proof_version", Math.max(1, Number(quote.proof_version || 1)))
+      .eq("policy_version", FINAL_SALE_POLICY_VERSION)
+      .maybeSingle();
+    if (policyError || !policyAcceptance) {
+      return NextResponse.json({ error: "Accept the final-sale custom-order terms before paying." }, { status: 409 });
+    }
 
     const { data: paidRows } = await supabase.from("payments").select("amount_cents,status").eq("quote_id", quote.id);
     const amountPaid = (paidRows ?? []).filter((row) => row.status === "paid").reduce((sum, row) => sum + Number(row.amount_cents || 0), 0);

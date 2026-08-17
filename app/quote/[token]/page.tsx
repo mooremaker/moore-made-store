@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { QuoteResponseButtons } from "@/components/QuoteResponseButtons";
 import { PaymentCheckoutButton } from "@/components/PaymentCheckoutButton";
 import { CashPaymentRequestButton } from "@/components/CashPaymentRequestButton";
+import { PaymentPolicyGate } from "@/components/PaymentPolicyGate";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { money, QUOTE_STATUS_LABELS, type QuoteLineItem, type QuoteProofItem, type QuoteStatus } from "@/lib/quote-types";
 import { QUOTE_PROOF_BUCKET, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase-admin";
 import { nextPaymentAmount, paymentStatusLabel, type PaymentStatus, type PaymentTerms } from "@/lib/payment-types";
 import { syncPaidCheckoutSessionById } from "@/lib/payment-server";
 import { isStripeConfigured } from "@/lib/stripe";
+import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -136,8 +138,18 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
     amountPaidCents,
   });
   const paymentLabel = paymentStep.kind === "deposit" ? "Pay deposit" : paymentStep.kind === "balance" ? "Pay remaining balance" : "Pay full amount";
-  const cashAppPaymentUrl = (process.env.CASHAPP_PAYMENT_URL || "").trim();
+  const cashAppConfigured = Boolean((process.env.CASHAPP_PAYMENT_URL || "").trim());
   const paymentReference = formatRequestNumber(request.request_number);
+  const currentProofVersion = Math.max(1, Number(quote.proof_version || 1));
+  const { data: policyAcceptance, error: policyAcceptanceError } = await supabase
+    .from("order_policy_acceptances")
+    .select("id,accepted_at")
+    .eq("quote_id", quote.id)
+    .eq("proof_version", currentProofVersion)
+    .eq("policy_version", FINAL_SALE_POLICY_VERSION)
+    .maybeSingle();
+  const paymentPolicyReady = !policyAcceptanceError;
+  const paymentPolicyAccepted = Boolean(policyAcceptance);
 
   return (
     <div className="shell publicQuoteShell proofApprovalPage scalableProofApprovalPage">
@@ -229,41 +241,49 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
           {paymentStep.amountCents > 0 ? <>
             <p className="publicApprovalIntro">{paymentStep.kind === "deposit" ? `A ${money(paymentStep.amountCents)} custom deposit is required to begin production. The remaining balance stays attached to this order.` : paymentStep.kind === "balance" ? "Your deposit is recorded. Pay the remaining balance before the order can be marked ready for pickup or shipped." : "Full payment is required to begin production."}</p>
 
-            <div className="paymentMethodStack">
-              {isStripeConfigured() ? <div className="digitalPaymentPanel digitalPaymentPrimary">
-                <div>
-                  <span className="eyebrow">Recommended</span>
-                  <h3>Pay securely online</h3>
-                  <p>Use Stripe Checkout for the fastest payment confirmation.</p>
-                </div>
-                <PaymentCheckoutButton token={token} amountCents={paymentStep.amountCents} label={paymentLabel} />
-              </div> : null}
+            <PaymentPolicyGate
+              token={token}
+              proofVersion={currentProofVersion}
+              policyReady={paymentPolicyReady}
+              initialAccepted={paymentPolicyAccepted}
+              initialAcceptedAt={policyAcceptance?.accepted_at || null}
+            >
+              <div className="paymentMethodStack">
+                {isStripeConfigured() ? <div className="digitalPaymentPanel digitalPaymentPrimary">
+                  <div>
+                    <span className="eyebrow">Recommended</span>
+                    <h3>Pay securely online</h3>
+                    <p>Use Stripe Checkout for the fastest payment confirmation.</p>
+                  </div>
+                  <PaymentCheckoutButton token={token} amountCents={paymentStep.amountCents} label={paymentLabel} />
+                </div> : null}
 
-              {cashAppPaymentUrl ? <div className={`cashAppPaymentPanel ${isStripeConfigured() ? "digitalPaymentSecondary" : ""}`}>
-                <div>
-                  <span className="eyebrow">{isStripeConfigured() ? "Alternative digital payment" : "Cash App payment"}</span>
-                  <h3>Send {money(paymentStep.amountCents)}</h3>
-                  <p>{paymentStep.kind === "deposit" ? "This is the custom deposit required to begin production." : paymentStep.kind === "balance" ? "This is the remaining balance on your order." : "Full payment is required to begin production."}</p>
-                </div>
-                <div className="cashAppReference">
-                  <span>Please include this order number in the payment note</span>
-                  <strong>{paymentReference}</strong>
-                </div>
-                <a className="btn cashAppPaymentButton" href={cashAppPaymentUrl} target="_blank" rel="noreferrer">Pay with Cash App ↗</a>
-              </div> : !isStripeConfigured() ? <div className="cashAppPaymentPanel cashAppPaymentPendingSetup">
-                <div>
-                  <span className="eyebrow">Digital payment</span>
-                  <h3>Payment link coming shortly</h3>
-                  <p>Moore Made is setting up its digital payment link. Your approved order and amount due are saved.</p>
-                </div>
-              </div> : null}
+                {cashAppConfigured ? <div className={`cashAppPaymentPanel ${isStripeConfigured() ? "digitalPaymentSecondary" : ""}`}>
+                  <div>
+                    <span className="eyebrow">{isStripeConfigured() ? "Alternative digital payment" : "Cash App payment"}</span>
+                    <h3>Send {money(paymentStep.amountCents)}</h3>
+                    <p>{paymentStep.kind === "deposit" ? "This is the custom deposit required to begin production." : paymentStep.kind === "balance" ? "This is the remaining balance on your order." : "Full payment is required to begin production."}</p>
+                  </div>
+                  <div className="cashAppReference">
+                    <span>Please include this order number in the payment note</span>
+                    <strong>{paymentReference}</strong>
+                  </div>
+                  <a className="btn cashAppPaymentButton" href={`/api/payments/cashapp?token=${encodeURIComponent(token)}`} target="_blank" rel="noreferrer">Pay with Cash App ↗</a>
+                </div> : !isStripeConfigured() ? <div className="cashAppPaymentPanel cashAppPaymentPendingSetup">
+                  <div>
+                    <span className="eyebrow">Digital payment</span>
+                    <h3>Cash App link coming shortly</h3>
+                    <p>Your approved order and amount due are saved. Moore Made will add its Cash App payment link here before digital payment is requested.</p>
+                  </div>
+                </div> : null}
 
-              <CashPaymentRequestButton
-                token={token}
-                amountCents={paymentStep.amountCents}
-                initialStatus={request.cash_payment_request_status || "none"}
-              />
-            </div>
+                <CashPaymentRequestButton
+                  token={token}
+                  amountCents={paymentStep.amountCents}
+                  initialStatus={request.cash_payment_request_status || "none"}
+                />
+              </div>
+            </PaymentPolicyGate>
 
             <div className="cashAppNextSteps paymentConfirmationSteps">
               <strong>What happens after payment?</strong>

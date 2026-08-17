@@ -372,6 +372,8 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             depositAmountCents={quote.deposit_amount_cents}
                             amountPaidCents={request.amount_paid_cents}
                             paymentStatus={request.payment_status}
+                            policyAccepted={Boolean(quote.paymentPolicyAccepted)}
+                            policyAcceptedAt={quote.paymentPolicyAcceptedAt || null}
                           />
                         </section>
                       ) : null}

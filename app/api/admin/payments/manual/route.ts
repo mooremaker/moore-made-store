@@ -5,6 +5,7 @@ import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email
 import { recalculateOrderPayment } from "@/lib/payment-server";
 import { money } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 const METHODS = new Set(["cashapp", "cash", "check", "other"]);
 
@@ -34,13 +35,24 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdmin();
     const [{ data: quote }, { data: order }, { data: paidRows }] = await Promise.all([
-      supabase.from("quotes").select("id,request_id,status,total_cents,payment_terms,deposit_amount_cents").eq("id", quoteId).eq("request_id", requestId).single(),
+      supabase.from("quotes").select("id,request_id,status,total_cents,payment_terms,deposit_amount_cents,proof_version").eq("id", quoteId).eq("request_id", requestId).single(),
       supabase.from("custom_requests").select("id,request_number,customer_name,email,product,cash_payment_request_status").eq("id", requestId).single(),
       supabase.from("payments").select("amount_cents,status").eq("request_id", requestId),
     ]);
 
     if (!quote || !order) return NextResponse.json({ error: "Order payment details could not be found." }, { status: 404 });
     if (quote.status !== "approved") return NextResponse.json({ error: "The customer must approve the proof + quote before payment is recorded." }, { status: 400 });
+
+    const { data: policyAcceptance, error: policyError } = await supabase
+      .from("order_policy_acceptances")
+      .select("id")
+      .eq("quote_id", quote.id)
+      .eq("proof_version", Math.max(1, Number(quote.proof_version || 1)))
+      .eq("policy_version", FINAL_SALE_POLICY_VERSION)
+      .maybeSingle();
+    if (policyError || !policyAcceptance) {
+      return NextResponse.json({ error: "The customer must accept the final-sale custom-order terms before payment is recorded." }, { status: 409 });
+    }
 
     const alreadyPaid = (paidRows ?? []).filter((row) => row.status === "paid").reduce((sum, row) => sum + Number(row.amount_cents || 0), 0);
     const totalCents = Math.max(0, Number(quote.total_cents || 0));
@@ -93,6 +105,7 @@ export async function POST(request: Request) {
              <p style="margin:0;"><strong>Remaining:</strong> ${escapeHtml(money(summary.remainingCents))}</p>
            </div>
            <p style="line-height:1.65;margin:0 0 18px;">${summary.remainingCents <= 0 ? "Your order is paid in full. We’ll keep you updated when it is ready for pickup or ships." : "Your payment has been applied to the order. Any remaining balance stays attached to your order."}</p>
+           <p style="line-height:1.55;margin:0 0 18px;color:#6b6b6b;font-size:13px;"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p>
            ${paymentRow.receipt_token ? `<a href="${siteUrl()}/receipt/${paymentRow.receipt_token}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View / print receipt</a>` : ""}`
         ),
       });

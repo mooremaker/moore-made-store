@@ -4,6 +4,7 @@ import { emailShell, escapeHtml, isEmailConfigured, sendMooreMadeEmail } from "@
 import { nextPaymentAmount, type PaymentTerms } from "@/lib/payment-types";
 import { money } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 export async function POST(_request: Request, context: { params: Promise<{ token: string }> }) {
   try {
@@ -11,7 +12,7 @@ export async function POST(_request: Request, context: { params: Promise<{ token
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("quotes")
-      .select("id,status,total_cents,payment_terms,deposit_amount_cents,custom_requests(id,request_number,customer_name,email,phone,sms_consent,payment_status,amount_paid_cents,cash_payment_request_status,cash_payment_requested_at)")
+      .select("id,status,total_cents,payment_terms,deposit_amount_cents,proof_version,custom_requests(id,request_number,customer_name,email,phone,sms_consent,payment_status,amount_paid_cents,cash_payment_request_status,cash_payment_requested_at)")
       .eq("public_token", token)
       .single();
 
@@ -28,6 +29,18 @@ export async function POST(_request: Request, context: { params: Promise<{ token
     };
 
     if (order.payment_status === "paid") return NextResponse.json({ error: "This order is already paid in full." }, { status: 400 });
+
+    const { data: policyAcceptance, error: policyError } = await supabase
+      .from("order_policy_acceptances")
+      .select("id")
+      .eq("quote_id", data.id)
+      .eq("proof_version", Math.max(1, Number(data.proof_version || 1)))
+      .eq("policy_version", FINAL_SALE_POLICY_VERSION)
+      .maybeSingle();
+    if (policyError || !policyAcceptance) {
+      return NextResponse.json({ error: "Accept the final-sale custom-order terms before arranging payment." }, { status: 409 });
+    }
+
     if (order.cash_payment_request_status === "pending" || order.cash_payment_request_status === "contacted") {
       return NextResponse.json({ ok: true, alreadyRequested: true });
     }

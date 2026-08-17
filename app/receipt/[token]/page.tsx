@@ -86,7 +86,8 @@ export default async function ReceiptPage({ params }: Props) {
         <footer className="receiptFooter">
           <strong>Thank you for choosing Moore Made.</strong>
           <p>This receipt confirms a payment recorded for {orderNumber}. Keep it for your records.</p>
-          <small>Moore Made LLC · mooremade.store</small>
+          <p className="receiptFinalSaleNotice"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p>
+          <small>Moore Made LLC · mooremade.store · Custom Order Terms: /terms/custom-orders</small>
         </footer>
       </article>
     </div>

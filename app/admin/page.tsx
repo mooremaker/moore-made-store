@@ -8,6 +8,7 @@ import { AdminWorkspace, type AdminRequestRow, type AdminShowcaseRow } from "@/c
 import { MESSAGE_BUCKET } from "@/lib/message-server";
 import type { AdminMessageThread, AdminUserOption, MessageAttachment, MessageEntry, MessageTopic, MessageThreadStatus } from "@/lib/message-types";
 import { EXPENSE_RECEIPT_BUCKET, type BusinessExpenseReceipt, type BusinessExpenseRow, type FinancialPaymentRow } from "@/lib/finance-types";
+import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -44,6 +45,13 @@ export default async function AdminPage() {
     .from("quotes")
     .select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,sent_at,responded_at,created_at,updated_at");
   const baseQuotes = (quoteData ?? []) as QuoteRecord[];
+
+  const { data: policyAcceptanceData } = await supabase
+    .from("order_policy_acceptances")
+    .select("quote_id,proof_version,policy_version,accepted_at")
+    .eq("policy_version", FINAL_SALE_POLICY_VERSION);
+  type PolicyAcceptanceRow = { quote_id:string; proof_version:number; policy_version:string; accepted_at:string; };
+  const policyAcceptances = (policyAcceptanceData ?? []) as PolicyAcceptanceRow[];
 
   const { data: proofItemData, error: proofItemError } = await supabase
     .from("quote_proof_items")
@@ -95,7 +103,15 @@ export default async function AdminPage() {
       })),
     }));
 
-    return { ...quote, proofItems, proofItemsVersion: adminVersion, changeRequests };
+    const policyAcceptance = policyAcceptances.find((row) => row.quote_id === quote.id && Number(row.proof_version) === Math.max(1, Number(quote.proof_version || 1)));
+    return {
+      ...quote,
+      proofItems,
+      proofItemsVersion: adminVersion,
+      changeRequests,
+      paymentPolicyAccepted: Boolean(policyAcceptance),
+      paymentPolicyAcceptedAt: policyAcceptance?.accepted_at || null,
+    };
   }));
 
   const { data: showcaseData, error: showcaseError } = await supabase

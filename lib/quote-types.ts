@@ -75,6 +75,8 @@ export type QuoteRecord = {
   proofItems?: QuoteProofItem[];
   proofItemsVersion?: number;
   changeRequests?: QuoteChangeRequest[];
+  paymentPolicyAccepted?: boolean;
+  paymentPolicyAcceptedAt?: string | null;
 };
 
 export function money(cents: number) {

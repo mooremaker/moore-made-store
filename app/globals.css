@@ -379,14 +379,27 @@ p { line-height: 1.65; }
     padding: 0;
     flex-direction: row;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     position: relative;
   }
+  .brand {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 68px);
+    white-space: nowrap;
+  }
   .brandLogo {
-    width: 154px;
+    display: block;
+    width: min(215px, 100%);
+    max-width: 100%;
+    height: auto;
+    max-height: 54px;
+    object-fit: contain;
   }
   .menuButton {
     display: inline-flex;
+    flex: 0 0 auto;
   }
   .nav {
     display: none;
@@ -2344,3 +2357,61 @@ p { line-height: 1.65; }
 }
 .manualPaymentSuccess { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .manualPaymentSuccess .btn { min-height:36px; padding:8px 11px; font-size:.76rem; }
+
+/* Phase 6.3 — final-sale payment gate + custom-order terms */
+.paymentPolicyGate { display: grid; gap: 16px; }
+.paymentPolicyCard {
+  border: 1px solid #d7c3a8;
+  border-radius: 18px;
+  background: #fffaf2;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+.paymentPolicyHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.paymentPolicyHeader h3 { margin: 5px 0 6px; font-size: 1.25rem; }
+.paymentPolicyHeader p { margin: 0; color: #5f574f; max-width: 680px; }
+.paymentPolicyVersion { flex: 0 0 auto; padding: 6px 9px; border: 1px solid #d7c3a8; border-radius: 999px; font-size: .68rem; font-weight: 900; color: #6f543d; background: #fff; }
+.paymentPolicyNotice { padding: 14px 15px; border-radius: 13px; background: #f1e5d5; color: #49392d; }
+.paymentPolicyNotice strong { display: block; margin-bottom: 5px; }
+.paymentPolicyNotice p { margin: 0; font-size: .9rem; line-height: 1.55; }
+.paymentPolicyChecks { display: grid; gap: 9px; }
+.paymentPolicyChecks label { display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px; border: 1px solid #ded9d1; border-radius: 12px; background: #fff; cursor: pointer; line-height: 1.48; font-size: .9rem; }
+.paymentPolicyChecks input { width: 19px; height: 19px; flex: 0 0 19px; margin: 1px 0 0; }
+.paymentPolicyActions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.paymentPolicyActions .btn:disabled { opacity: .45; cursor: not-allowed; }
+.paymentPolicyAccepted { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 14px 16px; border: 1px solid #c7d8c4; border-radius: 14px; background: #edf5eb; }
+.paymentPolicyAccepted > div { display: grid; gap: 3px; }
+.paymentPolicyAccepted p { margin: 0; color: #4e654b; font-size: .82rem; }
+.paymentPolicyUnlocked { display: grid; gap: 16px; }
+.manualPaymentPolicyAccepted { margin: 10px 0 0; color: #315536; font-size: .8rem; font-weight: 800; }
+
+.policyPage { max-width: 920px; padding-bottom: 60px; }
+.policyHero { max-width: 760px; }
+.policyDocument { padding: clamp(22px, 4vw, 40px); display: grid; gap: 0; }
+.policyDocument section { padding: 22px 0; border-top: 1px solid var(--border); }
+.policyDocument section:first-child { border-top: 0; padding-top: 0; }
+.policyDocument h2 { font-size: clamp(1.65rem, 4vw, 2.4rem); }
+.policyDocument h3 { margin: 0 0 8px; font-size: 1.08rem; }
+.policyDocument p { margin: 0; color: #4d4944; }
+.policyAcknowledgmentList { display: grid; gap: 9px; }
+.policyAcknowledgmentList p { padding: 10px 12px; border-radius: 10px; background: #f7f5f0; font-size: .9rem; }
+.policyDocumentFooter { padding-top: 22px; margin-top: 4px; border-top: 2px solid var(--ink); display: grid; gap: 10px; align-items: start; }
+.policyDocumentFooter .btn { width: fit-content; margin-top: 5px; }
+
+@media (max-width: 680px) {
+  .paymentPolicyCard { padding: 16px; }
+  .paymentPolicyHeader { display: grid; gap: 10px; }
+  .paymentPolicyVersion { width: fit-content; }
+  .paymentPolicyActions { display: grid; grid-template-columns: 1fr; }
+  .paymentPolicyActions .btn { width: 100%; }
+  .paymentPolicyAccepted { align-items: flex-start; flex-direction: column; }
+  .policyPage { width: min(100% - 24px, 920px); }
+}
+
+@media print {
+  .receiptFooter .receiptFinalSaleNotice { display: block; }
+}
+.footerLegal { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; justify-content: flex-end; }
+.footerLegal a { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 680px) { .footerLegal { justify-content: flex-start; } }

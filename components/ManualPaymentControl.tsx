@@ -17,6 +17,8 @@ type Props = {
   depositAmountCents: number | null;
   amountPaidCents: number;
   paymentStatus: PaymentStatus;
+  policyAccepted: boolean;
+  policyAcceptedAt: string | null;
 };
 
 function dollars(cents: number) {
@@ -33,6 +35,8 @@ export function ManualPaymentControl({
   depositAmountCents,
   amountPaidCents,
   paymentStatus,
+  policyAccepted,
+  policyAcceptedAt,
 }: Props) {
   const router = useRouter();
   const nextPayment = useMemo(
@@ -96,9 +100,12 @@ export function ManualPaymentControl({
         <div><span>Recorded paid</span><strong>{money(amountPaidCents)}</strong></div>
         <div><span>Remaining</span><strong>{money(remainingCents)}</strong></div>
       </div>
+      {policyAccepted ? <p className="manualPaymentPolicyAccepted">Final-sale terms accepted ✓{policyAcceptedAt ? ` · ${new Date(policyAcceptedAt).toLocaleString()}` : ""}</p> : null}
 
       {!approved ? (
         <div className="requestWarning">Manual payment recording unlocks after the customer approves the proof + quote.</div>
+      ) : !policyAccepted ? (
+        <div className="requestWarning"><strong>Final-sale terms still need customer acceptance.</strong><br />Have the customer open their approved proof + quote payment page and accept the required custom-order terms before you record any payment.</div>
       ) : remainingCents <= 0 ? (
         <div className="quoteResponseSuccess"><strong>Paid in full ✓</strong><p>No balance remains on {requestNumber}.</p></div>
       ) : (
