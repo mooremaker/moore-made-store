@@ -16,7 +16,7 @@ export default async function AccountLoginPage({ searchParams }: { searchParams:
       <section className="pageHero authHero">
         <div className="eyebrow">Your Moore Made account</div>
         <h1>Orders, proofs, all in one place.</h1>
-        <p className="lead">Use a secure email link to sign in. Your account only shows orders and files connected to your verified email.</p>
+        <p className="lead">Use a secure one-time email code to sign in. Your account only shows orders and files connected to your verified email.</p>
       </section>
       {params.error ? <div className="formError authError">That sign-in link is invalid or expired. Request a fresh link below.</div> : null}
       <MagicLinkForm mode="customer" nextPath={next} />

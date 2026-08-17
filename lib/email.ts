@@ -33,28 +33,64 @@ type SendEmailInput = {
   replyTo?: string;
 };
 
+function readableEmailError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const message = typeof record.message === "string" ? record.message : "Unknown Resend error.";
+    const name = typeof record.name === "string" ? record.name : "";
+    return name && !message.toLowerCase().includes(name.toLowerCase()) ? `${name}: ${message}` : message;
+  }
+  return String(error || "Unknown Resend error.");
+}
+
 export async function sendMooreMadeEmail(input: SendEmailInput) {
   const resend = getResend();
   const from = process.env.MOORE_MADE_FROM_EMAIL;
 
-  if (!resend || !from) {
-    return { ok: false as const, skipped: true as const, error: "Email is not configured." };
+  if (!process.env.RESEND_API_KEY) {
+    console.error("Moore Made email configuration missing: RESEND_API_KEY");
+    return { ok: false as const, skipped: true as const, error: "RESEND_API_KEY is missing in the deployment environment." };
+  }
+  if (!from) {
+    console.error("Moore Made email configuration missing: MOORE_MADE_FROM_EMAIL");
+    return { ok: false as const, skipped: true as const, error: "MOORE_MADE_FROM_EMAIL is missing in the deployment environment." };
+  }
+  if (!resend) {
+    return { ok: false as const, skipped: true as const, error: "Resend is not configured." };
   }
 
-  const { data, error } = await resend.emails.send({
-    from,
-    to: input.to,
-    subject: input.subject,
-    html: input.html,
-    replyTo: input.replyTo,
-  });
+  try {
+    const { data, error } = await resend.emails.send({
+      from,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      replyTo: input.replyTo,
+    });
 
-  if (error) {
-    console.error("Resend email failed", error);
-    return { ok: false as const, skipped: false as const, error: error.message };
+    if (error) {
+      const message = readableEmailError(error);
+      console.error("Resend email failed", {
+        message,
+        from,
+        recipientCount: Array.isArray(input.to) ? input.to.length : 1,
+        subject: input.subject,
+      });
+      return { ok: false as const, skipped: false as const, error: message };
+    }
+
+    return { ok: true as const, id: data?.id ?? null };
+  } catch (error) {
+    const message = readableEmailError(error);
+    console.error("Resend email threw an exception", {
+      message,
+      from,
+      recipientCount: Array.isArray(input.to) ? input.to.length : 1,
+      subject: input.subject,
+    });
+    return { ok: false as const, skipped: false as const, error: message };
   }
-
-  return { ok: true as const, id: data?.id ?? null };
 }
 
 export function emailShell(title: string, body: string) {

@@ -11,28 +11,52 @@ type Props = {
 
 export function MagicLinkForm({ mode, nextPath }: Props) {
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function requestCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const supabase = createSupabaseBrowserClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
       const { error: authError } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         options: {
-          emailRedirectTo: redirectTo,
           shouldCreateUser: mode === "customer",
         },
       });
       if (authError) throw authError;
+      setEmail(normalizedEmail);
+      setCode("");
       setSent(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send the sign-in link.");
+      setError(e instanceof Error ? e.message : "Could not send the sign-in code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const token = code.replace(/\D/g, "").slice(0, 10);
+      if (token.length < 6 || token.length > 10) throw new Error("Enter the full sign-in code from your email.");
+      const supabase = createSupabaseBrowserClient();
+      const { error: authError } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token,
+        type: "email",
+      });
+      if (authError) throw authError;
+      window.location.assign(nextPath);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That sign-in code could not be verified.");
     } finally {
       setBusy(false);
     }
@@ -40,18 +64,44 @@ export function MagicLinkForm({ mode, nextPath }: Props) {
 
   if (sent) {
     return (
-      <div className="card authSentCard" role="status">
+      <form className="card authCard" onSubmit={verifyCode}>
         <div className="successMark">✓</div>
         <h2>Check your email.</h2>
-        <p>We sent a secure, one-time sign-in link to <strong>{email}</strong>.</p>
-        <p className="muted">The link expires and can only be used once. You can close this page after opening the email.</p>
-        <button className="btn secondary" type="button" onClick={() => setSent(false)}>Use a different email</button>
-      </div>
+        <p>We sent a secure sign-in code to <strong>{email}</strong>.</p>
+        <div className="field">
+          <label htmlFor={`${mode}-code`}>Sign-in code</label>
+          <input
+            id={`${mode}-code`}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6,10}"
+            minLength={6}
+            maxLength={10}
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 10))}
+            placeholder="Enter the code from your email"
+            required
+            autoFocus
+          />
+        </div>
+        <p className="muted">Codes are one-time use and expire automatically. Using a typed code also prevents email security scanners from consuming your login before you do.</p>
+        {error ? <div className="formError">{error}</div> : null}
+        <button className="btn" type="submit" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
+        <button
+          className="btn secondary"
+          type="button"
+          disabled={busy}
+          onClick={() => { setSent(false); setCode(""); setError(""); }}
+        >
+          Send a new code or use a different email
+        </button>
+      </form>
     );
   }
 
   return (
-    <form className="card authCard" onSubmit={submit}>
+    <form className="card authCard" onSubmit={requestCode}>
       <div className="field">
         <label htmlFor={`${mode}-email`}>Email address</label>
         <input
@@ -66,12 +116,12 @@ export function MagicLinkForm({ mode, nextPath }: Props) {
         />
       </div>
       {mode === "customer" ? (
-        <p className="fieldHelp">New here? This same secure link creates your Moore Made account. No password to remember.</p>
+        <p className="fieldHelp">New here? This same secure code creates your Moore Made account. No password to remember.</p>
       ) : (
         <p className="fieldHelp">Only pre-approved Moore Made staff accounts can enter the admin dashboard.</p>
       )}
       {error ? <div className="formError">{error}</div> : null}
-      <button className="btn" type="submit" disabled={busy}>{busy ? "Sending..." : "Email me a secure sign-in link"}</button>
+      <button className="btn" type="submit" disabled={busy}>{busy ? "Sending..." : "Email me a secure sign-in code"}</button>
     </form>
   );
 }

@@ -962,7 +962,7 @@ p { line-height: 1.65; }
 .adminTopbarRedesign h1 { font-size: clamp(2.6rem, 5.5vw, 4.8rem); }
 .adminTopbarRedesign p { margin: 8px 0 0; color: var(--muted); max-width: 680px; }
 
-.adminStatsModern { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
+.adminStatsModern { grid-template-columns: repeat(7, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
 .adminStatButton {
   appearance: none;
   text-align: left;
@@ -1121,9 +1121,13 @@ p { line-height: 1.65; }
 .adminShowcaseCompact .adminShowcasePhotos { margin: 0 0 14px; }
 
 @media (max-width: 1050px) {
-  .adminStatsModern { grid-template-columns: repeat(3,1fr); }
+  .adminStatsModern { grid-template-columns: repeat(7,minmax(0,1fr)); }
   .adminRequestSummary { grid-template-columns: minmax(220px,1fr) minmax(250px,.9fr); }
   .adminRequestQuickActions { grid-column: 1 / -1; grid-template-columns: minmax(180px,240px) 160px; justify-content: end; }
+}
+
+@media (max-width: 900px) {
+  .adminStatsModern { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 
 @media (max-width: 760px) {

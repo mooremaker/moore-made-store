@@ -255,7 +255,7 @@ export async function POST(request: Request) {
 
     if (!emailResult.ok) {
       return NextResponse.json(
-        { error: "The proof and quote were saved as a draft, but the email could not be sent. Check Resend and try again.", quote },
+        { error: `The proof and quote were saved as a draft, but the email could not be sent. ${emailResult.error}`, quote },
         { status: 502 }
       );
     }
