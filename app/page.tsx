@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ShowcaseCard } from "@/components/ShowcaseCard";
+import { HomeShowcaseCarousel } from "@/components/HomeShowcaseCarousel";
 import { getApprovedShowcasePosts } from "@/lib/showcase-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const showcasePosts = await getApprovedShowcasePosts(3);
+  const showcasePosts = await getApprovedShowcasePosts(12);
 
   return (
     <>
@@ -39,16 +39,9 @@ export default async function Home() {
         <div className="shell">
           <div className="showcaseSectionHead">
             <div><div className="eyebrow">Made by You</div><h2>See what people are making.</h2><p className="muted">Real Moore Made projects, shared by the people who ordered them.</p></div>
-            <Link className="textLink showcaseViewAll" href="/made-by-you">View the full showcase →</Link>
+            <Link className="textLink showcaseViewAll" href="/made-by-you">View all reviews →</Link>
           </div>
-          {showcasePosts.length ? (
-            <div className="showcaseGrid homeShowcaseGrid">{showcasePosts.map((post) => <ShowcaseCard post={post} key={post.id} />)}</div>
-          ) : (
-            <div className="showcasePreviewEmpty">
-              {["Customer project", "Customer project", "Customer project"].map((label, index) => <div className="showcasePlaceholder card" key={index}><span>{label}</span><strong>Made by You</strong></div>)}
-              <div className="showcaseEmptyAction"><p>Already have a Moore Made order you love?</p><Link className="btn secondary" href="/made-by-you/submit">Share your order</Link></div>
-            </div>
-          )}
+          <HomeShowcaseCarousel posts={showcasePosts} />
         </div>
       </section>
     </>

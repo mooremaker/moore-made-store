@@ -2228,3 +2228,276 @@ p { line-height: 1.65; }
     font-size: 10.4vw !important;
   }
 }
+
+/* Phase 6.5 — compact mobile homepage + single-review carousel */
+.homeShowcaseCarousel {
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+.homeShowcaseStage .showcaseCard {
+  width: 100%;
+}
+.homeShowcaseControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.showcaseArrow {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  display: inline-grid;
+  place-items: center;
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.showcaseArrow:hover { background: #f3eee7; }
+.showcaseArrow:disabled { opacity: .35; cursor: default; }
+.homeShowcaseCounter {
+  min-width: 54px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 850;
+}
+.homeShowcasePlaceholder { min-height: 250px; }
+.homeShowcaseFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+@media (max-width: 760px) {
+  /* Keep the popular-product line on exactly one line. */
+  .heroCategoryLine {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100%;
+    gap: 0 !important;
+    margin-top: 16px !important;
+    font-size: clamp(.56rem, 2.45vw, .68rem) !important;
+    line-height: 1.2 !important;
+    letter-spacing: -.015em !important;
+    white-space: nowrap !important;
+  }
+  .ideaItem {
+    flex: 0 0 auto;
+    white-space: nowrap !important;
+  }
+  .ideaItem:not(:first-child)::before {
+    margin: 0 clamp(4px, 1.5vw, 7px) !important;
+  }
+
+  /* Make the how-it-works section much shorter and easier to scan. */
+  .processSection {
+    padding: 16px 0 20px !important;
+  }
+  .processSection .sectionIntro {
+    margin-bottom: 12px !important;
+  }
+  .processSection .sectionIntro h2 {
+    margin-top: 4px;
+    margin-bottom: 5px;
+    font-size: clamp(1.6rem, 7.2vw, 2rem) !important;
+    line-height: 1 !important;
+  }
+  .processLead {
+    margin-top: 4px !important;
+    font-size: .82rem !important;
+    line-height: 1.42 !important;
+  }
+  .processGrid {
+    gap: 8px !important;
+  }
+  .processCard {
+    min-height: 0 !important;
+    padding: 13px 14px !important;
+    border-radius: 15px !important;
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    column-gap: 11px !important;
+    row-gap: 3px !important;
+    align-items: center !important;
+  }
+  .stepNumber {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    min-width: 38px !important;
+    width: 38px;
+    height: 28px !important;
+    padding: 0 !important;
+    font-size: .67rem !important;
+  }
+  .processCard h3 {
+    grid-column: 2;
+    margin: 0 !important;
+    font-size: .95rem !important;
+    line-height: 1.2 !important;
+  }
+  .processCard p {
+    grid-column: 2;
+    margin: 1px 0 0 !important;
+    font-size: .78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Homepage reviews: one card, compact header, arrows underneath. */
+  .homeShowcaseSection {
+    padding: 17px 0 28px !important;
+  }
+  .showcaseSectionHead {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) auto;
+    align-items: end !important;
+    gap: 6px 12px !important;
+    margin-bottom: 12px !important;
+  }
+  .showcaseSectionHead > div { min-width: 0; }
+  .showcaseSectionHead h2 {
+    margin: 3px 0 0 !important;
+    font-size: clamp(1.65rem, 7.5vw, 2.1rem) !important;
+    line-height: 1 !important;
+  }
+  .showcaseSectionHead p {
+    display: none;
+  }
+  .showcaseViewAll {
+    align-self: end;
+    font-size: .76rem !important;
+    white-space: nowrap;
+  }
+  .homeShowcaseCarousel {
+    width: 100%;
+  }
+  .homeShowcaseStage .showcasePhoto {
+    aspect-ratio: 16 / 10;
+  }
+  .homeShowcaseStage .showcaseBody {
+    padding: 14px !important;
+  }
+  .homeShowcaseStage .showcaseMeta {
+    font-size: .66rem !important;
+  }
+  .homeShowcaseStage .showcaseBody h3 {
+    margin: 8px 0 4px !important;
+    font-size: 1rem !important;
+  }
+  .homeShowcaseStage .showcaseReview {
+    margin: 0 0 10px !important;
+    font-size: .84rem !important;
+    line-height: 1.42 !important;
+  }
+  .homeShowcaseStage .textLink {
+    font-size: .78rem;
+  }
+  .homeShowcaseControls {
+    margin-top: 9px;
+    gap: 10px;
+  }
+  .showcaseArrow {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+  .homeShowcasePlaceholder {
+    min-height: 180px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .heroCategoryLine {
+    font-size: .54rem !important;
+  }
+  .ideaItem:not(:first-child)::before {
+    margin: 0 4px !important;
+  }
+}
+
+/* Phase 6.6 — desktop showcase polish + one-line mobile process heading */
+
+/* Desktop homepage showcase should use the width of the page instead of floating as a narrow card. */
+@media (min-width: 761px) {
+  .homeShowcaseCarousel {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .homeShowcaseStage .showcaseCard {
+    display: grid;
+    grid-template-columns: minmax(300px, .9fr) minmax(0, 1.1fr);
+    min-height: 285px;
+  }
+
+  .homeShowcaseStage .showcasePhoto {
+    aspect-ratio: auto;
+    min-height: 285px;
+    height: 100%;
+  }
+
+  .homeShowcaseStage .showcaseBody {
+    padding: 30px 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .homeShowcaseStage .showcaseBody h3 {
+    font-size: 1.35rem;
+    margin: 14px 0 8px;
+  }
+
+  .homeShowcaseStage .showcaseReview {
+    font-size: 1rem;
+    line-height: 1.65;
+    margin-bottom: 20px;
+  }
+
+  .homeShowcaseControls {
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+
+  /* When there are no reviews yet, use a short full-width empty state. */
+  .homeShowcaseEmpty {
+    width: 100%;
+  }
+
+  .homeShowcasePlaceholder {
+    min-height: 155px;
+    padding: 28px 32px;
+    justify-content: center;
+  }
+
+  .homeShowcaseFooter {
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  /* Keep this section title on one line; shrink it instead of wrapping. */
+  .processSection .sectionIntro h2 {
+    max-width: 100% !important;
+    font-size: clamp(1rem, 5.5vw, 1.75rem) !important;
+    line-height: 1 !important;
+    letter-spacing: -.035em !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+
+  /* Undo the desktop horizontal review layout on phones. */
+  .homeShowcaseStage .showcaseCard {
+    display: block !important;
+    min-height: 0 !important;
+  }
+}
