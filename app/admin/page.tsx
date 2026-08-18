@@ -7,7 +7,7 @@ import type { QuoteRecord } from "@/lib/quote-types";
 import { AdminWorkspace, type AdminRequestRow, type AdminShowcaseRow } from "@/components/AdminWorkspace";
 import { MESSAGE_BUCKET } from "@/lib/message-server";
 import type { AdminMessageThread, AdminUserOption, MessageAttachment, MessageEntry, MessageTopic, MessageThreadStatus } from "@/lib/message-types";
-import { EXPENSE_RECEIPT_BUCKET, type BusinessExpenseReceipt, type BusinessExpenseRow, type FinancialPaymentRow } from "@/lib/finance-types";
+import { EXPENSE_RECEIPT_BUCKET, FUNDING_DOCUMENT_BUCKET, type BusinessExpenseReceipt, type BusinessExpenseRow, type BusinessFundingDocument, type BusinessFundingRow, type FinancialPaymentRow } from "@/lib/finance-types";
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -117,6 +117,7 @@ export default async function AdminPage() {
   const { data: showcaseData, error: showcaseError } = await supabase
     .from("showcase_posts")
     .select("id,customer_name,business_name,email,product,rating,review,caption,social_handle,status,photo_paths,created_at")
+    .neq("status", "draft")
     .order("created_at", { ascending: false });
   const showcaseRows = (showcaseData ?? []) as ShowcaseRow[];
   const showcaseWithPhotos: AdminShowcaseRow[] = await Promise.all(showcaseRows.map(async (row) => ({
@@ -201,6 +202,33 @@ export default async function AdminPage() {
       .map((receipt) => ({ ...receipt, url: signedExpenseReceiptById.get(receipt.id) || null })),
   }));
 
+
+  const { data: fundingData, error: fundingError } = await supabase
+    .from("business_funding_entries")
+    .select("id,entry_date,party_name,party_kind,entry_type,amount_cents,payment_method,reference,note,ownership_percent,recorded_by,voided_at,void_reason,created_at")
+    .order("entry_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  const baseFunding = (fundingData ?? []) as BusinessFundingRow[];
+
+  const { data: fundingDocumentData, error: fundingDocumentError } = await supabase
+    .from("business_funding_documents")
+    .select("id,funding_entry_id,storage_path,original_filename,mime_type,size_bytes,created_at")
+    .order("created_at", { ascending: true });
+  const fundingDocuments = (fundingDocumentData ?? []) as BusinessFundingDocument[];
+  const signedFundingDocumentById = new Map<string, string>();
+  if (!fundingDocumentError) {
+    for (const document of fundingDocuments) {
+      const { data: signed } = await supabase.storage.from(FUNDING_DOCUMENT_BUCKET).createSignedUrl(document.storage_path, 3600);
+      if (signed?.signedUrl) signedFundingDocumentById.set(document.id, signed.signedUrl);
+    }
+  }
+  const funding: BusinessFundingRow[] = baseFunding.map((entry) => ({
+    ...entry,
+    documents: fundingDocuments
+      .filter((document) => document.funding_entry_id === entry.id)
+      .map((document) => ({ ...document, url: signedFundingDocumentById.get(document.id) || null })),
+  }));
+
   const messageThreads: AdminMessageThread[] = messageThreadRows.map((thread) => {
     const order = thread.request_id ? requestById.get(thread.request_id) : null;
     const profile = profileByUser.get(thread.customer_user_id);
@@ -266,7 +294,9 @@ export default async function AdminPage() {
       messagesReady={!messageError && !messageEntryError && !messageAttachmentError}
       payments={payments}
       expenses={expenses}
+      funding={funding}
       financialsReady={!paymentError && !expenseError && !expenseReceiptError}
+      fundingReady={!fundingError && !fundingDocumentError}
     />
   </div>;
 }

@@ -23,5 +23,5 @@ export function ShowcaseDeleteButton({ id }: { id: string }) {
     router.refresh();
   }
 
-  return <button className="btn secondary dangerButton" type="button" onClick={remove} disabled={busy}>{busy ? "Deleting…" : "Delete"}</button>;
+  return <button className="btn secondary dangerButton" type="button" onClick={remove} disabled={busy}>{busy ? "Deleting…" : "Delete review"}</button>;
 }

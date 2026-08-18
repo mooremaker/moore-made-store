@@ -962,7 +962,9 @@ p { line-height: 1.65; }
 .adminTopbarRedesign h1 { font-size: clamp(2.6rem, 5.5vw, 4.8rem); }
 .adminTopbarRedesign p { margin: 8px 0 0; color: var(--muted); max-width: 680px; }
 
-.adminStatsModern { grid-template-columns: repeat(7, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
+.adminStatsModern { grid-template-columns: repeat(12, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
+.adminStatsModern > .adminStatButton { grid-column: span 3; }
+.adminStatsModern > .adminStatButton:nth-child(n+5) { grid-column: span 4; }
 .adminStatButton {
   appearance: none;
   text-align: left;
@@ -1121,18 +1123,18 @@ p { line-height: 1.65; }
 .adminShowcaseCompact .adminShowcasePhotos { margin: 0 0 14px; }
 
 @media (max-width: 1050px) {
-  .adminStatsModern { grid-template-columns: repeat(7,minmax(0,1fr)); }
+  .adminStatsModern { grid-template-columns: repeat(12, minmax(0,1fr)); }
+  .adminStatsModern > .adminStatButton { grid-column: span 3; }
+  .adminStatsModern > .adminStatButton:nth-child(n+5) { grid-column: span 4; }
   .adminRequestSummary { grid-template-columns: minmax(220px,1fr) minmax(250px,.9fr); }
   .adminRequestQuickActions { grid-column: 1 / -1; grid-template-columns: minmax(180px,240px) 160px; justify-content: end; }
-}
-
-@media (max-width: 900px) {
-  .adminStatsModern { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 
 @media (max-width: 760px) {
   .adminPageRedesign { width: min(100% - 20px, 1220px); padding-top: 24px; }
   .adminStatsModern { grid-template-columns: repeat(2,1fr); }
+  .adminStatsModern > .adminStatButton,
+  .adminStatsModern > .adminStatButton:nth-child(n+5) { grid-column: auto; }
   .adminWorkspaceTabs { width: 100%; }
   .adminWorkspaceTabs button { flex: 1; }
   .adminInboxToolbar { grid-template-columns: 1fr; }
@@ -1150,6 +1152,8 @@ p { line-height: 1.65; }
 
 @media (max-width: 500px) {
   .adminStatsModern { grid-template-columns: 1fr 1fr; gap: 7px; }
+  .adminStatsModern > .adminStatButton,
+  .adminStatsModern > .adminStatButton:nth-child(n+5) { grid-column: auto; }
   .adminStatButton { padding: 13px; }
   .adminStatButton strong { font-size: 1.45rem; }
   .adminStatButton small { display: none; }
@@ -2503,5 +2507,1643 @@ p { line-height: 1.65; }
   .homeShowcaseStage .showcaseCard {
     display: block !important;
     min-height: 0 !important;
+  }
+}
+
+/* Phase 6.7 — admin Made by You photo editor */
+.showcasePhotoManager { display:grid; gap:10px; margin-bottom:14px; }
+.adminShowcasePhotosEditable { margin:0; }
+.adminShowcasePhotoEdit { min-width:0; display:grid; gap:6px; }
+.adminShowcasePhotoEdit > a { margin:0; }
+.showcasePhotoRemove {
+  border:1px solid #d8b8b4;
+  border-radius:9px;
+  min-height:34px;
+  padding:7px 9px;
+  background:#fff7f6;
+  color:#7a3030;
+  font:inherit;
+  font-size:.76rem;
+  font-weight:850;
+  cursor:pointer;
+}
+.showcasePhotoRemove:hover { background:#fbe9e7; }
+.showcasePhotoRemove:disabled { opacity:.55; cursor:wait; }
+.showcasePhotoAdminBar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid #e5dfd6; border-radius:11px; background:#fff; }
+.showcasePhotoAdminBar > div { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+.showcasePhotoAdminBar strong { font-size:.86rem; }
+.showcasePhotoAdminBar span { color:var(--muted); font-size:.76rem; }
+.showcasePhotoAdd { position:relative; min-height:36px; padding:8px 12px; font-size:.78rem; cursor:pointer; }
+.showcasePhotoAdd input { position:absolute; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
+.showcasePhotoAdd.isDisabled { opacity:.55; pointer-events:none; }
+.showcasePhotoFeedback { margin:0; }
+@media (max-width:760px) {
+  .showcasePhotoAdminBar { align-items:stretch; flex-direction:column; }
+  .showcasePhotoAdd { width:100%; }
+}
+
+/* Phase 6.7 — admin Made by You photo editor */
+.showcasePhotoManager { display:grid; gap:10px; margin-bottom:14px; }
+.adminShowcasePhotosEditable { margin:0; }
+.adminShowcasePhotoEdit { min-width:0; display:grid; gap:6px; }
+.adminShowcasePhotoEdit > a { margin:0; }
+.showcasePhotoRemove { border:1px solid #d8b8b4; border-radius:9px; min-height:34px; padding:7px 9px; background:#fff7f6; color:#7a3030; font:inherit; font-size:.76rem; font-weight:850; cursor:pointer; }
+.showcasePhotoRemove:hover { background:#fbe9e7; }
+.showcasePhotoRemove:disabled { opacity:.55; cursor:wait; }
+.showcasePhotoAdminBar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid #e5dfd6; border-radius:11px; background:#fff; }
+.showcasePhotoAdminBar > div { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+.showcasePhotoAdminBar strong { font-size:.86rem; }
+.showcasePhotoAdminBar span { color:var(--muted); font-size:.76rem; }
+.showcasePhotoAdd { position:relative; min-height:36px; padding:8px 12px; font-size:.78rem; cursor:pointer; }
+.showcasePhotoAdd input { position:absolute; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
+.showcasePhotoAdd.isDisabled { opacity:.55; pointer-events:none; }
+.showcasePhotoFeedback { margin:0; }
+@media (max-width:760px) { .showcasePhotoAdminBar { align-items:stretch; flex-direction:column; } .showcasePhotoAdd { width:100%; } }
+
+/* Phase 6.8 — customer-owned Made by You drafts + editing */
+.reviewEditorActions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.reviewEditorActions .dangerText { margin-left:auto; }
+.dangerText { color:#8a302d !important; }
+.customerReviewPhotoGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.customerReviewPhoto { border:1px solid var(--border); background:#fff; border-radius:14px; overflow:hidden; padding-bottom:9px; }
+.customerReviewPhoto a { display:block; aspect-ratio:4/3; overflow:hidden; background:#eee8df; }
+.customerReviewPhoto img { width:100%; height:100%; object-fit:cover; display:block; }
+.customerReviewPhoto .textButton { margin:8px 10px 0; }
+.accountShowcaseActions { display:flex; align-items:center; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
+.accountShowcaseRow > div:first-child { display:grid; gap:4px; }
+.accountShowcaseRow .btn { min-height:36px; padding:8px 12px; font-size:.8rem; }
+@media (max-width:760px) {
+  .customerReviewPhotoGrid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .reviewEditorActions { display:grid; grid-template-columns:1fr 1fr; }
+  .reviewEditorActions .dangerText { grid-column:1/-1; margin-left:0; justify-self:start; }
+  .accountShowcaseRow { align-items:flex-start !important; gap:12px; }
+  .accountShowcaseActions { width:100%; justify-content:space-between; }
+}
+@media (max-width:430px) { .customerReviewPhotoGrid { grid-template-columns:1fr; } }
+
+/* Phase 6.9 — preserve review progress through sign-in */
+.reviewSignInNote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.reviewSignInButton { flex: 0 0 auto; }
+.reviewSelectedFiles {
+  margin-top: 8px;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #faf8f4;
+  font-size: .78rem;
+  color: var(--muted);
+}
+.reviewSelectedFiles strong { color: var(--ink); font-size: .8rem; }
+.reviewSelectedFiles span { overflow-wrap: anywhere; }
+@media (max-width: 680px) {
+  .reviewSignInNote { align-items: stretch; flex-direction: column; }
+  .reviewSignInButton { width: 100%; }
+}
+
+/* Phase 6.10 — consistent email sign-in + OTP fallback */
+.authOtpFallback {
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #faf8f4;
+}
+.authOtpFallback > strong { display: block; margin-bottom: 4px; }
+.authOtpFallback > p { margin: 0 0 12px; }
+.authOtpForm { display: grid; gap: 10px; }
+.authOtpForm .btn { width: fit-content; }
+@media (max-width: 760px) {
+  .authOtpFallback { padding: 13px; }
+  .authOtpForm .btn { width: 100%; }
+}
+
+
+/* Phase 6.11 — compact printable payment receipts */
+.receiptPage {
+  max-width: 900px;
+  padding-top: 26px;
+  padding-bottom: 48px;
+}
+.receiptActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.receiptPaper {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: clamp(24px, 5vw, 44px);
+  box-shadow: 0 16px 42px rgba(0,0,0,.045);
+}
+.receiptHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.receiptLogo {
+  display: block !important;
+  width: 190px !important;
+  max-width: 190px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  flex: 0 0 190px;
+}
+.receiptTitle {
+  text-align: right;
+  min-width: 0;
+}
+.receiptTitle h1 {
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  line-height: .95;
+  margin: 6px 0 8px;
+  letter-spacing: -.04em;
+}
+.receiptTitle p { margin: 0; color: var(--muted); }
+.receiptRule { height: 1px; background: var(--border); margin: 24px 0; }
+.receiptCustomerGrid,
+.receiptPaymentBox,
+.receiptTotals {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--border);
+}
+.receiptCustomerGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.receiptPaymentBox { grid-template-columns: repeat(2,minmax(0,1fr)); margin-top: 14px; }
+.receiptTotals { margin-top: 14px; }
+.receiptCustomerGrid > div,
+.receiptPaymentBox > div,
+.receiptTotals > div {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+  background: #fff;
+}
+.receiptCustomerGrid span,
+.receiptPaymentBox span,
+.receiptTotals span {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.receiptCustomerGrid strong,
+.receiptPaymentBox strong,
+.receiptTotals strong { overflow-wrap: anywhere; }
+.receiptTotals > div { grid-template-columns: 1fr auto; align-items: center; }
+.receiptBalance { border-top: 2px solid var(--ink); }
+.receiptFooter { margin-top: 24px; line-height: 1.55; }
+.receiptFooter p { margin: 8px 0; }
+.receiptFinalSaleNotice {
+  margin-top: 16px !important;
+  padding: 13px 14px;
+  border-radius: 12px;
+  background: #f6f1e9;
+}
+.receiptFooter small { display: block; margin-top: 18px; color: var(--muted); }
+@media (max-width: 620px) {
+  .receiptPage { width: min(100% - 20px, 900px); padding-top: 16px; }
+  .receiptPaper { border-radius: 16px; padding: 20px; }
+  .receiptHeader { flex-direction: column; gap: 18px; }
+  .receiptLogo { width: 154px !important; max-width: 154px !important; flex-basis: 154px; }
+  .receiptTitle { text-align: left; }
+  .receiptCustomerGrid,
+  .receiptPaymentBox { grid-template-columns: 1fr; }
+}
+@media print {
+  .siteHeader,
+  .siteFooter,
+  .receiptActions { display: none !important; }
+  body { background: #fff !important; }
+  .receiptPage { width: 100% !important; max-width: none !important; padding: 0 !important; }
+  .receiptPaper { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .receiptLogo { width: 165px !important; max-width: 165px !important; }
+}
+
+/* Phase 6.12 — calmer requests, clearer sign-in, compact review galleries, funding ledger */
+.optionalLabel {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Custom request: keep required basics forward-facing and tuck optional detail away. */
+.requestFormRedesign { gap: 14px; }
+.requestEssentialsBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 15px;
+  border: 1px solid #ddd5ca;
+  border-radius: 14px;
+  background: #faf8f4;
+}
+.requestEssentialsBar > div:first-child { display: grid; gap: 2px; }
+.requestEssentialsBar strong { font-size: .92rem; }
+.requestEssentialsBar > div:first-child span { color: var(--muted); font-size: .78rem; }
+.requestTimingChips { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.requestTimingChips span {
+  border: 1px solid #ded6ca;
+  border-radius: 999px;
+  background: #fff;
+  padding: 6px 9px;
+  color: #544d45;
+  font-size: .7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.requestAccordion .formAccordionBody { gap: 11px; }
+.requestOptionalDetails {
+  overflow: hidden;
+  border: 1px solid #e7e1d8;
+  border-radius: 11px;
+  background: #fbfaf7;
+}
+.requestOptionalDetails > summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: #3f3a35;
+  font-size: .8rem;
+  font-weight: 850;
+}
+.requestOptionalDetails > summary::-webkit-details-marker { display: none; }
+.requestOptionalDetails > summary::after { content: "+"; color: var(--muted); font-size: 1rem; }
+.requestOptionalDetails[open] > summary::after { content: "−"; }
+.requestOptionalDetails > summary span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: .66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+.requestOptionalBody { display: grid; gap: 11px; padding: 0 12px 12px; border-top: 1px solid #ece7df; }
+.requestOptionalBody > :first-child { margin-top: 11px; }
+.requestArtworkField { margin-bottom: 1px; }
+.artworkIdeaCompact {
+  margin-top: 7px;
+  padding: 9px 11px;
+  border-left: 3px solid #c8b29a;
+  background: #faf6ef;
+  color: #514a43;
+  font-size: .78rem;
+  line-height: 1.45;
+}
+.artworkQualityDetails { color: var(--muted); font-size: .76rem; }
+.artworkQualityDetails summary { cursor: pointer; font-weight: 800; color: #514b44; }
+.artworkQualityDetails p { margin: 7px 0 0; line-height: 1.5; }
+.requestSubmitRow { align-items: center; }
+.requestSubmitRow .submitHint { max-width: 520px; }
+
+/* Email sign-in: code first, one email, link remains an optional shortcut. */
+.authIntroCompact { display: grid; gap: 5px; margin-bottom: 2px; }
+.authIntroCompact p { margin: 0; color: var(--muted); line-height: 1.5; }
+.authOtpPrimary {
+  width: 100%;
+  display: grid;
+  gap: 11px;
+  margin: 8px 0 2px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #faf8f4;
+}
+.authCodeField input {
+  max-width: 260px;
+  font-size: 1.35rem;
+  font-weight: 850;
+  letter-spacing: .16em;
+  text-align: center;
+}
+.authEmailChoice { margin: 0; max-width: 560px; }
+.authSecondaryActions { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.authSecondaryActions .textButton { font-size: .78rem; }
+.authSecondaryActions .textButton:disabled { opacity: .5; cursor: default; }
+
+/* Compact Made by You galleries. */
+.showcaseAdminGallery { display: grid; gap: 8px; max-width: 640px; }
+.showcaseAdminStage,
+.showcasePublicGallery { position: relative; overflow: hidden; background: #eee8df; }
+.showcaseAdminStage {
+  width: min(100%, 540px);
+  height: clamp(220px, 30vw, 310px);
+  border: 1px solid #e0d9d0;
+  border-radius: 13px;
+}
+.showcaseAdminStage > a { display: block; width: 100%; height: 100%; }
+.showcaseAdminStage img,
+.showcasePublicGallery img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.showcaseGalleryArrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: rgba(20,20,20,.68);
+  color: #fff;
+  font: inherit;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.showcaseGalleryArrow.isPrevious { left: 9px; }
+.showcaseGalleryArrow.isNext { right: 9px; }
+.showcaseGalleryCount {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  z-index: 2;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(20,20,20,.68);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 850;
+}
+.showcaseAdminThumbs { display: flex; gap: 6px; max-width: 540px; overflow-x: auto; padding: 1px 0 3px; }
+.showcaseAdminThumbs button {
+  flex: 0 0 54px;
+  height: 44px;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #eee8df;
+  cursor: pointer;
+  opacity: .7;
+}
+.showcaseAdminThumbs button.isActive { border-color: #171717; opacity: 1; }
+.showcaseAdminThumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.showcaseCurrentPhotoActions { max-width: 540px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.showcaseCurrentPhotoActions .showcasePhotoRemove { flex: 0 0 auto; }
+.showcaseNoPhotos {
+  display: grid;
+  gap: 3px;
+  max-width: 540px;
+  padding: 18px;
+  border: 1px dashed #d6cdc1;
+  border-radius: 13px;
+  background: #faf8f4;
+}
+.showcaseNoPhotos span { color: var(--muted); font-size: .8rem; }
+.showcasePublicGallery { aspect-ratio: 4/3; }
+.showcasePublicGallery img { object-fit: cover; }
+.showcaseGalleryDots {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+  z-index: 2;
+}
+.showcaseGalleryDots button { width: 6px; height: 6px; border: 0; border-radius: 999px; padding: 0; background: rgba(255,255,255,.55); cursor: pointer; }
+.showcaseGalleryDots button.isActive { width: 16px; background: #fff; }
+.adminShowcaseCompact .adminRequestExpanded { display: grid; grid-template-columns: minmax(300px,.85fr) minmax(0,1.15fr); gap: 14px; align-items: start; }
+.adminShowcaseCompact .adminRequestExpanded > .adminDetailGrid { align-self: stretch; }
+
+/* Finance: quick actions stay visible; funding gets a permanent audit trail. */
+.financeIntroRedesign { align-items: flex-start; }
+.financeExportActions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.financeQuickActions {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 9px;
+  margin: 3px 0 14px;
+}
+.financeQuickActions button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0,1fr);
+  grid-template-rows: auto auto;
+  column-gap: 9px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.financeQuickActions button > span { grid-row: 1 / 3; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: #f3eee7; font-size: 1rem; font-weight: 900; }
+.financeQuickActions button strong { font-size: .82rem; }
+.financeQuickActions button small { min-width: 0; color: var(--muted); font-size: .68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.financeQuickActions button:hover,
+.financeQuickActions button.active { border-color: #aaa095; background: #faf8f4; }
+.financeQuickActions button:disabled { opacity: .45; cursor: not-allowed; }
+.financeQuickFormCard { display: grid; gap: 14px; padding: 18px; margin-bottom: 15px; }
+.financeQuickFormCard form { display: grid; gap: 12px; }
+.financeMetricGridCompact { grid-template-columns: repeat(5,minmax(0,1fr)); }
+.fundingLegalWarning { display: grid; gap: 6px; padding: 12px; border: 1px solid #d7bea0; border-radius: 11px; background: #fcf6ed; }
+.fundingLegalWarning > span { color: #67584b; font-size: .78rem; line-height: 1.45; }
+.fundingOverview { padding: 17px; display: grid; gap: 12px; }
+.ownershipLock { padding: 7px 10px; border: 1px solid #d8d0c5; border-radius: 999px; background: #faf8f4; font-size: .72rem; font-weight: 850; white-space: nowrap; }
+.fundingPartyGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.fundingPartyGrid article { border: 1px solid #e5dfd6; border-radius: 11px; background: #fff; padding: 12px; display: grid; gap: 7px; }
+.fundingPartyGrid article > strong { font-size: .9rem; margin-bottom: 2px; }
+.fundingPartyGrid article > div { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #eee9e2; padding-top: 6px; font-size: .74rem; }
+.fundingPartyGrid span { color: var(--muted); }
+.fundingDocumentList { display: flex; gap: 5px; flex-wrap: wrap; }
+.fundingDocumentList a { text-decoration: underline; text-underline-offset: 2px; font-size: .73rem; font-weight: 800; }
+.fundingTable tr.isVoided { opacity: .48; text-decoration: line-through; }
+.fundingTable td small { display: block; margin-top: 3px; color: var(--muted); font-size: .68rem; }
+
+@media (max-width: 980px) {
+  .adminShowcaseCompact .adminRequestExpanded { grid-template-columns: 1fr; }
+  .showcaseAdminGallery, .showcaseAdminStage, .showcaseCurrentPhotoActions { max-width: 100%; width: 100%; }
+  .financeMetricGridCompact { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .fundingPartyGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 680px) {
+  .requestEssentialsBar { align-items: flex-start; flex-direction: column; padding: 11px 12px; }
+  .requestTimingChips { justify-content: flex-start; }
+  .requestTimingChips span { font-size: .67rem; }
+  .requestOptionalDetails > summary { min-height: 42px; }
+  .authOtpPrimary { padding: 13px; }
+  .authCodeField input { max-width: none; width: 100%; }
+  .authSecondaryActions { display: grid; gap: 8px; }
+  .showcaseAdminStage { height: 235px; }
+  .showcaseCurrentPhotoActions { align-items: stretch; flex-direction: column; }
+  .showcaseCurrentPhotoActions .showcasePhotoRemove { width: 100%; }
+  .showcaseGalleryArrow { width: 32px; height: 32px; }
+  .financeQuickActions { grid-template-columns: 1fr; }
+  .financeMetricGridCompact { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .fundingPartyGrid { grid-template-columns: 1fr; }
+  .ownershipLock { white-space: normal; }
+}
+.requestTrackingBar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.requestTrackingBar > div, .requestTrackingBar > span { display:grid; gap:2px; }
+.requestTrackingBar small { color:var(--muted); font-size:.75rem; }
+.requestTrackingBar .btn { flex:0 0 auto; min-height:36px; padding:8px 13px; text-decoration:none; }
+@media (max-width:680px) { .requestTrackingBar { align-items:stretch; flex-direction:column; } .requestTrackingBar .btn { width:100%; } }
+
+/* =========================================================
+   Phase 6.13 — photo-first reviews + compact mobile cleanup
+   ========================================================= */
+
+/* Public Made by You cards are now photo-first. The review lives in a
+   translucent panel over the image so long reviews no longer force huge cards. */
+.showcaseOverlayCard {
+  position: relative;
+  padding: 0 !important;
+  overflow: hidden;
+  background: #1f1d1a;
+}
+.showcaseMedia {
+  position: relative;
+  width: 100%;
+  height: 390px;
+  overflow: hidden;
+  background: #27231f;
+}
+.showcaseOverlayCard .showcasePhoto,
+.showcaseOverlayCard .showcasePublicGallery {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto !important;
+  border-radius: 0;
+  background: #27231f;
+}
+.showcasePublicGallery {
+  isolation: isolate;
+  outline: none;
+}
+.showcaseGalleryBackdrop {
+  position: absolute;
+  inset: -18px;
+  z-index: 0;
+  width: calc(100% + 36px) !important;
+  height: calc(100% + 36px) !important;
+  object-fit: cover !important;
+  filter: blur(22px);
+  opacity: .34;
+  transform: scale(1.05);
+}
+.showcaseGalleryImage {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block;
+}
+.showcasePhotoFallback {
+  z-index: 1;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: linear-gradient(145deg,#eee8df,#d9d0c5) !important;
+  color: #5d554c;
+}
+.showcasePhotoFallback span { font-size: 1.15rem; font-weight: 900; }
+.showcasePhotoFallback small { font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
+
+.showcaseReviewOverlay {
+  position: absolute;
+  z-index: 5;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  max-height: 172px;
+  overflow: hidden;
+  padding: 14px 16px 13px;
+  border: 1px solid rgba(255,255,255,.58);
+  border-radius: 16px;
+  background: rgba(250,248,244,.88);
+  box-shadow: 0 12px 34px rgba(0,0,0,.18);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
+  backdrop-filter: blur(14px) saturate(1.05);
+  color: var(--ink);
+  transition: max-height .22s ease, background .22s ease;
+}
+.showcaseOverlayCard.isReviewExpanded .showcaseReviewOverlay {
+  max-height: calc(100% - 24px);
+  background: rgba(250,248,244,.95);
+}
+.showcaseOverlayMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  color: #625b53;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+.showcaseOverlayMeta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.showcaseOverlayCard h3 {
+  margin: 7px 0 5px;
+  font-size: 1.08rem;
+  line-height: 1.15;
+}
+.showcaseOverlayReviewScroll {
+  min-height: 0;
+  max-height: 48px;
+  overflow: hidden;
+  transition: max-height .22s ease;
+}
+.showcaseOverlayCard.isReviewExpanded .showcaseOverlayReviewScroll {
+  max-height: min(270px, 45vh);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.showcaseOverlayCard .showcaseReview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  color: #3f3a35;
+  font-size: .86rem;
+  line-height: 1.42;
+}
+.showcaseOverlayCard.isReviewExpanded .showcaseReview {
+  display: block;
+  overflow: visible;
+  margin-bottom: 8px;
+}
+.showcaseCaption {
+  margin: 0 0 7px;
+  color: #625b53;
+  font-size: .78rem;
+  line-height: 1.4;
+}
+.showcaseOverlayActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.showcaseReviewToggle {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.showcaseOverlayCta { font-size: .76rem; white-space: nowrap; }
+
+/* Photo controls stay on the image and always browse every photo for the review. */
+.showcaseGalleryArrow { z-index: 7; }
+.showcaseGalleryCount {
+  top: 12px !important;
+  bottom: auto !important;
+  left: 12px !important;
+  right: auto !important;
+  z-index: 7;
+}
+.showcaseGalleryDots {
+  top: 17px !important;
+  bottom: auto !important;
+  z-index: 7;
+}
+
+/* Homepage: one random approved review loads first, then auto-rotates through all
+   approved reviews. Review navigation sits on the card instead of awkwardly below it. */
+.homeShowcaseCarousel {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.homeShowcaseStage {
+  position: relative;
+  width: min(100%, 920px);
+  margin: 0 auto;
+}
+.homeShowcaseStage .showcaseCard {
+  display: block !important;
+  width: 100%;
+  min-height: 0 !important;
+}
+.homeShowcaseStage .showcaseMedia {
+  height: clamp(390px, 44vw, 520px);
+}
+.homeShowcaseControls {
+  position: absolute;
+  z-index: 10;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 0 !important;
+  padding: 5px;
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 999px;
+  background: rgba(20,20,20,.66);
+  box-shadow: 0 7px 20px rgba(0,0,0,.16);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+}
+.homeShowcaseControls .showcaseArrow {
+  width: 29px;
+  height: 29px;
+  border-color: rgba(255,255,255,.45);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: .85rem;
+}
+.homeShowcaseControls .showcaseArrow:hover { background: rgba(255,255,255,.24); }
+.homeShowcaseControls .homeShowcaseCounter {
+  min-width: 74px;
+  color: #fff;
+  font-size: .66rem;
+  letter-spacing: .01em;
+}
+.homeShowcaseAutoNote { display: none; }
+
+/* Full Made by You page stays compact while still allowing every photo and full review. */
+.showcaseGrid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  align-items: start;
+}
+.showcaseGrid .showcaseMedia { height: 390px; }
+
+/* Admin review photo manager: one photo at a time, obvious per-photo removal,
+   thumbnails to jump between every uploaded image. */
+.showcasePhotoManager {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+}
+.showcasePhotoManagerHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.showcasePhotoManagerHeading > div { display: grid; gap: 2px; }
+.showcasePhotoManagerHeading strong { font-size: .88rem; }
+.showcasePhotoManagerHeading span { color: var(--muted); font-size: .72rem; }
+.showcaseAdminGallery { max-width: 100% !important; }
+.showcaseAdminStage {
+  position: relative;
+  isolation: isolate;
+  width: 100% !important;
+  max-width: 560px !important;
+  height: clamp(220px, 28vw, 300px) !important;
+  overflow: hidden;
+  background: #27231f;
+  outline: none;
+}
+.showcaseAdminStage > a {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.showcaseAdminBackdrop {
+  position: absolute;
+  inset: -16px;
+  z-index: 0;
+  width: calc(100% + 32px) !important;
+  height: calc(100% + 32px) !important;
+  object-fit: cover !important;
+  filter: blur(20px);
+  opacity: .32;
+  transform: scale(1.04);
+}
+.showcaseAdminImage {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+.showcasePhotoRemoveOverlay {
+  position: absolute;
+  z-index: 8;
+  top: 10px;
+  right: 10px;
+  min-height: 31px;
+  padding: 6px 9px;
+  border-color: rgba(255,255,255,.72) !important;
+  background: rgba(123,34,27,.86) !important;
+  color: #fff !important;
+  box-shadow: 0 5px 15px rgba(0,0,0,.18);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.showcasePhotoRemoveOverlay:hover { background: rgba(145,38,30,.96) !important; }
+.showcaseAdminThumbs {
+  max-width: 560px !important;
+  gap: 7px;
+  scrollbar-width: thin;
+}
+.showcaseAdminThumbs button {
+  position: relative;
+  flex-basis: 62px;
+  height: 49px;
+}
+.showcaseAdminThumbs button > span {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(20,20,20,.7);
+  color: #fff;
+  font-size: .58rem;
+  font-weight: 900;
+}
+.showcaseCurrentPhotoActions {
+  max-width: 560px !important;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Make the admin tabs and site footer stop looking squeezed on narrow phones. */
+@media (max-width: 760px) {
+  .showcaseGrid { grid-template-columns: 1fr; }
+  .showcaseGrid .showcaseMedia { height: clamp(350px, 112vw, 470px); }
+
+  .homeShowcaseStage { width: 100%; }
+  .homeShowcaseStage .showcaseMedia { height: clamp(350px, 112vw, 455px); }
+  .homeShowcaseControls {
+    top: 9px;
+    right: 9px;
+    padding: 4px;
+  }
+  .homeShowcaseControls .showcaseArrow { width: 28px; height: 28px; }
+  .homeShowcaseControls .homeShowcaseCounter { min-width: 69px; font-size: .63rem; }
+
+  .showcaseReviewOverlay {
+    left: 9px;
+    right: 9px;
+    bottom: 9px;
+    max-height: 158px;
+    padding: 12px 13px 11px;
+    border-radius: 14px;
+  }
+  .showcaseOverlayCard.isReviewExpanded .showcaseReviewOverlay { max-height: calc(100% - 18px); }
+  .showcaseOverlayMeta { font-size: .62rem; }
+  .showcaseOverlayCard h3 { margin-top: 6px; font-size: 1rem; }
+  .showcaseOverlayCard .showcaseReview { font-size: .79rem; line-height: 1.38; }
+  .showcaseOverlayActions { gap: 7px; flex-wrap: wrap; }
+  .showcaseReviewToggle, .showcaseOverlayCta { font-size: .7rem; }
+  .showcaseGalleryDots { top: 15px !important; }
+  .showcaseGalleryCount { top: 9px !important; left: 9px !important; }
+
+  .showcasePhotoManagerHeading { align-items: stretch; flex-direction: column; }
+  .showcasePhotoManagerHeading .showcasePhotoAdd { width: 100%; }
+  .showcaseAdminStage { height: 235px !important; max-width: none !important; }
+  .showcasePhotoRemoveOverlay {
+    top: 8px;
+    right: 8px;
+    width: auto !important;
+    font-size: .68rem;
+  }
+
+  .footerInner {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 10px;
+    text-align: center;
+    font-size: .78rem;
+    line-height: 1.4;
+  }
+  .footerLegal {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 560px) {
+  .adminWorkspaceTabs {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 5px;
+    width: 100%;
+    padding: 5px;
+    border-radius: 16px;
+  }
+  .adminWorkspaceTabs button {
+    width: 100%;
+    min-width: 0;
+    border-radius: 11px;
+    padding: 9px 7px;
+    font-size: .75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 380px) {
+  .showcaseReviewOverlay { max-height: 151px; }
+  .showcaseOverlayCta { width: 100%; }
+  .homeShowcaseControls .homeShowcaseCounter { min-width: 63px; }
+}
+
+
+/* =========================================================
+   Phase 6.14 — custom request hero + account status polish
+   ========================================================= */
+.customOrderHero {
+  max-width: 900px;
+}
+.customOrderHero .accountTrackingPrompt {
+  width: 100%;
+  max-width: 900px;
+  padding: 10px 14px;
+}
+.requestSignedInState {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, auto);
+  align-items: center;
+  row-gap: 4px;
+  column-gap: 24px;
+}
+.requestSignedCopy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.requestSignedCopy > span {
+  color: var(--muted);
+  font-size: .72rem;
+}
+.requestSignedCopy strong {
+  color: var(--ink);
+  font-size: .88rem;
+  overflow-wrap: anywhere;
+}
+.requestSignedInState p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.4;
+  text-align: right;
+}
+@media (min-width: 801px) {
+  .customOrderHero h1 {
+    white-space: nowrap;
+    font-size: clamp(3.6rem, 6vw, 5.15rem);
+  }
+}
+@media (max-width: 680px) {
+  .customOrderHero .accountTrackingPrompt {
+    padding: 9px 12px;
+  }
+  .requestSignedInState {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 3px;
+  }
+  .requestSignedInState p {
+    grid-column: 1;
+    text-align: left;
+    margin-top: 1px;
+  }
+}
+
+/* =========================================================
+   Phase 6.15 — compact homepage reviews + full review popup
+   ========================================================= */
+
+/* Keep the showcase heading together. It stays large on desktop and scales down
+   enough to remain a single line on phones instead of breaking awkwardly. */
+.showcaseSectionHead h2 {
+  white-space: nowrap;
+}
+
+/* Replace the oversized single homepage feature with three small project cards. */
+.homeShowcaseCompact {
+  width: 100%;
+  max-width: none;
+}
+.homeCompactReviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+.homeCompactReview {
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 15px;
+  background: #fffdfa;
+}
+.homeCompactReviewMedia {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  background: #e9e2d8;
+  overflow: hidden;
+  cursor: pointer;
+}
+.homeCompactReviewMedia img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform .2s ease;
+}
+.homeCompactReviewMedia:hover img { transform: scale(1.02); }
+.homeCompactReviewFallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #665f57;
+  font-size: .82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.homeCompactPhotoCount {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(20,20,20,.74);
+  color: #fff;
+  font-size: .62rem;
+  font-weight: 900;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.homeCompactReviewBody {
+  display: grid;
+  gap: 6px;
+  padding: 11px 12px 12px;
+}
+.homeCompactReviewMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  min-width: 0;
+  color: #6d655c;
+  font-size: .61rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .045em;
+}
+.homeCompactReviewMeta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.homeCompactReview h3 {
+  margin: 0;
+  font-size: .98rem;
+  line-height: 1.15;
+}
+.homeCompactReviewBody > p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  min-height: 2.55em;
+  color: #514b45;
+  font-size: .74rem;
+  line-height: 1.35;
+}
+.homeCompactReviewActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 1px;
+}
+.homeCompactReviewActions .textLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--ink);
+  font-size: .68rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.homeCompactReviewNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 12px;
+}
+.homeCompactReviewNav .showcaseArrow {
+  width: 32px;
+  height: 32px;
+}
+.homeCompactReviewNav .homeShowcaseCounter {
+  min-width: 132px;
+  text-align: center;
+  font-size: .67rem;
+}
+
+.homeCompactMobileNav {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 9px;
+}
+.homeCompactMobileNav .showcaseArrow {
+  width: 30px;
+  height: 30px;
+}
+.homeCompactMobileNav .homeShowcaseCounter {
+  min-width: 52px;
+  text-align: center;
+  font-size: .67rem;
+  font-weight: 800;
+}
+
+/* Full review/photo experience opens only when someone asks for it. This keeps
+   the homepage fast and compact while preserving every uploaded photo. */
+.showcaseModalBackdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(22,18,16,.68);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+}
+.showcaseModal {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, .92fr);
+  width: min(960px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 20px;
+  background: rgba(249,247,243,.94);
+  box-shadow: 0 28px 80px rgba(0,0,0,.32);
+  -webkit-backdrop-filter: blur(18px) saturate(1.05);
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+.showcaseModalClose {
+  position: absolute;
+  z-index: 20;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: rgba(20,20,20,.72);
+  color: #fff;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.showcaseModalMedia {
+  position: relative;
+  min-height: 430px;
+  background: #2a2621;
+}
+.showcaseModalMedia .showcasePhoto,
+.showcaseModalMedia .showcasePublicGallery {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto !important;
+  border-radius: 0;
+}
+.showcaseModalMedia .showcaseGalleryImage { object-fit: contain !important; }
+.showcaseModalReview {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 26px 24px;
+  background: rgba(250,248,244,.80);
+}
+.showcaseModalMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #655d55;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+.showcaseModalMeta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.showcaseModalReview h3 {
+  margin: 10px 0 10px;
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+.showcaseModalReviewText {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+.showcaseModalReviewText > p:first-child {
+  margin: 0;
+  color: #3f3a35;
+  font-size: .91rem;
+  line-height: 1.58;
+}
+.showcaseModalActions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+.showcaseModalActions .btn { min-height: 40px; padding: 9px 13px; font-size: .75rem; }
+
+@media (max-width: 900px) {
+  .homeCompactReviewMedia { height: 145px; }
+  .homeCompactReviewActions .textLink:last-child { display: none; }
+  .showcaseModal { grid-template-columns: 1fr; width: min(620px, 100%); overflow-y: auto; }
+  .showcaseModalMedia { min-height: min(52vh, 430px); }
+  .showcaseModalReview { min-height: 0; padding: 20px 18px 18px; }
+  .showcaseModalReviewText { overflow: visible; }
+}
+
+@media (max-width: 760px) {
+  .showcaseSectionHead {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) auto;
+    align-items: start !important;
+    gap: 7px 10px !important;
+  }
+  .showcaseSectionHead > div { min-width: 0; }
+  .showcaseSectionHead h2 {
+    margin: 0 0 4px;
+    white-space: nowrap;
+    font-size: clamp(1.1rem, 5.65vw, 1.45rem) !important;
+    letter-spacing: -.035em;
+  }
+  .showcaseSectionHead p { font-size: .73rem; line-height: 1.35; }
+  .showcaseViewAll {
+    align-self: start;
+    margin-top: 19px;
+    font-size: .67rem !important;
+    white-space: nowrap;
+  }
+
+  .homeCompactReviewGrid {
+    display: block;
+    width: 100%;
+    padding: 1px 0 0;
+    overflow: hidden;
+  }
+  .homeCompactReviewGrid > .homeCompactReview:not(:first-child) { display: none; }
+  .homeCompactReview {
+    width: 100%;
+    max-width: none;
+    margin-inline: auto;
+  }
+  .homeCompactReviewMedia { height: 150px; }
+  .homeCompactReviewBody { padding: 9px 10px 10px; }
+  .homeCompactReview h3 { font-size: .91rem; }
+  .homeCompactReviewBody > p { font-size: .7rem; min-height: 0; }
+  .homeCompactReviewActions .textLink { font-size: .65rem; }
+  .homeCompactReviewNav { display: none; }
+  .homeCompactMobileNav { display: flex; }
+
+  .showcaseModalBackdrop { padding: 10px; align-items: center; }
+  .showcaseModal { max-height: calc(100vh - 20px); border-radius: 16px; }
+  .showcaseModalMedia { min-height: min(45vh, 330px); }
+  .showcaseModalReview h3 { font-size: 1.12rem; }
+  .showcaseModalReviewText > p:first-child { font-size: .81rem; line-height: 1.48; }
+  .showcaseModalActions { flex-direction: column; }
+  .showcaseModalActions .btn { width: 100%; }
+}
+
+@media (max-width: 390px) {
+  .showcaseSectionHead h2 { font-size: 1.02rem !important; }
+  .showcaseViewAll { font-size: .62rem !important; }
+  .homeCompactReview { width: 100%; }
+}
+
+/* =========================================================
+   Phase 6.17 — mobile showcase header alignment
+   Keep the review heading clean and make the "View all reviews" link
+   feel attached to the section instead of floating beside the title.
+   ========================================================= */
+@media (max-width: 760px) {
+  .showcaseSectionHead {
+    display: block !important;
+    margin-bottom: 8px;
+  }
+
+  .showcaseSectionHead > div {
+    width: 100%;
+  }
+
+  .showcaseSectionHead h2 {
+    width: 100%;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .showcaseSectionHead p {
+    margin: 3px 0 0;
+  }
+
+  .showcaseViewAll {
+    display: block;
+    width: 100%;
+    margin: 4px 0 0 !important;
+    text-align: right;
+    line-height: 1.2;
+  }
+}
+
+/* =========================================================
+   Phase 6.18 — lighter glass review surfaces
+   Make review copy feel layered over the showcase instead of sitting
+   inside an opaque white panel. Keep enough blur/contrast for legibility.
+   ========================================================= */
+.showcaseReviewOverlay {
+  background: rgba(250,248,244,.48);
+  border-color: rgba(255,255,255,.42);
+  -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  backdrop-filter: blur(10px) saturate(1.08);
+}
+.showcaseOverlayCard.isReviewExpanded .showcaseReviewOverlay {
+  background: rgba(250,248,244,.60);
+}
+
+/* Compact homepage cards should read as light glass rather than a solid white block. */
+.homeCompactReview {
+  background: rgba(255,253,250,.38);
+}
+.homeCompactReviewBody {
+  background: rgba(250,248,244,.44);
+  -webkit-backdrop-filter: blur(8px) saturate(1.04);
+  backdrop-filter: blur(8px) saturate(1.04);
+}
+
+/* Full-review popup: substantially reduce the white wash while retaining readable text. */
+.showcaseModal {
+  background: rgba(249,247,243,.58);
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
+  backdrop-filter: blur(14px) saturate(1.06);
+}
+.showcaseModalReview {
+  background: rgba(250,248,244,.40);
+  -webkit-backdrop-filter: blur(12px) saturate(1.06);
+  backdrop-filter: blur(12px) saturate(1.06);
+}
+
+/* =========================================================
+   Phase 6.19 — review lightbox + photo-first popup
+   Keep the transparent inline review, while making the photo/review easy to
+   open in a larger viewer. Every review photo remains browseable in the popup.
+   ========================================================= */
+.showcaseReviewOverlayClickable {
+  cursor: zoom-in;
+}
+.showcaseReviewOverlayClickable button,
+.showcaseReviewOverlayClickable a {
+  cursor: pointer;
+}
+.showcasePublicGallery.isPhotoClickable .showcaseGalleryImage {
+  cursor: zoom-in;
+}
+
+.showcasePhotoReviewModal {
+  display: block;
+  width: min(920px, 100%);
+  height: min(720px, calc(100vh - 44px));
+  max-height: calc(100vh - 44px);
+  overflow: hidden;
+  background: #26211d;
+}
+.showcasePhotoReviewModal .showcaseModalMedia {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  background: #26211d;
+}
+.showcasePhotoReviewModal .showcaseModalMedia .showcasePhoto,
+.showcasePhotoReviewModal .showcaseModalMedia .showcasePublicGallery {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto !important;
+  border-radius: 0;
+}
+.showcasePhotoReviewModal .showcaseGalleryImage {
+  object-fit: contain !important;
+}
+.showcaseFullSizeLink {
+  position: absolute;
+  z-index: 12;
+  top: 12px;
+  right: 54px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,.68);
+  border-radius: 999px;
+  background: rgba(20,20,20,.68);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 900;
+  text-decoration: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.showcaseFullSizeLink:hover { background: rgba(20,20,20,.82); }
+
+.showcaseModalReviewOverlay {
+  position: absolute;
+  z-index: 10;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  max-height: 164px;
+  overflow: hidden;
+  padding: 14px 16px 13px;
+  border: 1px solid rgba(255,255,255,.42);
+  border-radius: 16px;
+  background: rgba(250,248,244,.30);
+  color: var(--ink);
+  box-shadow: 0 14px 38px rgba(0,0,0,.20);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+  backdrop-filter: blur(12px) saturate(1.08);
+  transition: max-height .22s ease, background .22s ease;
+}
+.showcasePhotoReviewModal.isReviewExpanded .showcaseModalReviewOverlay {
+  max-height: calc(100% - 32px);
+  background: rgba(250,248,244,.40);
+}
+.showcaseModalReviewOverlay .showcaseModalMeta {
+  font-size: .66rem;
+}
+.showcaseModalReviewOverlay h3 {
+  margin: 7px 0 5px;
+  font-size: 1.12rem;
+  line-height: 1.15;
+}
+.showcaseModalReviewScroll {
+  min-height: 0;
+  max-height: 47px;
+  overflow: hidden;
+  transition: max-height .22s ease;
+}
+.showcasePhotoReviewModal.isReviewExpanded .showcaseModalReviewScroll {
+  max-height: min(430px, 58vh);
+  overflow-y: auto;
+  padding-right: 5px;
+}
+.showcaseModalReviewScroll > p:first-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  color: #302c28;
+  font-size: .84rem;
+  line-height: 1.43;
+}
+.showcasePhotoReviewModal.isReviewExpanded .showcaseModalReviewScroll > p:first-child {
+  display: block;
+  overflow: visible;
+}
+.showcaseModalOverlayActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .showcasePhotoReviewModal {
+    width: 100%;
+    height: calc(100vh - 20px);
+    max-height: calc(100vh - 20px);
+    border-radius: 16px;
+  }
+  .showcaseModalReviewOverlay {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    max-height: 150px;
+    padding: 12px 12px 11px;
+    border-radius: 14px;
+  }
+  .showcasePhotoReviewModal.isReviewExpanded .showcaseModalReviewOverlay {
+    max-height: calc(100% - 16px);
+  }
+  .showcaseModalReviewOverlay h3 { font-size: 1rem; }
+  .showcaseModalReviewScroll > p:first-child { font-size: .77rem; line-height: 1.42; }
+  .showcaseModalOverlayActions { gap: 8px; }
+  .showcaseModalOverlayActions .showcaseReviewToggle,
+  .showcaseModalOverlayActions .showcaseOverlayCta { font-size: .68rem; }
+  .showcaseFullSizeLink {
+    top: 10px;
+    right: 50px;
+    min-height: 30px;
+    padding: 5px 9px;
+    font-size: .64rem;
+  }
+}
+
+/* =========================================================
+   Phase 6.20 — denser Made by You desktop gallery
+   Target three compact review cards per row on wide screens, while keeping
+   the existing photo lightbox and expandable glass review behavior.
+   ========================================================= */
+@media (min-width: 1051px) {
+  .madeByYouPage .showcaseGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .madeByYouPage .showcaseGrid .showcaseMedia {
+    height: 315px;
+  }
+
+  .madeByYouPage .showcaseReviewOverlay {
+    left: 9px;
+    right: 9px;
+    bottom: 9px;
+    max-height: 126px;
+    padding: 10px 11px 9px;
+    border-radius: 13px;
+  }
+
+  .madeByYouPage .showcaseOverlayCard.isReviewExpanded .showcaseReviewOverlay {
+    max-height: calc(100% - 18px);
+  }
+
+  .madeByYouPage .showcaseOverlayMeta {
+    gap: 7px;
+    font-size: .58rem;
+  }
+
+  .madeByYouPage .showcaseOverlayCard h3 {
+    margin: 5px 0 4px;
+    font-size: .94rem;
+  }
+
+  .madeByYouPage .showcaseOverlayReviewScroll {
+    max-height: 37px;
+  }
+
+  .madeByYouPage .showcaseOverlayCard .showcaseReview {
+    -webkit-line-clamp: 2;
+    font-size: .72rem;
+    line-height: 1.28;
+  }
+
+  .madeByYouPage .showcaseOverlayActions {
+    gap: 7px;
+    margin-top: 5px;
+  }
+
+  .madeByYouPage .showcaseReviewToggle,
+  .madeByYouPage .showcaseOverlayCta {
+    font-size: .65rem;
+  }
+
+  .madeByYouPage .showcaseGalleryArrow {
+    width: 30px;
+    height: 30px;
+  }
+
+  .madeByYouPage .showcaseGalleryCount {
+    top: 9px !important;
+    left: 9px !important;
+    font-size: .62rem;
+  }
+
+  .madeByYouPage .showcaseGalleryDots {
+    top: 13px !important;
+  }
+}
+
+/* Medium desktop/tablet gets a deliberate 2-column layout instead of squeezing
+   three cards too tightly. */
+@media (min-width: 761px) and (max-width: 1050px) {
+  .madeByYouPage .showcaseGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+  }
+  .madeByYouPage .showcaseGrid .showcaseMedia {
+    height: 350px;
   }
 }

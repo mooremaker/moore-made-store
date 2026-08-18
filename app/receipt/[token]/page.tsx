@@ -58,7 +58,7 @@ export default async function ReceiptPage({ params }: Props) {
       <div className="receiptActions"><a className="btn secondary" href="/account">Back to account</a><PrintReceiptButton /></div>
       <article className="receiptPaper">
         <header className="receiptHeader">
-          <Image src="/moore-made-header-logo.png" width={1741} height={576} alt="Moore Made" className="receiptLogo" priority />
+          <Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="receiptLogo" priority />
           <div className="receiptTitle"><div className="eyebrow">Payment receipt</div><h1>{receiptLabel(payment.receipt_number)}</h1><p>{dateTime(payment.paid_at)}</p></div>
         </header>
 

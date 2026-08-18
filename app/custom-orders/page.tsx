@@ -16,10 +16,8 @@ export default async function CustomOrdersPage() {
       <section className="pageHero customOrderHero">
         <div className="eyebrow">Made your way</div>
         <h1>Place a custom request.</h1>
-        <p className="lead">
-          Tell us as much as you know. If you are not sure about a detail, leave it blank or write “not sure” — we can work through the rest with you.
-        </p>
-        <div className="accountTrackingPrompt">{user ? <>Signed in as <strong>{user.email}</strong>. This request will be attached to your account automatically.</> : <>Want to track this request online? <Link href="/account/login?next=/custom-orders"><strong>Sign in or create an account first</strong></Link>. You can still submit as a guest.</>}</div>
+        <p className="lead">Start with the basics. Everything else is optional, and “not sure” is completely fine.</p>
+        <div className="accountTrackingPrompt requestTrackingBar">{user ? <div className="requestSignedInState"><div className="requestSignedCopy"><span>Signed in as</span><strong>{user.email}</strong></div><p>This request will be attached to your account automatically.</p></div> : <><div><strong>Want to track this request later?</strong><small>Sign in first, or continue below as a guest.</small></div><Link className="btn secondary" href="/account/login?next=/custom-orders">Sign in</Link></>}</div>
       </section>
       <CustomRequestForm initialName={profile?.full_name ?? ""} initialEmail={user?.email ?? ""} initialPhone={profile?.phone ?? ""} />
     </div>

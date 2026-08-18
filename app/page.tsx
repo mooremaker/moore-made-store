@@ -5,7 +5,7 @@ import { getApprovedShowcasePosts } from "@/lib/showcase-data";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const showcasePosts = await getApprovedShowcasePosts(12);
+  const showcasePosts = await getApprovedShowcasePosts();
 
   return (
     <>

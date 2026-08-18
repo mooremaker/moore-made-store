@@ -15,7 +15,7 @@ type RequestRow = {
   id: string; request_number: number; product: string; quantity: number; status: RequestStatus; deadline: string | null; delivery: string | null; created_at: string; artwork_paths: string[] | null; tracking_number: string | null; tracking_url: string | null; fulfillment_note: string | null; payment_status: PaymentStatus; amount_paid_cents: number;
 };
 type QuoteRow = { id: string; request_id: string; public_token: string; status: QuoteStatus; total_cents: number; valid_until: string | null; proof_version: number; payment_terms: PaymentTerms; deposit_amount_cents: number | null; };
-type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; };
+type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; published_snapshot:unknown|null; updated_at:string; };
 type ReceiptRow = { id:string; request_id:string; amount_cents:number; payment_method:string; paid_at:string|null; created_at:string; receipt_number:number|null; receipt_token:string|null; status:string; };
 
 function dateLabel(value: string | null) {
@@ -34,7 +34,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const [{ data: profile }, { data: requestData }, { data: showcaseData }, { data: messageThreadData }] = await Promise.all([
     supabase.from("profiles").select("full_name,phone").eq("id", user.id).maybeSingle(),
     supabase.from("custom_requests").select("id,request_number,product,quantity,status,deadline,delivery,created_at,artwork_paths,tracking_number,tracking_url,fulfillment_note,payment_status,amount_paid_cents").order("created_at", { ascending: false }),
-    supabase.from("showcase_posts").select("id,product,rating,status,created_at").order("created_at", { ascending: false }),
+    supabase.from("showcase_posts").select("id,product,rating,status,created_at,updated_at,published_snapshot").order("updated_at", { ascending: false }),
     supabase.from("message_threads").select("customer_unread_count"),
   ]);
 
@@ -121,7 +121,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
       <section className="accountSection">
         <div className="accountSectionHead"><div><div className="eyebrow">Made by You</div><h2>Your showcase submissions</h2></div><Link className="btn secondary" href="/made-by-you/submit">Share an order</Link></div>
-        {(showcaseData ?? []).length ? <div className="accountShowcaseList">{((showcaseData ?? []) as ShowcaseRow[]).map((post) => <div className="card accountShowcaseRow" key={post.id}><div><strong>{post.product}</strong><span>{"★".repeat(post.rating)}</span></div><span className="badge">{post.status === "approved" ? "Published" : post.status === "rejected" ? "Not published" : "Awaiting approval"}</span></div>)}</div> : <p className="muted">You have not submitted a Made by You post yet.</p>}
+        {(showcaseData ?? []).length ? <div className="accountShowcaseList">{((showcaseData ?? []) as ShowcaseRow[]).map((post) => {
+          const label = post.status === "approved" ? "Published" : post.status === "draft" ? (post.published_snapshot ? "Draft changes" : "Draft") : post.status === "rejected" ? (post.published_snapshot ? "Changes not published" : "Not published") : (post.published_snapshot ? "Changes awaiting approval" : "Awaiting approval");
+          return <div className="card accountShowcaseRow" key={post.id}><div><strong>{post.product === "Untitled review" ? "Untitled review" : post.product}</strong><span>{"★".repeat(post.rating)}</span><small className="muted">Updated {dateLabel(post.updated_at)}</small></div><div className="accountShowcaseActions"><span className="badge">{label}</span><Link className="btn secondary" href={`/account/made-by-you/${post.id}`}>{post.status === "draft" ? "Continue editing" : "Edit review"}</Link></div></div>;
+        })}</div> : <p className="muted">You have not submitted a Made by You post yet.</p>}
       </section>
     </div>
   );

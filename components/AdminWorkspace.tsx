@@ -8,10 +8,11 @@ import { CashPaymentAdminAlert } from "@/components/CashPaymentAdminAlert";
 import { RequestStatusControl } from "@/components/RequestStatusControl";
 import { ShowcaseStatusControl } from "@/components/ShowcaseStatusControl";
 import { ShowcaseDeleteButton } from "@/components/ShowcaseDeleteButton";
+import { ShowcasePhotoManager } from "@/components/ShowcasePhotoManager";
 import { AdminMessagesPanel } from "@/components/messages/AdminMessagesPanel";
 import { AdminFinancialsPanel } from "@/components/admin/AdminFinancialsPanel";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
-import type { BusinessExpenseRow, FinancialPaymentRow } from "@/lib/finance-types";
+import type { BusinessExpenseRow, BusinessFundingRow, FinancialPaymentRow } from "@/lib/finance-types";
 import {
   formatRequestNumber,
   REQUEST_STATUS_LABELS,
@@ -85,7 +86,9 @@ type Props = {
   messagesReady: boolean;
   payments: FinancialPaymentRow[];
   expenses: BusinessExpenseRow[];
+  funding: BusinessFundingRow[];
   financialsReady: boolean;
+  fundingReady: boolean;
 };
 
 type OrderFilter = "all" | RequestStatus;
@@ -124,7 +127,7 @@ function submittedDate(value: string) {
   });
 }
 
-export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, financialsReady }: Props) {
+export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, financialsReady, fundingReady }: Props) {
   const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase">("orders");
   const [query, setQuery] = useState("");
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
@@ -405,7 +408,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
       ) : tab === "messages" ? (
         messagesReady ? <AdminMessagesPanel threads={messageThreads} adminUsers={adminUsers} currentAdminUserId={currentAdminUserId} /> : <section className="adminWorkspacePanel"><div className="formError">Messages are not set up in Supabase yet. Run supabase/moore_made_phase5_messages.sql.</div></section>
       ) : tab === "financials" ? (
-        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need a database update. Run supabase/moore_made_phase6_1_expense_receipts.sql (and Phase 6 first if you have not already).</div></section>
+        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} fundingReady={fundingReady} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need a database update. Run supabase/moore_made_phase6_1_expense_receipts.sql (and Phase 6 first if you have not already).</div></section>
       ) : (
         <section className="adminWorkspacePanel">
           <div className="adminSectionIntro">
@@ -446,7 +449,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                   </div>
 
                   {isOpen ? <div className="adminRequestExpanded">
-                    <div className="adminShowcasePhotos">{post.photoLinks.map((photo) => <a key={photo.path} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Customer submitted project" /></a>)}</div>
+                    <ShowcasePhotoManager postId={post.id} initialPhotos={post.photoLinks} />
                     <div className="adminDetailGrid">
                       <section className="adminDetailGroup"><div className="adminDetailGroupTitle"><span>01</span><h4>Customer</h4></div><dl className="adminDefinitionList"><div><dt>Name</dt><dd>{post.customer_name}</dd></div><div><dt>Business</dt><dd>{post.business_name || "—"}</dd></div><div><dt>Email</dt><dd><a href={`mailto:${post.email}`}>{post.email}</a></dd></div><div><dt>Social</dt><dd>{post.social_handle || "—"}</dd></div></dl></section>
                       <section className="adminDetailGroup"><div className="adminDetailGroupTitle"><span>02</span><h4>Review</h4></div><p className="adminScrollableText">“{post.review}”</p>{post.caption ? <><div className="adminMiniLabel">Caption</div><p className="adminScrollableText">{post.caption}</p></> : null}</section>

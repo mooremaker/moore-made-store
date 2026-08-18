@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -9,99 +10,125 @@ type Props = {
   nextPath: string;
 };
 
+const RESEND_SECONDS = 45;
+
 export function MagicLinkForm({ mode, nextPath }: Props) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
+  const [resendIn, setResendIn] = useState(0);
 
-  async function requestCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setInterval(() => setResendIn((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
+
+  async function sendSignInEmail() {
     setBusy(true);
     setError("");
     try {
-      const normalizedEmail = email.trim().toLowerCase();
       const supabase = createSupabaseBrowserClient();
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
       const { error: authError } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
+        email: email.trim().toLowerCase(),
         options: {
+          emailRedirectTo: redirectTo,
           shouldCreateUser: mode === "customer",
         },
       });
       if (authError) throw authError;
-      setEmail(normalizedEmail);
-      setCode("");
       setSent(true);
+      setOtp("");
+      setResendIn(RESEND_SECONDS);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send the sign-in code.");
+      setError(e instanceof Error ? e.message : "Could not send the sign-in email.");
     } finally {
       setBusy(false);
     }
   }
 
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await sendSignInEmail();
+  }
+
   async function verifyCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
+    const token = otp.replace(/\D/g, "");
+    if (token.length < 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+
+    setVerifying(true);
     setError("");
     try {
-      const token = code.replace(/\D/g, "").slice(0, 10);
-      if (token.length < 6 || token.length > 10) throw new Error("Enter the full sign-in code from your email.");
       const supabase = createSupabaseBrowserClient();
-      const { error: authError } = await supabase.auth.verifyOtp({
+      const { error: verifyError } = await supabase.auth.verifyOtp({
         email: email.trim().toLowerCase(),
         token,
         type: "email",
       });
-      if (authError) throw authError;
-      window.location.assign(nextPath);
+      if (verifyError) throw verifyError;
+      router.replace(nextPath);
+      router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That sign-in code could not be verified.");
+      setError(e instanceof Error ? e.message : "That sign-in code is invalid or expired.");
     } finally {
-      setBusy(false);
+      setVerifying(false);
     }
   }
 
   if (sent) {
     return (
-      <form className="card authCard" onSubmit={verifyCode}>
+      <div className="card authSentCard" role="status">
         <div className="successMark">✓</div>
+        <div className="eyebrow">Sign-in email sent</div>
         <h2>Check your email.</h2>
-        <p>We sent a secure sign-in code to <strong>{email}</strong>.</p>
-        <div className="field">
-          <label htmlFor={`${mode}-code`}>Sign-in code</label>
-          <input
-            id={`${mode}-code`}
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9]{6,10}"
-            minLength={6}
-            maxLength={10}
-            value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 10))}
-            placeholder="Enter the code from your email"
-            required
-            autoFocus
-          />
+        <p>We sent secure sign-in instructions to <strong>{email}</strong>.</p>
+
+        <form onSubmit={verifyCode} className="authOtpPrimary">
+          <div className="field authCodeField">
+            <label htmlFor={`${mode}-otp`}>6-digit sign-in code</label>
+            <input
+              id={`${mode}-otp`}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={10}
+              value={otp}
+              onChange={(event) => setOtp(event.target.value.replace(/\D/g, ""))}
+              placeholder="123456"
+              required
+              autoFocus
+            />
+          </div>
+          <p className="fieldHelp authEmailChoice">If the email also includes a <strong>Sign in to Moore Made</strong> button, you can tap that instead. Either method signs you into the same account.</p>
+          {error ? <div className="formError">{error}</div> : null}
+          <button className="btn" type="submit" disabled={verifying}>{verifying ? "Signing in..." : "Sign in"}</button>
+        </form>
+
+        <div className="authSecondaryActions">
+          <button className="textButton" type="button" disabled={busy || resendIn > 0} onClick={() => void sendSignInEmail()}>
+            {busy ? "Sending..." : resendIn > 0 ? `Resend email in ${resendIn}s` : "Resend sign-in email"}
+          </button>
+          <button className="textButton" type="button" onClick={() => { setSent(false); setError(""); setOtp(""); setResendIn(0); }}>Use a different email</button>
         </div>
-        <p className="muted">Codes are one-time use and expire automatically. Using a typed code also prevents email security scanners from consuming your login before you do.</p>
-        {error ? <div className="formError">{error}</div> : null}
-        <button className="btn" type="submit" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
-        <button
-          className="btn secondary"
-          type="button"
-          disabled={busy}
-          onClick={() => { setSent(false); setCode(""); setError(""); }}
-        >
-          Send a new code or use a different email
-        </button>
-      </form>
+      </div>
     );
   }
 
   return (
-    <form className="card authCard" onSubmit={requestCode}>
+    <form className="card authCard" onSubmit={submit}>
+      <div className="authIntroCompact">
+        <div className="eyebrow">Password-free sign in</div>
+        <p>{mode === "customer" ? "Enter your email and we’ll send a secure code. No password to create or remember." : "Enter your approved admin email. After email verification, you’ll complete the admin security check."}</p>
+      </div>
       <div className="field">
         <label htmlFor={`${mode}-email`}>Email address</label>
         <input
@@ -116,12 +143,12 @@ export function MagicLinkForm({ mode, nextPath }: Props) {
         />
       </div>
       {mode === "customer" ? (
-        <p className="fieldHelp">New here? This same secure code creates your Moore Made account. No password to remember.</p>
+        <p className="fieldHelp">New here? The same email creates your Moore Made account automatically.</p>
       ) : (
         <p className="fieldHelp">Only pre-approved Moore Made staff accounts can enter the admin dashboard.</p>
       )}
       {error ? <div className="formError">{error}</div> : null}
-      <button className="btn" type="submit" disabled={busy}>{busy ? "Sending..." : "Email me a secure sign-in code"}</button>
+      <button className="btn" type="submit" disabled={busy}>{busy ? "Sending..." : "Send sign-in email"}</button>
     </form>
   );
 }
