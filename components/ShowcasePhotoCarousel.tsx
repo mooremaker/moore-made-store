@@ -1,30 +1,39 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useRefreshStablePhotoIndex } from "@/lib/showcase-photo-selection";
 
 type Props = {
   photoUrls: string[];
   altBase: string;
   onPhotoClick?: () => void;
   showFullSizeLink?: boolean;
+  reviewId?: string;
 };
 
-export function ShowcasePhotoCarousel({ photoUrls, altBase, onPhotoClick, showFullSizeLink = false }: Props) {
-  const [index, setIndex] = useState(0);
+export function ShowcasePhotoCarousel({ photoUrls, altBase, onPhotoClick, showFullSizeLink = false, reviewId = altBase }: Props) {
+  const [index, setIndex] = useRefreshStablePhotoIndex(reviewId, photoUrls);
   const touchStartX = useRef<number | null>(null);
-  const active = photoUrls[index] ?? null;
+  const active = index == null ? null : (photoUrls[index] ?? null);
 
   useEffect(() => {
     if (!photoUrls.length) setIndex(0);
-    else if (index > photoUrls.length - 1) setIndex(photoUrls.length - 1);
-  }, [photoUrls.length, index]);
+    else if (index != null && index > photoUrls.length - 1) setIndex(photoUrls.length - 1);
+  }, [photoUrls.length, index, setIndex]);
 
   function move(direction: -1 | 1) {
     if (photoUrls.length < 2) return;
-    setIndex((current) => (current + direction + photoUrls.length) % photoUrls.length);
+    setIndex((current) => {
+      const safeCurrent = current ?? 0;
+      return (safeCurrent + direction + photoUrls.length) % photoUrls.length;
+    });
   }
 
   if (!active) {
+    if (photoUrls.length) {
+      return <div className="showcasePhoto showcasePublicGallery showcasePhotoLoading" aria-hidden="true" />;
+    }
+
     return (
       <div className="showcasePhoto showcasePublicGallery showcasePhotoFallback">
         <span>Made by You</span>
@@ -37,7 +46,7 @@ export function ShowcasePhotoCarousel({ photoUrls, altBase, onPhotoClick, showFu
     <div
       className={`showcasePhoto showcasePublicGallery ${onPhotoClick ? "isPhotoClickable" : ""}`}
       tabIndex={photoUrls.length > 1 ? 0 : -1}
-      aria-label={photoUrls.length > 1 ? `Project photo ${index + 1} of ${photoUrls.length}. Use arrow keys or swipe to browse.` : "Project photo"}
+      aria-label={photoUrls.length > 1 ? `Project photo ${(index ?? 0) + 1} of ${photoUrls.length}. Use arrow keys or swipe to browse.` : "Project photo"}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") move(-1);
         if (event.key === "ArrowRight") move(1);
@@ -59,7 +68,7 @@ export function ShowcasePhotoCarousel({ photoUrls, altBase, onPhotoClick, showFu
       <img
         className="showcaseGalleryImage"
         src={active}
-        alt={`${altBase} photo ${index + 1}`}
+        alt={`${altBase} photo ${(index ?? 0) + 1}`}
         onClick={onPhotoClick}
       />
 
@@ -78,7 +87,7 @@ export function ShowcasePhotoCarousel({ photoUrls, altBase, onPhotoClick, showFu
       {photoUrls.length > 1 ? <>
         <button className="showcaseGalleryArrow isPrevious" type="button" onClick={() => move(-1)} aria-label="Previous project photo">‹</button>
         <button className="showcaseGalleryArrow isNext" type="button" onClick={() => move(1)} aria-label="Next project photo">›</button>
-        <span className="showcaseGalleryCount">{index + 1} / {photoUrls.length}</span>
+        <span className="showcaseGalleryCount">{(index ?? 0) + 1} / {photoUrls.length}</span>
         <div className="showcaseGalleryDots" aria-label="Project photo navigation">
           {photoUrls.map((_, photoIndex) => (
             <button

@@ -2,18 +2,19 @@ import { redirect } from "next/navigation";
 import { getAdminAuthState } from "@/lib/auth";
 import type { RequestStatus } from "@/lib/custom-request-types";
 import type { ShowcaseStatus } from "@/lib/showcase-types";
+import { normalizeShowcasePhotoPreviewMap } from "@/lib/showcase-photo-preview";
 import { CUSTOM_REQUEST_BUCKET, QUOTE_PROOF_BUCKET, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase-admin";
 import type { QuoteRecord } from "@/lib/quote-types";
 import { AdminWorkspace, type AdminRequestRow, type AdminShowcaseRow } from "@/components/AdminWorkspace";
 import { MESSAGE_BUCKET } from "@/lib/message-server";
 import type { AdminMessageThread, AdminUserOption, MessageAttachment, MessageEntry, MessageTopic, MessageThreadStatus } from "@/lib/message-types";
-import { EXPENSE_RECEIPT_BUCKET, FUNDING_DOCUMENT_BUCKET, type BusinessExpenseReceipt, type BusinessExpenseRow, type BusinessFundingDocument, type BusinessFundingRow, type FinancialPaymentRow } from "@/lib/finance-types";
+import { EXPENSE_RECEIPT_BUCKET, FUNDING_DOCUMENT_BUCKET, type BusinessExpenseReceipt, type BusinessExpenseRow, type BusinessFinanceAuditRow, type BusinessFundingDocument, type BusinessFundingRow, type BusinessGoalFundingRow, type BusinessGoalRow, type FinancialPaymentRow } from "@/lib/finance-types";
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 type RequestRow = { id:string; request_number:number; customer_name:string; email:string; phone:string|null; sms_consent:boolean; product:string; quantity:number; item_type:string|null; colors:string|null; sizes:string|null; logo_size:string|null; print_sides:string|null; placements:string[]|null; artwork_instructions:string|null; deadline:string|null; delivery:string|null; notes:string|null; status:RequestStatus; payment_status:"unpaid"|"deposit_paid"|"paid"; amount_paid_cents:number; artwork_paths:string[]|null; tracking_number:string|null; tracking_url:string|null; fulfillment_note:string|null; fulfillment_notified_at:string|null; cash_payment_request_status:"none"|"pending"|"contacted"|"completed"|"cancelled"; cash_payment_requested_at:string|null; cash_payment_requested_amount_cents:number|null; cash_payment_contacted_at:string|null; created_at:string; };
-type ShowcaseRow = { id:string; customer_name:string; business_name:string|null; email:string; product:string; rating:number; review:string; caption:string|null; social_handle:string|null; status:ShowcaseStatus; photo_paths:string[]|null; created_at:string; };
+type ShowcaseRow = { id:string; customer_name:string; business_name:string|null; email:string; product:string; rating:number; review:string; caption:string|null; social_handle:string|null; status:ShowcaseStatus; photo_paths:string[]|null; photo_preview_settings:unknown; created_at:string; };
 type MessageThreadRow = { id:string; customer_user_id:string; request_id:string|null; subject:string; topic:MessageTopic; status:MessageThreadStatus; assigned_admin_user_id:string|null; customer_unread_count:number; admin_unread_count:number; last_message_at:string; created_at:string; };
 type MessageEntryRow = { id:string; thread_id:string; sender_user_id:string|null; sender_role:"customer"|"admin"|"system"; sender_display_name:string; body:string; is_internal:boolean; created_at:string; };
 type MessageAttachmentRow = { id:string; message_id:string; storage_path:string; original_filename:string; mime_type:string|null; size_bytes:number|null; };
@@ -116,17 +117,20 @@ export default async function AdminPage() {
 
   const { data: showcaseData, error: showcaseError } = await supabase
     .from("showcase_posts")
-    .select("id,customer_name,business_name,email,product,rating,review,caption,social_handle,status,photo_paths,created_at")
+    .select("id,customer_name,business_name,email,product,rating,review,caption,social_handle,status,photo_paths,photo_preview_settings,created_at")
     .neq("status", "draft")
     .order("created_at", { ascending: false });
   const showcaseRows = (showcaseData ?? []) as ShowcaseRow[];
-  const showcaseWithPhotos: AdminShowcaseRow[] = await Promise.all(showcaseRows.map(async (row) => ({
-    ...row,
-    photoLinks: (await Promise.all((row.photo_paths ?? []).map(async (path) => {
-      const { data: signed } = await supabase.storage.from("showcase-files").createSignedUrl(path, 3600);
-      return signed?.signedUrl ? { path, url: signed.signedUrl } : null;
-    }))).filter(Boolean) as { path: string; url: string }[],
-  })));
+  const showcaseWithPhotos: AdminShowcaseRow[] = await Promise.all(showcaseRows.map(async (row) => {
+    const previewMap = normalizeShowcasePhotoPreviewMap(row.photo_preview_settings);
+    return {
+      ...row,
+      photoLinks: (await Promise.all((row.photo_paths ?? []).map(async (path) => {
+        const { data: signed } = await supabase.storage.from("showcase-files").createSignedUrl(path, 3600);
+        return signed?.signedUrl ? { path, url: signed.signedUrl, preview: previewMap[path] ?? { x: 50, y: 50, zoom: 1 } } : null;
+      }))).filter(Boolean) as AdminShowcaseRow["photoLinks"],
+    };
+  }));
 
   const { data: messageThreadData, error: messageError } = await supabase
     .from("message_threads")
@@ -180,7 +184,7 @@ export default async function AdminPage() {
 
   const { data: expenseData, error: expenseError } = await supabase
     .from("business_expenses")
-    .select("id,expense_date,vendor,category,description,amount_cents,payment_method,note,recorded_by,created_at,updated_at")
+    .select("id,expense_date,vendor,category,description,amount_cents,payment_method,note,recorded_by,created_at,updated_at,voided_at,void_reason")
     .order("expense_date", { ascending: false })
     .order("created_at", { ascending: false });
   const baseExpenses = (expenseData ?? []) as BusinessExpenseRow[];
@@ -229,6 +233,30 @@ export default async function AdminPage() {
       .map((document) => ({ ...document, url: signedFundingDocumentById.get(document.id) || null })),
   }));
 
+  const { data: goalData, error: goalError } = await supabase
+    .from("business_goals")
+    .select("id,name,description,target_amount_cents,priority,status,target_date,funding_source,note,created_by,voided_at,void_reason,created_at,updated_at")
+    .order("created_at", { ascending: false });
+  const baseGoals = (goalData ?? []) as BusinessGoalRow[];
+
+  const { data: goalFundingData, error: goalFundingError } = await supabase
+    .from("business_goal_funding")
+    .select("id,goal_id,entry_date,direction,amount_cents,funding_source,note,recorded_by,created_at")
+    .order("entry_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  const goalFunding = (goalFundingData ?? []) as BusinessGoalFundingRow[];
+  const goals: BusinessGoalRow[] = baseGoals.map((goal) => ({
+    ...goal,
+    funding_entries: goalFunding.filter((entry) => entry.goal_id === goal.id),
+  }));
+
+  const { data: financeAuditData, error: financeAuditError } = await supabase
+    .from("business_finance_audit")
+    .select("id,occurred_at,entity_type,entity_id,action,actor_user_id,before_data,after_data")
+    .order("occurred_at", { ascending: false })
+    .limit(150);
+  const financeAudit = (financeAuditData ?? []) as BusinessFinanceAuditRow[];
+
   const messageThreads: AdminMessageThread[] = messageThreadRows.map((thread) => {
     const order = thread.request_id ? requestById.get(thread.request_id) : null;
     const profile = profileByUser.get(thread.customer_user_id);
@@ -276,7 +304,7 @@ export default async function AdminPage() {
 
   return <div className="shell adminPage adminPageRedesign">
     <section className="adminTopbar adminTopbarRedesign">
-      <div><div className="eyebrow">Moore Made private admin</div><h1>Order dashboard.</h1><p>Manage requests, customer messages, proof + quote approvals, payments, receipts, financials, production status, and showcase approvals.</p></div>
+      <div><div className="eyebrow">Moore Made private admin</div><h1>Business command center.</h1><p>Move between orders, customers, production, financials, business goals, and tax-ready records without leaving the admin.</p></div>
       <form action="/api/auth/logout" method="post"><input type="hidden" name="next" value="/admin/login" /><button className="btn secondary" type="submit">Sign out</button></form>
     </section>
 
@@ -295,8 +323,12 @@ export default async function AdminPage() {
       payments={payments}
       expenses={expenses}
       funding={funding}
+      goals={goals}
+      financeAudit={financeAudit}
       financialsReady={!paymentError && !expenseError && !expenseReceiptError}
       fundingReady={!fundingError && !fundingDocumentError}
+      goalsReady={!goalError && !goalFundingError}
+      auditReady={!financeAuditError}
     />
   </div>;
 }

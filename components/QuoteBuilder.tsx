@@ -90,6 +90,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [importingMockups, setImportingMockups] = useState(false);
+  const [mockupImportChecked, setMockupImportChecked] = useState(Boolean(existingQuote));
 
   useEffect(() => {
     if (!existingQuote?.proofItems?.length) return;
@@ -187,6 +189,58 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
     return result;
   }
 
+  async function importMockupStudio(silent = false) {
+    if (locked) return;
+    setImportingMockups(true);
+    if (!silent) { setError(""); setMessage(""); }
+    try {
+      const response = await fetch(`/api/admin/mockups?requestId=${encodeURIComponent(requestId)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) {
+        if (silent && (response.status === 503 || response.status === 404)) return;
+        throw new Error(result.error || "Could not load Mockup Studio exports.");
+      }
+      const exports = Array.isArray(result.proofExports) ? result.proofExports : [];
+      if (!exports.length) {
+        if (!silent) setMessage("No exported Mockup Studio views are ready yet. Open Mockup Studio and choose Export for proof + quote first.");
+        return;
+      }
+      const assets: QuoteProofAsset[] = exports.map((item: { path: string; originalName?: string; url?: string }) => ({ path: item.path, originalName: item.originalName || item.path.split("/").pop() || "Mockup", url: item.url }));
+      setProofItems((current) => {
+        const existingPaths = new Set(current.flatMap((item) => item.assets.map((asset) => asset.path)));
+        const newAssets = assets.filter((asset) => !existingPaths.has(asset.path));
+        if (!newAssets.length) return current;
+        const emptyIndex = current.findIndex((item) => item.assets.length === 0 && item.newFiles.length === 0 && !item.dbId);
+        if (emptyIndex >= 0) return current.map((item, index) => index === emptyIndex ? { ...item, title: item.title.trim() || product || "Order mockup", assets: newAssets } : item);
+        return [...current, { clientKey: newClientKey(), title: product || "Order mockup", notes: "Created in Moore Made Mockup Studio.", assets: newAssets, newFiles: [] }];
+      });
+      if (!silent) setMessage(`${exports.length} Mockup Studio view${exports.length === 1 ? "" : "s"} added to this proof.`);
+    } catch (err) {
+      if (!silent) setError(err instanceof Error ? err.message : "Could not import Mockup Studio exports.");
+    } finally {
+      setImportingMockups(false);
+      setMockupImportChecked(true);
+    }
+  }
+
+  useEffect(() => {
+    if (existingQuote || locked || mockupImportChecked) return;
+    void importMockupStudio(true);
+    // Intentional one-time import check for a brand-new quote.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingQuote, locked, mockupImportChecked]);
+
+  useEffect(() => {
+    if (locked) return;
+    const handleExport = (event: Event) => {
+      const detail = (event as CustomEvent<{ requestId?: string }>).detail;
+      if (detail?.requestId === requestId) void importMockupStudio(true);
+    };
+    window.addEventListener("moore-made-mockup-exported", handleExport);
+    return () => window.removeEventListener("moore-made-mockup-exported", handleExport);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestId, locked]);
+
   async function submit(action: "save" | "send") {
     setError("");
     setMessage("");
@@ -271,6 +325,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
         <div className="quoteBuilderBody">
           {existingQuote?.status === "approved" ? <div className="quoteLocked">This proof and quote have been approved. Keep this version as the production reference.</div> : null}
           {waitingOnCustomer ? <div className="quoteLocked">This version is currently waiting on the customer. Editing is locked until they approve it or request changes.</div> : null}
+          {existingQuote?.public_token ? <div className="quoteDocumentActions"><a className="btn secondary" href={`/proforma/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Pro Forma + Proof ↗</a>{existingQuote.status === "approved" ? <a className="btn secondary" href={`/invoice/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Invoice ↗</a> : null}</div> : null}
           {latestChangeRequest ? (
             <div className="proofChangeRequest">
               <strong>Customer requested changes</strong>
@@ -287,7 +342,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           <section className="proofBuilderSection">
             <div className="proofBuilderHeading scalableProofHeading">
               <div><span className="eyebrow">Product proofs</span><h5>Build the customer&apos;s approval set</h5><p>Use one proof item per product/design. Each item can contain multiple views, pages, images, or PDFs.</p></div>
-              <span className="proofVersionBadge">Version {displayVersion}</span>
+              <div className="proofBuilderHeaderActions"><button className="btn secondary" type="button" disabled={locked || importingMockups} onClick={() => importMockupStudio(false)}>{importingMockups ? "Importing…" : "Import Mockup Studio"}</button><span className="proofVersionBadge">Version {displayVersion}</span></div>
             </div>
 
             <div className="proofItemEditorList">

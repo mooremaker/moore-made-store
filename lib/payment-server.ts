@@ -9,7 +9,7 @@ import { getStripe } from "@/lib/stripe";
 export async function recalculateOrderPayment(requestId: string, quoteId: string) {
   const supabase = getSupabaseAdmin();
   const [{ data: quote }, { data: request }, { data: paymentRows }] = await Promise.all([
-    supabase.from("quotes").select("id,total_cents,payment_terms,deposit_amount_cents").eq("id", quoteId).single(),
+    supabase.from("quotes").select("id,public_token,total_cents,payment_terms,deposit_amount_cents").eq("id", quoteId).single(),
     supabase.from("custom_requests").select("id,status,request_number,customer_name,email,product").eq("id", requestId).single(),
     supabase.from("payments").select("amount_cents,status").eq("request_id", requestId),
   ]);
@@ -47,6 +47,7 @@ export async function recalculateOrderPayment(requestId: string, quoteId: string
     remainingCents: Math.max(0, totalCents - amountPaidCents),
     paymentStatus,
     orderStatus: nextStatus,
+    invoiceToken: quote.public_token || null,
   };
 }
 
@@ -102,7 +103,10 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
            </div>
            <p style="line-height:1.65;margin:0 0 18px;">${summary.remainingCents <= 0 ? "Your order is paid in full. We’ll keep you updated when it is ready for pickup or ships." : "Your payment has been applied to the order. Any remaining balance stays attached to your order."}</p>
            <p style="line-height:1.55;margin:0 0 18px;color:#6b6b6b;font-size:13px;"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p>
-           ${receiptPayment?.receipt_token ? `<a href="${siteUrl()}/receipt/${receiptPayment.receipt_token}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View / print receipt</a>` : ""}`
+           <div style="display:flex;gap:10px;flex-wrap:wrap;">
+             ${summary.invoiceToken ? `<a href="${siteUrl()}/invoice/${summary.invoiceToken}" style="display:inline-block;background:#fff;color:#171717;border:1px solid #d7d1c8;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View invoice</a>` : ""}
+             ${receiptPayment?.receipt_token ? `<a href="${siteUrl()}/receipt/${receiptPayment.receipt_token}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View / print receipt</a>` : ""}
+           </div>`
         ),
       });
     } catch (customerEmailError) {

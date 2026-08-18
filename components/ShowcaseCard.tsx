@@ -34,6 +34,7 @@ export function ShowcaseCard({ post, onExpandedChange }: Props) {
           <ShowcasePhotoCarousel
             photoUrls={post.photoUrls}
             altBase={`${post.product} customer project`}
+            reviewId={post.id}
             onPhotoClick={() => setModalOpen(true)}
           />
 

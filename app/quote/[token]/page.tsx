@@ -157,6 +157,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
         <div className="eyebrow">Final proof + quote</div>
         <h1>{formatRequestNumber(request.request_number)}</h1>
         <p className="lead">Hi {request.customer_name}, review every product mockup and the complete pricing below. Approve the whole order once, or request changes only for the item(s) that need them.</p>
+        <div className="quoteDocumentLinks"><a className="btn secondary" href={`/proforma/${token}`} target="_blank" rel="noreferrer">Pro Forma + Proof ↗</a>{quote.status === "approved" ? <a className="btn secondary" href={`/invoice/${token}`} target="_blank" rel="noreferrer">Invoice ↗</a> : null}</div>
       </section>
 
       <section className="card publicQuoteCard proofApprovalCard">

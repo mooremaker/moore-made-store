@@ -39,6 +39,7 @@ export function ShowcaseReviewModal({ post, onClose }: { post: PublicShowcasePos
           <ShowcasePhotoCarousel
             photoUrls={post.photoUrls}
             altBase={`${post.product} customer project`}
+            reviewId={post.id}
             showFullSizeLink
           />
 

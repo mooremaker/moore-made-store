@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
-import { EXPENSE_CATEGORY_LABELS, EXPENSE_RECEIPT_BUCKET, type BusinessExpenseCategory } from "@/lib/finance-types";
+import { EXPENSE_CATEGORY_LABELS, type BusinessExpenseCategory } from "@/lib/finance-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { uploadExpenseReceiptFiles, validateExpenseReceiptFiles } from "@/lib/expense-receipt-server";
 
@@ -71,26 +71,20 @@ export async function DELETE(request: Request) {
   try {
     const body = await request.json();
     const id = clean(body.id, 80);
+    const reason = clean(body.reason, 500) || "Voided by admin";
     if (!id) return NextResponse.json({ error: "Expense id is required." }, { status: 400 });
 
     const supabase = getSupabaseAdmin();
-    const { data: receipts } = await supabase
-      .from("business_expense_receipts")
-      .select("storage_path")
-      .eq("expense_id", id);
+    const { error } = await supabase.from("business_expenses").update({
+      voided_at: new Date().toISOString(),
+      voided_by: auth.user.id,
+      void_reason: reason,
+    }).eq("id", id).is("voided_at", null);
 
-    const { error } = await supabase.from("business_expenses").delete().eq("id", id);
-    if (error) return NextResponse.json({ error: "Could not delete this expense." }, { status: 500 });
-
-    const paths = (receipts ?? []).map((receipt) => receipt.storage_path).filter(Boolean);
-    if (paths.length) {
-      const { error: storageError } = await supabase.storage.from(EXPENSE_RECEIPT_BUCKET).remove(paths);
-      if (storageError) console.error("Expense receipt storage cleanup failed", storageError);
-    }
-
+    if (error) return NextResponse.json({ error: "Could not void this expense." }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Expense delete failed", error);
-    return NextResponse.json({ error: "Could not delete this expense." }, { status: 500 });
+    console.error("Expense void failed", error);
+    return NextResponse.json({ error: "Could not void this expense." }, { status: 500 });
   }
 }

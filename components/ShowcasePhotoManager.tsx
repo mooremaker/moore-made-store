@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { DEFAULT_SHOWCASE_PHOTO_PREVIEW, type ShowcasePhotoPreview } from "@/lib/showcase-photo-preview";
 
-type PhotoLink = { path: string; url: string };
+type PhotoLink = { path: string; url: string; preview: ShowcasePhotoPreview };
 
 type Props = {
   postId: string;
@@ -22,17 +23,59 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [savingPreview, setSavingPreview] = useState(false);
+  const [previewDraft, setPreviewDraft] = useState<ShowcasePhotoPreview>({ ...DEFAULT_SHOWCASE_PHOTO_PREVIEW });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const remaining = Math.max(0, MAX_PHOTOS - photos.length);
+  const activePhoto = photos[activeIndex] ?? null;
 
   useEffect(() => {
     if (!photos.length) setActiveIndex(0);
     else if (activeIndex > photos.length - 1) setActiveIndex(photos.length - 1);
   }, [photos.length, activeIndex]);
 
+  useEffect(() => {
+    setPreviewDraft(activePhoto?.preview ?? { ...DEFAULT_SHOWCASE_PHOTO_PREVIEW });
+  }, [activePhoto?.path]);
+
   function move(direction: -1 | 1) {
     if (photos.length < 2) return;
     setActiveIndex((current) => (current + direction + photos.length) % photos.length);
+  }
+
+  function setFocalPoint(event: ReactPointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
+    setPreviewDraft((current) => ({ ...current, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }));
+  }
+
+  async function savePreview() {
+    if (!activePhoto) return;
+    setSavingPreview(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/showcase-photo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: postId, path: activePhoto.path, preview: previewDraft }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save the preview framing.");
+      const saved = data.preview as ShowcasePhotoPreview;
+      setPhotos((current) => current.map((photo) => photo.path === activePhoto.path ? { ...photo, preview: saved } : photo));
+      setPreviewDraft(saved);
+      setNotice(`Preview framing saved for photo ${activeIndex + 1}.`);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the preview framing.");
+    } finally {
+      setSavingPreview(false);
+    }
   }
 
   async function removePhoto(path: string) {
@@ -103,9 +146,6 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
     }
   }
 
-  const remaining = Math.max(0, MAX_PHOTOS - photos.length);
-  const activePhoto = photos[activeIndex] ?? null;
-
   return (
     <div className="showcasePhotoManager">
       <div className="showcasePhotoManagerHeading">
@@ -165,12 +205,63 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
             <div className="showcaseAdminThumbs" aria-label="Choose a review photo">
               {photos.map((photo, index) => (
                 <button key={photo.path} type="button" className={index === activeIndex ? "isActive" : ""} onClick={() => setActiveIndex(index)} aria-label={`View photo ${index + 1}`}>
-                  <img src={photo.url} alt="" />
+                  <img
+                    src={photo.url}
+                    alt=""
+                    style={{ objectPosition: `${photo.preview.x}% ${photo.preview.y}%`, transform: `scale(${photo.preview.zoom})`, transformOrigin: `${photo.preview.x}% ${photo.preview.y}%` }}
+                  />
                   <span>{index + 1}</span>
                 </button>
               ))}
             </div>
           ) : null}
+
+          <section className="showcasePreviewEditor" aria-label={`Preview framing for photo ${activeIndex + 1}`}>
+            <div className="showcasePreviewEditorHeading">
+              <div>
+                <strong>Main-page preview</strong>
+                <span>Choose how this photo is framed in compact review cards. The full photo is never changed.</span>
+              </div>
+              <span className="showcasePreviewSavedState">Photo {activeIndex + 1}</span>
+            </div>
+
+            <div
+              className="showcasePreviewStage"
+              onPointerDown={setFocalPoint}
+              role="application"
+              aria-label="Click or tap the part of the photo you want centered in the compact preview"
+            >
+              <img
+                src={activePhoto.url}
+                alt={`Compact homepage preview for photo ${activeIndex + 1}`}
+                draggable={false}
+                style={{ objectPosition: `${previewDraft.x}% ${previewDraft.y}%`, transform: `scale(${previewDraft.zoom})`, transformOrigin: `${previewDraft.x}% ${previewDraft.y}%` }}
+              />
+              <span className="showcasePreviewTarget" style={{ left: `${previewDraft.x}%`, top: `${previewDraft.y}%` }} aria-hidden="true" />
+              <span className="showcasePreviewHint">Click or tap where you want the preview centered</span>
+            </div>
+
+            <div className="showcasePreviewControls">
+              <label>
+                <span>Horizontal</span>
+                <input type="range" min="0" max="100" step="1" value={previewDraft.x} onChange={(event) => setPreviewDraft((current) => ({ ...current, x: Number(event.currentTarget.value) }))} />
+              </label>
+              <label>
+                <span>Vertical</span>
+                <input type="range" min="0" max="100" step="1" value={previewDraft.y} onChange={(event) => setPreviewDraft((current) => ({ ...current, y: Number(event.currentTarget.value) }))} />
+              </label>
+              <label>
+                <span>Zoom</span>
+                <input type="range" min="1" max="2.25" step="0.05" value={previewDraft.zoom} onChange={(event) => setPreviewDraft((current) => ({ ...current, zoom: Number(event.currentTarget.value) }))} />
+              </label>
+            </div>
+
+            <div className="showcasePreviewActions">
+              <button type="button" className="btn secondary" onClick={() => setPreviewDraft({ ...DEFAULT_SHOWCASE_PHOTO_PREVIEW })} disabled={savingPreview}>Reset center</button>
+              <button type="button" className="btn" onClick={savePreview} disabled={savingPreview}>{savingPreview ? "Saving..." : "Save preview framing"}</button>
+            </div>
+            <p className="fieldHelp">This saved framing is reused automatically anywhere Moore Made shows this photo in a cropped thumbnail. The large review page and popup continue to show the full original image.</p>
+          </section>
 
           <div className="showcaseCurrentPhotoActions">
             <span className="fieldHelp">Select a thumbnail or use ← → / swipe to inspect every photo. Tap the large image for full size.</span>

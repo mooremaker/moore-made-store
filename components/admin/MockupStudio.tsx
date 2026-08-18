@@ -1,0 +1,275 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { emptyMockupDocument, type MockupAssetRef, type MockupDocument, type MockupLayer, type MockupView } from "@/lib/mockup-types";
+
+const MOCKUP_BUCKET = "mockup-studio-files";
+const PROOF_BUCKET = "quote-proof-files";
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+function uid(prefix = "item") {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? `${prefix}-${crypto.randomUUID()}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function cleanDocument(document: MockupDocument): MockupDocument {
+  return {
+    ...document,
+    views: document.views.map((view) => ({
+      ...view,
+      base: view.base ? { path: view.base.path, originalName: view.base.originalName } : null,
+      layers: view.layers.map((layer) => ({ ...layer, asset: { path: layer.asset.path, originalName: layer.asset.originalName } })),
+      exportAsset: view.exportAsset ? { path: view.exportAsset.path, originalName: view.exportAsset.originalName } : null,
+    })),
+  };
+}
+
+async function uploadFiles(requestId: string, purpose: string, files: File[], bucket = MOCKUP_BUCKET) {
+  const oversized = files.find((file) => file.size > MAX_FILE_BYTES);
+  if (oversized) throw new Error(`${oversized.name} is larger than 20 MB.`);
+  const endpoint = bucket === PROOF_BUCKET ? "/api/admin/quote-proof-uploads" : "/api/admin/mockups/uploads";
+  const body = bucket === PROOF_BUCKET
+    ? { requestId, itemKey: purpose, files: files.map((file) => ({ name: file.name, size: file.size, type: file.type })) }
+    : { requestId, purpose, files: files.map((file) => ({ name: file.name, size: file.size, type: file.type })) };
+  const preparedResponse = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const prepared = await preparedResponse.json();
+  if (!preparedResponse.ok) throw new Error(prepared.error || "Could not prepare the upload.");
+  const supabase = getSupabaseBrowser();
+  const result: MockupAssetRef[] = [];
+  for (const target of prepared.uploads ?? []) {
+    const file = files[target.index];
+    if (!file) continue;
+    const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(target.path, target.token, file, { contentType: file.type || undefined });
+    if (error) throw new Error(`Could not upload ${file.name}.`);
+    result.push({ path: target.path, originalName: file.name, url: URL.createObjectURL(file) });
+  }
+  return result;
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("One of the mockup images could not be loaded for export."));
+    image.src = src;
+  });
+}
+
+async function renderView(view: MockupView) {
+  if (!view.base?.url) throw new Error(`${view.name} needs a base product image before it can be exported.`);
+  const base = await loadImage(view.base.url);
+  const canvas = document.createElement("canvas");
+  canvas.width = base.naturalWidth || base.width;
+  canvas.height = base.naturalHeight || base.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Your browser could not create the mockup export.");
+  ctx.drawImage(base, 0, 0, canvas.width, canvas.height);
+
+  for (const layer of [...view.layers].sort((a, b) => a.zIndex - b.zIndex)) {
+    if (!layer.asset.url) continue;
+    const image = await loadImage(layer.asset.url);
+    const width = canvas.width * (layer.width / 100);
+    const height = width * ((image.naturalHeight || image.height) / Math.max(1, image.naturalWidth || image.width));
+    ctx.save();
+    ctx.globalAlpha = layer.opacity;
+    ctx.translate(canvas.width * (layer.x / 100), canvas.height * (layer.y / 100));
+    ctx.rotate((layer.rotation * Math.PI) / 180);
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    ctx.restore();
+  }
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png", 0.96));
+  if (!blob) throw new Error("Could not create the mockup PNG.");
+  return blob;
+}
+
+type Props = {
+  requestId: string;
+  requestNumber: string;
+  product: string;
+};
+
+export function MockupStudio({ requestId, requestNumber, product }: Props) {
+  const [open, setOpen] = useState(false);
+  const [documentState, setDocumentState] = useState<MockupDocument>(emptyMockupDocument());
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [ready, setReady] = useState<boolean | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const stageRef = useRef<HTMLDivElement | null>(null);
+
+  const activeView = useMemo(() => documentState.views.find((view) => view.id === documentState.activeViewId) || documentState.views[0], [documentState]);
+  const selectedLayer = activeView?.layers.find((layer) => layer.id === selectedLayerId) || null;
+  const exportCount = documentState.views.filter((view) => view.exportAsset?.path).length;
+
+  async function loadProject() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/mockups?requestId=${encodeURIComponent(requestId)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) {
+        if (result.code === "MIGRATION_REQUIRED") setReady(false);
+        throw new Error(result.error || "Could not load Mockup Studio.");
+      }
+      setReady(true);
+      setDocumentState(result.document || emptyMockupDocument());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load Mockup Studio.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!open || ready !== null) return;
+    void loadProject();
+  }, [open, ready]);
+
+  function updateView(viewId: string, updater: (view: MockupView) => MockupView) {
+    setDocumentState((current) => ({ ...current, views: current.views.map((view) => view.id === viewId ? updater(view) : view) }));
+  }
+
+  function updateLayer(layerId: string, patch: Partial<MockupLayer>) {
+    if (!activeView) return;
+    updateView(activeView.id, (view) => ({ ...view, exportAsset: null, layers: view.layers.map((layer) => layer.id === layerId ? { ...layer, ...patch } : layer) }));
+  }
+
+  async function chooseBase(file: File | undefined) {
+    if (!file || !activeView) return;
+    setError(""); setMessage("");
+    try {
+      const [uploaded] = await uploadFiles(requestId, `${activeView.id}-base`, [file]);
+      updateView(activeView.id, (view) => ({ ...view, base: uploaded, exportAsset: null }));
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not upload the base image."); }
+  }
+
+  async function addArtwork(files: FileList | null) {
+    if (!activeView) return;
+    const selected = Array.from(files ?? []).filter((file) => file.type.startsWith("image/"));
+    if (!selected.length) return;
+    setError(""); setMessage("");
+    try {
+      const assets = await uploadFiles(requestId, `${activeView.id}-artwork`, selected);
+      const maxZ = activeView.layers.reduce((max, layer) => Math.max(max, layer.zIndex), 0);
+      const layers = assets.map((asset, index) => ({ id: uid("layer"), asset, x: 50, y: 50, width: 28, rotation: 0, opacity: 1, zIndex: maxZ + index + 1 } satisfies MockupLayer));
+      updateView(activeView.id, (view) => ({ ...view, layers: [...view.layers, ...layers], exportAsset: null }));
+      setSelectedLayerId(layers.at(-1)?.id || null);
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not upload artwork."); }
+  }
+
+  function onLayerPointerDown(event: React.PointerEvent, layer: MockupLayer) {
+    if (layer.locked || !stageRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedLayerId(layer.id);
+    const stage = stageRef.current;
+    const pointerId = event.pointerId;
+    event.currentTarget.setPointerCapture(pointerId);
+    const move = (clientX: number, clientY: number) => {
+      const rect = stage.getBoundingClientRect();
+      updateLayer(layer.id, { x: clamp(((clientX - rect.left) / rect.width) * 100, -30, 130), y: clamp(((clientY - rect.top) / rect.height) * 100, -30, 130) });
+    };
+    move(event.clientX, event.clientY);
+    const onMove = (e: PointerEvent) => move(e.clientX, e.clientY);
+    const onUp = () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }
+
+  async function save(status: "draft" | "proof_ready" = "draft") {
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/admin/mockups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, title: `${requestNumber} · ${product}`, status, document: cleanDocument(documentState) }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save mockups.");
+      setReady(true);
+      setMessage(result.message || "Mockup project saved.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not save mockups."); }
+    finally { setSaving(false); }
+  }
+
+  async function exportForProof() {
+    setExporting(true); setError(""); setMessage("");
+    try {
+      let nextDocument = documentState;
+      for (const view of documentState.views) {
+        if (!view.base?.url) continue;
+        const blob = await renderView(view);
+        const safeView = view.name.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "view";
+        const file = new File([blob], `${requestNumber}-${safeView}-mockup.png`, { type: "image/png" });
+        const [uploaded] = await uploadFiles(requestId, `mockup-${view.id}`, [file], PROOF_BUCKET);
+        nextDocument = { ...nextDocument, views: nextDocument.views.map((item) => item.id === view.id ? { ...item, exportAsset: uploaded } : item) };
+      }
+      if (!nextDocument.views.some((view) => view.exportAsset?.path)) throw new Error("Add at least one product base image before exporting proof views.");
+      setDocumentState(nextDocument);
+      const response = await fetch("/api/admin/mockups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, title: `${requestNumber} · ${product}`, status: "proof_ready", document: cleanDocument(nextDocument) }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save the exported mockups.");
+      setMessage("Proof views exported and attached to the Proof + Quote workspace.");
+      window.dispatchEvent(new CustomEvent("moore-made-mockup-exported", { detail: { requestId } }));
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not export proof views."); }
+    finally { setExporting(false); }
+  }
+
+  function addView() {
+    const id = uid("view");
+    setDocumentState((current) => ({ ...current, activeViewId: id, views: [...current.views, { id, name: `View ${current.views.length + 1}`, base: null, layers: [] }] }));
+    setSelectedLayerId(null);
+  }
+
+  return (
+    <div className="mockupStudio">
+      <button className="mockupStudioToggle" type="button" onClick={() => setOpen((value) => !value)}>
+        <span><strong>Mockup Studio</strong><small>{exportCount ? `${exportCount} proof view${exportCount === 1 ? "" : "s"} ready` : "Build front/back product previews without leaving Moore Made"}</small></span><span>{open ? "−" : "+"}</span>
+      </button>
+      {open ? <div className="mockupStudioBody">
+        {loading ? <div className="mockupLoading">Loading Mockup Studio…</div> : ready === false ? <div className="requestWarning"><strong>Mockup Studio needs one database update.</strong><br />Run <code>supabase/moore_made_phase6_22_mockup_studio.sql</code>, then refresh this order.</div> : <>
+          <div className="mockupStudioIntro"><div><span className="eyebrow">Admin design workspace</span><h5>{requestNumber} · {product}</h5><p>Upload a blank product image, place the client&apos;s logos/artwork on top, then export the finished front/back views directly into the Proof + Quote workflow.</p></div><div className="mockupStudioTopActions"><button className="btn secondary" type="button" disabled={saving} onClick={() => save("draft")}>{saving ? "Saving…" : "Save draft"}</button><button className="btn" type="button" disabled={exporting || saving} onClick={exportForProof}>{exporting ? "Rendering…" : "Export for proof + quote"}</button></div></div>
+
+          <div className="mockupViewTabs">
+            {documentState.views.map((view) => <button type="button" key={view.id} className={view.id === activeView?.id ? "active" : ""} onClick={() => { setDocumentState((current) => ({ ...current, activeViewId: view.id })); setSelectedLayerId(null); }}><span>{view.name}</span>{view.exportAsset?.path ? <small>Proof ready ✓</small> : <small>{view.base ? `${view.layers.length} layer${view.layers.length === 1 ? "" : "s"}` : "No base"}</small>}</button>)}
+            <button className="mockupAddView" type="button" onClick={addView}>+ View</button>
+          </div>
+
+          {activeView ? <div className="mockupWorkspace">
+            <aside className="mockupToolsPanel">
+              <label className="field"><span>View name</span><input value={activeView.name} maxLength={100} onChange={(e) => updateView(activeView.id, (view) => ({ ...view, name: e.target.value, exportAsset: null }))} /></label>
+              <div className="mockupToolBlock"><div><strong>1. Product base</strong><small>Front/back photo or blank mockup</small></div><label className="btn secondary mockupUploadButton">{activeView.base ? "Replace base image" : "Upload base image"}<input type="file" accept="image/*" hidden onChange={(e) => { void chooseBase(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>{activeView.base ? <small className="mockupFileName">{activeView.base.originalName}</small> : null}</div>
+              <div className="mockupToolBlock"><div><strong>2. Artwork</strong><small>Logo, graphic, or other transparent image</small></div><label className="btn secondary mockupUploadButton">+ Add artwork<input type="file" accept="image/*" multiple hidden onChange={(e) => { void addArtwork(e.target.files); e.currentTarget.value = ""; }} /></label></div>
+
+              <div className="mockupLayerList"><strong>Layers</strong>{activeView.layers.length ? activeView.layers.slice().sort((a,b) => b.zIndex-a.zIndex).map((layer) => <button type="button" key={layer.id} className={selectedLayerId === layer.id ? "active" : ""} onClick={() => setSelectedLayerId(layer.id)}><span>{layer.asset.originalName}</span><small>{Math.round(layer.width)}% wide</small></button>) : <p>No artwork layers yet.</p>}</div>
+
+              {selectedLayer ? <div className="mockupLayerControls"><div className="mockupControlHeading"><strong>Selected artwork</strong><button type="button" className="textButton dangerText" onClick={() => { updateView(activeView.id, (view) => ({ ...view, layers: view.layers.filter((layer) => layer.id !== selectedLayer.id), exportAsset: null })); setSelectedLayerId(null); }}>Remove</button></div>
+                <label><span>Size <b>{Math.round(selectedLayer.width)}%</b></span><input type="range" min="3" max="150" step="1" value={selectedLayer.width} onChange={(e) => { updateLayer(selectedLayer.id, { width: Number(e.target.value) }); }} /></label>
+                <label><span>Rotation <b>{Math.round(selectedLayer.rotation)}°</b></span><input type="range" min="-180" max="180" step="1" value={selectedLayer.rotation} onChange={(e) => { updateLayer(selectedLayer.id, { rotation: Number(e.target.value) }); }} /></label>
+                <label><span>Opacity <b>{Math.round(selectedLayer.opacity * 100)}%</b></span><input type="range" min="10" max="100" step="1" value={selectedLayer.opacity * 100} onChange={(e) => { updateLayer(selectedLayer.id, { opacity: Number(e.target.value) / 100 }); }} /></label>
+                <div className="mockupNudges"><button type="button" onClick={() => updateLayer(selectedLayer.id,{x:selectedLayer.x-1})}>←</button><button type="button" onClick={() => updateLayer(selectedLayer.id,{y:selectedLayer.y-1})}>↑</button><button type="button" onClick={() => updateLayer(selectedLayer.id,{y:selectedLayer.y+1})}>↓</button><button type="button" onClick={() => updateLayer(selectedLayer.id,{x:selectedLayer.x+1})}>→</button><button type="button" onClick={() => updateLayer(selectedLayer.id,{x:50,y:50})}>Center</button></div>
+              </div> : null}
+            </aside>
+
+            <div className="mockupCanvasColumn">
+              <div className="mockupCanvasHead"><div><strong>{activeView.name} preview</strong><small>Drag artwork directly on the product. Sliders give you precise size/rotation control.</small></div>{activeView.exportAsset?.path ? <span>Proof export ready ✓</span> : <span>Draft</span>}</div>
+              <div className={`mockupStage ${activeView.base ? "hasBase" : ""}`} ref={stageRef} onPointerDown={() => setSelectedLayerId(null)}>
+                {activeView.base?.url ? <img className="mockupBaseImage" src={activeView.base.url} alt={`${activeView.name} product base`} draggable={false} /> : <div className="mockupEmptyCanvas"><strong>Upload a {activeView.name.toLowerCase()} product image</strong><p>Use the same type of blank/mockup image you currently bring into Canva.</p></div>}
+                {activeView.base?.url ? activeView.layers.map((layer) => layer.asset.url ? <div key={layer.id} className={`mockupLayer ${selectedLayerId === layer.id ? "selected" : ""}`} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, zIndex: layer.zIndex, opacity: layer.opacity, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }} onPointerDown={(event) => onLayerPointerDown(event, layer)}><img src={layer.asset.url} alt={layer.asset.originalName} draggable={false} /></div> : null) : null}
+              </div>
+              <div className="mockupCanvasFoot"><span>The editor never changes the original customer artwork. It only saves placement instructions and rendered proof images.</span>{activeView.exportAsset?.url ? <a href={activeView.exportAsset.url} target="_blank" rel="noreferrer">Open latest exported PNG ↗</a> : null}</div>
+            </div>
+          </div> : null}
+
+          {error ? <div className="formError">{error}</div> : null}
+          {message ? <div className="formSuccess">{message}</div> : null}
+          <div className="mockupFutureNote"><strong>Built for the future client portal.</strong><span>The project format already separates product templates, editable placement, client artwork, and frozen proof exports so we can later let clients use approved templates without exposing admin controls.</span></div>
+        </>}
+      </div> : null}
+    </div>
+  );
+}

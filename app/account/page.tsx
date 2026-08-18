@@ -105,6 +105,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     </div>
                     <div className="accountOrderActions">
                       {quote && ["sent","changes_requested","approved"].includes(quote.status) ? <Link className="btn" href={`/quote/${quote.public_token}`}>{quote.status === "approved" && request.payment_status !== "paid" ? "Open payment" : "Review proof + quote"}</Link> : null}
+                      {quote?.status === "approved" ? <Link className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank">Invoice</Link> : null}
                       <Link className="btn secondary" href={`/account/messages?order=${request.id}`}>Message Moore Made</Link>
                     </div>
                     {receipts.length ? <div className="accountReceipts"><strong>Payment receipts</strong><div>{receipts.map((receipt) => receipt.receipt_token ? <a key={receipt.id} href={`/receipt/${receipt.receipt_token}`} target="_blank" rel="noreferrer"><span>{receiptLabel(receipt.receipt_number)}</span><small>{paymentMethodLabel(receipt.payment_method)} · {money(receipt.amount_cents)}</small></a> : null)}</div></div> : null}

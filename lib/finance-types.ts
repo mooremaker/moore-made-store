@@ -62,6 +62,8 @@ export type BusinessExpenseRow = {
   recorded_by: string | null;
   created_at: string;
   updated_at: string;
+  voided_at: string | null;
+  void_reason: string | null;
   receipts?: BusinessExpenseReceipt[];
 };
 
@@ -96,6 +98,7 @@ export type FundingEntryType =
   | "reimbursement_due"
   | "reimbursement_paid"
   | "equity_investment"
+  | "gift_received"
   | "needs_classification";
 
 export const FUNDING_PARTY_KIND_LABELS: Record<FundingPartyKind, string> = {
@@ -111,6 +114,7 @@ export const FUNDING_ENTRY_TYPE_LABELS: Record<FundingEntryType, string> = {
   reimbursement_due: "Personal expense owed back",
   reimbursement_paid: "Reimbursement paid",
   equity_investment: "Equity investment",
+  gift_received: "Family / outside gift (no repayment)",
   needs_classification: "Needs classification",
 };
 
@@ -143,4 +147,66 @@ export type BusinessFundingRow = {
   void_reason: string | null;
   created_at: string;
   documents?: BusinessFundingDocument[];
+};
+
+
+export type BusinessGoalPriority = "critical" | "high" | "medium" | "future";
+export type BusinessGoalStatus = "planned" | "saving" | "ready" | "purchased" | "paused" | "completed" | "cancelled";
+
+export const BUSINESS_GOAL_PRIORITY_LABELS: Record<BusinessGoalPriority, string> = {
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  future: "Future",
+};
+
+export const BUSINESS_GOAL_STATUS_LABELS: Record<BusinessGoalStatus, string> = {
+  planned: "Planned",
+  saving: "Saving",
+  ready: "Ready to buy",
+  purchased: "Purchased",
+  paused: "Paused",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export type BusinessGoalFundingRow = {
+  id: string;
+  goal_id: string;
+  entry_date: string;
+  direction: "allocate" | "withdraw";
+  amount_cents: number;
+  funding_source: string | null;
+  note: string | null;
+  recorded_by: string | null;
+  created_at: string;
+};
+
+export type BusinessGoalRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  target_amount_cents: number;
+  priority: BusinessGoalPriority;
+  status: BusinessGoalStatus;
+  target_date: string | null;
+  funding_source: string | null;
+  note: string | null;
+  created_by: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  funding_entries?: BusinessGoalFundingRow[];
+};
+
+export type BusinessFinanceAuditRow = {
+  id: string;
+  occurred_at: string;
+  entity_type: string;
+  entity_id: string | null;
+  action: string;
+  actor_user_id: string | null;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
 };

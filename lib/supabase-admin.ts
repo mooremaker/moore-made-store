@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const CUSTOM_REQUEST_BUCKET = "custom-request-files";
 export const QUOTE_PROOF_BUCKET = "quote-proof-files";
+export const MOCKUP_STUDIO_BUCKET = "mockup-studio-files";
 
 export function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

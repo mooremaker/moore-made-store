@@ -3,12 +3,25 @@ import { notFound } from "next/navigation";
 import { PrintReceiptButton } from "@/components/receipt/PrintReceiptButton";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { paymentMethodLabel, receiptLabel } from "@/lib/finance-types";
-import { money } from "@/lib/quote-types";
+import { money, type QuoteLineItem } from "@/lib/quote-types";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase-admin";
 
 export const metadata = { title: "Moore Made Receipt", robots: { index: false, follow: false } };
 
 type Props = { params: Promise<{ token: string }> };
+
+type ReceiptQuote = {
+  public_token: string;
+  line_items: QuoteLineItem[];
+  setup_fee_cents: number;
+  shipping_cents: number;
+  tax_cents: number;
+  discount_cents: number;
+  subtotal_cents: number;
+  total_cents: number;
+  payment_terms: "full" | "deposit";
+  deposit_amount_cents: number | null;
+};
 
 function dateTime(value: string | null) {
   if (!value) return "—";
@@ -36,12 +49,13 @@ export default async function ReceiptPage({ params }: Props) {
     .maybeSingle();
   if (!payment) notFound();
 
-  const [{ data: order }, { data: quote }, { data: paidRows }] = await Promise.all([
+  const [{ data: order }, { data: quoteData }, { data: paidRows }] = await Promise.all([
     supabase.from("custom_requests").select("request_number,customer_name,product,quantity").eq("id", payment.request_id).single(),
-    supabase.from("quotes").select("total_cents").eq("id", payment.quote_id).single(),
+    supabase.from("quotes").select("public_token,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents").eq("id", payment.quote_id).single(),
     supabase.from("payments").select("amount_cents,paid_at,status").eq("request_id", payment.request_id).eq("status", "paid"),
   ]);
-  if (!order || !quote) notFound();
+  if (!order || !quoteData) notFound();
+  const quote = quoteData as unknown as ReceiptQuote;
 
   const paidAtMs = payment.paid_at ? new Date(payment.paid_at).getTime() : Number.POSITIVE_INFINITY;
   const paidToDate = (paidRows ?? []).reduce((sum, row) => {
@@ -52,10 +66,11 @@ export default async function ReceiptPage({ params }: Props) {
   const totalCents = Number(quote.total_cents || 0);
   const remainingCents = Math.max(0, totalCents - paidToDate);
   const orderNumber = formatRequestNumber(order.request_number);
+  const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
 
   return (
     <div className="shell receiptPage">
-      <div className="receiptActions"><a className="btn secondary" href="/account">Back to account</a><PrintReceiptButton /></div>
+      <div className="receiptActions"><a className="btn secondary" href="/account">Back to account</a><a className="btn secondary" href={`/invoice/${quote.public_token}`}>View invoice</a><PrintReceiptButton /></div>
       <article className="receiptPaper">
         <header className="receiptHeader">
           <Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="receiptLogo" priority />
@@ -68,24 +83,54 @@ export default async function ReceiptPage({ params }: Props) {
           <div><span>Customer</span><strong>{order.customer_name}</strong></div>
           <div><span>Order</span><strong>{orderNumber}</strong></div>
           <div><span>Product</span><strong>{order.product}</strong></div>
-          <div><span>Quantity</span><strong>{order.quantity}</strong></div>
+          <div><span>Requested quantity</span><strong>{order.quantity}</strong></div>
+        </section>
+
+        <section className="receiptBreakdownSection">
+          <div className="receiptSectionHeading"><div><span className="eyebrow">Order breakdown</span><h2>What this order includes</h2></div><small>Prices reflect the approved quote.</small></div>
+          <div className="receiptLineItems">
+            <div className="receiptLine receiptLineHeader"><span>Item</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+            {lineItems.map((item, index) => (
+              <div className="receiptLine" key={`${item.description}-${index}`}>
+                <span>{item.description}</span>
+                <span>{item.quantity}</span>
+                <span>{money(item.unitPriceCents)}</span>
+                <strong>{money(item.quantity * item.unitPriceCents)}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="receiptOrderTotals">
+            <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
+            {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
+            {quote.shipping_cents ? <div><span>Shipping</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
+            {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            <div className="receiptOrderGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
+          </div>
+          <div className="receiptTermsNote">
+            <span>Payment terms</span>
+            <strong>{quote.payment_terms === "deposit" ? `Custom deposit · ${money(quote.deposit_amount_cents || 0)} initial payment` : "Full payment"}</strong>
+          </div>
         </section>
 
         <section className="receiptPaymentBox">
-          <div><span>Payment received</span><strong>{money(payment.amount_cents)}</strong></div>
+          <div><span>This payment</span><strong>{money(payment.amount_cents)}</strong></div>
           <div><span>Payment method</span><strong>{paymentMethodLabel(payment.payment_method)}</strong></div>
           {payment.manual_reference ? <div><span>Reference</span><strong>{payment.manual_reference}</strong></div> : null}
+          <div><span>Payment date</span><strong>{dateTime(payment.paid_at)}</strong></div>
         </section>
 
         <section className="receiptTotals">
           <div><span>Order total</span><strong>{money(totalCents)}</strong></div>
-          <div><span>Paid through this receipt</span><strong>{money(paidToDate)}</strong></div>
+          <div><span>This payment</span><strong>{money(payment.amount_cents)}</strong></div>
+          <div><span>Total paid through this receipt</span><strong>{money(paidToDate)}</strong></div>
           <div className="receiptBalance"><span>Balance remaining</span><strong>{money(remainingCents)}</strong></div>
         </section>
 
         <footer className="receiptFooter">
           <strong>Thank you for choosing Moore Made.</strong>
-          <p>This receipt confirms a payment recorded for {orderNumber}. Keep it for your records.</p>
+          <p>This receipt confirms the payment above for {orderNumber}. The order breakdown is included so your payment always stays connected to the approved work.</p>
           <p className="receiptFinalSaleNotice"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p>
           <small>Moore Made LLC · mooremade.store · Custom Order Terms: /terms/custom-orders</small>
         </footer>

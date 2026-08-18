@@ -33,7 +33,7 @@ export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: 
     });
   }, [threads, filter, query]);
 
-  const selected = threads.find((thread) => thread.id === selectedId) ?? visible[0] ?? null;
+  const selected = visible.find((thread) => thread.id === selectedId) ?? visible[0] ?? null;
   const unreadCount = threads.reduce((sum, thread) => sum + thread.adminUnreadCount, 0);
 
   useEffect(() => {

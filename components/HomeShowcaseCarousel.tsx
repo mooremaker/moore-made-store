@@ -4,19 +4,30 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { ShowcaseReviewModal } from "@/components/ShowcaseReviewModal";
 import type { PublicShowcasePost } from "@/lib/showcase-data";
+import { useRefreshStablePhotoIndex } from "@/lib/showcase-photo-selection";
 
 const AUTO_ROTATE_MS = 9000;
 const DESKTOP_CARD_COUNT = 3;
 
 function CompactShowcaseCard({ post, onOpen }: { post: PublicShowcasePost; onOpen: () => void }) {
   const displayName = post.business_name || post.customer_name;
-  const previewPhoto = post.photoUrls[0] ?? null;
+  const [previewIndex] = useRefreshStablePhotoIndex(post.id, post.photoUrls);
+  const previewPhoto = previewIndex == null ? null : (post.photoUrls[previewIndex] ?? post.photoUrls[0] ?? null);
+  const preview = previewIndex == null ? null : (post.photoPreviews[previewIndex] ?? { x: 50, y: 50, zoom: 1 });
 
   return (
     <article className="homeCompactReview card">
       <button type="button" className="homeCompactReviewMedia" onClick={onOpen} aria-label={`Open review from ${displayName}`}>
         {previewPhoto ? (
-          <img src={previewPhoto} alt={`${post.product} customer project`} loading="lazy" decoding="async" />
+          <img
+            src={previewPhoto}
+            alt={`${post.product} customer project`}
+            loading="eager"
+            decoding="async"
+            style={preview ? { objectPosition: `${preview.x}% ${preview.y}%`, transform: `scale(${preview.zoom})`, transformOrigin: `${preview.x}% ${preview.y}%` } : undefined}
+          />
+        ) : post.photoUrls.length ? (
+          <span className="homeCompactReviewLoading" aria-hidden="true" />
         ) : (
           <span className="homeCompactReviewFallback">Made by You</span>
         )}
@@ -47,11 +58,6 @@ export function HomeShowcaseCarousel({ posts }: { posts: PublicShowcasePost[] })
   const [selectedPost, setSelectedPost] = useState<PublicShowcasePost | null>(null);
   const touchStartX = useRef<number | null>(null);
   const resumeTimer = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (posts.length > 1) setStartIndex(Math.floor(Math.random() * posts.length));
-    else setStartIndex(0);
-  }, [posts.length]);
 
   useEffect(() => {
     if (posts.length < 2 || hoverPaused || selectedPost) return;

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdmin();
     const [{ data: quote }, { data: order }, { data: paidRows }] = await Promise.all([
-      supabase.from("quotes").select("id,request_id,status,total_cents,payment_terms,deposit_amount_cents,proof_version").eq("id", quoteId).eq("request_id", requestId).single(),
+      supabase.from("quotes").select("id,request_id,public_token,status,total_cents,payment_terms,deposit_amount_cents,proof_version").eq("id", quoteId).eq("request_id", requestId).single(),
       supabase.from("custom_requests").select("id,request_number,customer_name,email,product,cash_payment_request_status").eq("id", requestId).single(),
       supabase.from("payments").select("amount_cents,status").eq("request_id", requestId),
     ]);
@@ -106,7 +106,10 @@ export async function POST(request: Request) {
            </div>
            <p style="line-height:1.65;margin:0 0 18px;">${summary.remainingCents <= 0 ? "Your order is paid in full. We’ll keep you updated when it is ready for pickup or ships." : "Your payment has been applied to the order. Any remaining balance stays attached to your order."}</p>
            <p style="line-height:1.55;margin:0 0 18px;color:#6b6b6b;font-size:13px;"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p>
-           ${paymentRow.receipt_token ? `<a href="${siteUrl()}/receipt/${paymentRow.receipt_token}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View / print receipt</a>` : ""}`
+           <div style="display:flex;gap:10px;flex-wrap:wrap;">
+             ${quote.public_token ? `<a href="${siteUrl()}/invoice/${quote.public_token}" style="display:inline-block;background:#fff;color:#171717;border:1px solid #d7d1c8;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View invoice</a>` : ""}
+             ${paymentRow.receipt_token ? `<a href="${siteUrl()}/receipt/${paymentRow.receipt_token}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View / print receipt</a>` : ""}
+           </div>`
         ),
       });
     } catch (emailError) {

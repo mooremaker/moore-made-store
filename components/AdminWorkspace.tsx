@@ -11,14 +11,16 @@ import { ShowcaseDeleteButton } from "@/components/ShowcaseDeleteButton";
 import { ShowcasePhotoManager } from "@/components/ShowcasePhotoManager";
 import { AdminMessagesPanel } from "@/components/messages/AdminMessagesPanel";
 import { AdminFinancialsPanel } from "@/components/admin/AdminFinancialsPanel";
+import { MockupStudio } from "@/components/admin/MockupStudio";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
-import type { BusinessExpenseRow, BusinessFundingRow, FinancialPaymentRow } from "@/lib/finance-types";
+import type { BusinessExpenseRow, BusinessFinanceAuditRow, BusinessFundingRow, BusinessGoalRow, FinancialPaymentRow } from "@/lib/finance-types";
 import {
   formatRequestNumber,
   REQUEST_STATUS_LABELS,
   type RequestStatus,
 } from "@/lib/custom-request-types";
 import { SHOWCASE_STATUS_LABELS, type ShowcaseStatus } from "@/lib/showcase-types";
+import type { ShowcasePhotoPreview } from "@/lib/showcase-photo-preview";
 import { money, type QuoteRecord } from "@/lib/quote-types";
 
 type FileLink = { path: string; url: string };
@@ -71,7 +73,7 @@ export type AdminShowcaseRow = {
   status: ShowcaseStatus;
   photo_paths: string[] | null;
   created_at: string;
-  photoLinks: FileLink[];
+  photoLinks: (FileLink & { preview: ShowcasePhotoPreview })[];
 };
 
 type Props = {
@@ -87,8 +89,12 @@ type Props = {
   payments: FinancialPaymentRow[];
   expenses: BusinessExpenseRow[];
   funding: BusinessFundingRow[];
+  goals: BusinessGoalRow[];
+  financeAudit: BusinessFinanceAuditRow[];
   financialsReady: boolean;
   fundingReady: boolean;
+  goalsReady: boolean;
+  auditReady: boolean;
 };
 
 type OrderFilter = "all" | RequestStatus;
@@ -127,7 +133,7 @@ function submittedDate(value: string) {
   });
 }
 
-export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, financialsReady, fundingReady }: Props) {
+export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, goals, financeAudit, financialsReady, fundingReady, goalsReady, auditReady }: Props) {
   const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase">("orders");
   const [query, setQuery] = useState("");
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
@@ -215,12 +221,22 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         </button>
       </section>
 
-      <div className="adminWorkspaceTabs" role="tablist" aria-label="Admin workspace">
+      <nav className="adminWorkspaceSwitcher" aria-label="Admin workspace area">
+        <button type="button" className={tab !== "financials" ? "active" : ""} onClick={() => setTab("orders")}>
+          <span className="adminWorkspaceSwitcherIcon">▣</span>
+          <span><strong>Orders & customers</strong><small>Requests, messages, production, showcase</small></span>
+        </button>
+        <button type="button" className={tab === "financials" ? "active" : ""} onClick={() => setTab("financials")}>
+          <span className="adminWorkspaceSwitcherIcon">$</span>
+          <span><strong>Business & financials</strong><small>Money, goals, records, tax readiness</small></span>
+        </button>
+      </nav>
+
+      {tab !== "financials" ? <div className="adminWorkspaceTabs adminOperationsTabs" role="tablist" aria-label="Orders and customers">
         <button type="button" className={tab === "orders" ? "active" : ""} onClick={() => setTab("orders")}>Orders <span>{requests.length}</span></button>
         <button type="button" className={tab === "messages" ? "active" : ""} onClick={() => setTab("messages")}>Messages <span>{counts.messageUnread}</span></button>
-        <button type="button" className={tab === "financials" ? "active" : ""} onClick={() => setTab("financials")}>Financials</button>
         <button type="button" className={tab === "showcase" ? "active" : ""} onClick={() => setTab("showcase")}>Made by You <span>{counts.showcasePending}</span></button>
-      </div>
+      </div> : null}
 
       {tab === "orders" ? (
         <section className="adminWorkspacePanel">
@@ -338,6 +354,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         ) : <p className="muted">No artwork uploaded.</p>}
                       </div>
 
+                      <section className="adminQuoteSection adminMockupSection">
+                        <div className="adminDetailGroupTitle"><span>✦</span><h4>Mockup Studio</h4></div>
+                        <MockupStudio requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} />
+                      </section>
+
                       <section className="adminQuoteSection">
                         <div className="adminDetailGroupTitle"><span>$</span><h4>Proof + quote approval</h4></div>
                         {quoteReady ? (
@@ -408,7 +429,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
       ) : tab === "messages" ? (
         messagesReady ? <AdminMessagesPanel threads={messageThreads} adminUsers={adminUsers} currentAdminUserId={currentAdminUserId} /> : <section className="adminWorkspacePanel"><div className="formError">Messages are not set up in Supabase yet. Run supabase/moore_made_phase5_messages.sql.</div></section>
       ) : tab === "financials" ? (
-        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} fundingReady={fundingReady} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need a database update. Run supabase/moore_made_phase6_1_expense_receipts.sql (and Phase 6 first if you have not already).</div></section>
+        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} goals={goals} financeAudit={financeAudit} adminUsers={adminUsers} fundingReady={fundingReady} goalsReady={goalsReady} auditReady={auditReady} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need the latest database update. Run <code>supabase/moore_made_phase6_16_finance_command_center.sql</code> after your existing financial migrations.</div></section>
       ) : (
         <section className="adminWorkspacePanel">
           <div className="adminSectionIntro">
@@ -433,7 +454,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                 <article className={`adminShowcaseCompact ${isOpen ? "isOpen" : ""}`} key={post.id}>
                   <div className="adminShowcaseSummary">
                     <div className="adminShowcaseThumb">
-                      {post.photoLinks[0] ? <img src={post.photoLinks[0].url} alt="Customer submitted project" /> : <span>No photo</span>}
+                      {post.photoLinks[0] ? <img src={post.photoLinks[0].url} alt="Customer submitted project" style={{ objectPosition: `${post.photoLinks[0].preview.x}% ${post.photoLinks[0].preview.y}%`, transform: `scale(${post.photoLinks[0].preview.zoom})`, transformOrigin: `${post.photoLinks[0].preview.x}% ${post.photoLinks[0].preview.y}%` }} /> : <span>No photo</span>}
                     </div>
                     <div className="adminRequestIdentity">
                       <div className="adminRequestKicker"><span>{"★".repeat(post.rating)}{"☆".repeat(5 - post.rating)}</span><span className={`statusBadge showcase-${post.status}`}>{SHOWCASE_STATUS_LABELS[post.status]}</span></div>
