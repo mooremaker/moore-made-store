@@ -97,20 +97,35 @@ type Props = {
   auditReady: boolean;
 };
 
-type OrderFilter = "all" | RequestStatus;
+type OrderFilter = "all" | "review" | "production" | RequestStatus;
 type ShowcaseFilter = "all" | ShowcaseStatus;
 
 const orderFilters: { value: OrderFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "new", label: "New" },
-  { value: "reviewing", label: "Reviewing" },
-  { value: "quote_sent", label: "Proof + quote sent" },
-  { value: "approved", label: "Approved" },
-  { value: "in_production", label: "In production" },
-  { value: "ready", label: "Ready for pickup" },
-  { value: "shipped", label: "Shipped" },
+  { value: "review", label: "Review / proof" },
+  { value: "production", label: "Production" },
   { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
 ];
+
+function matchesOrderFilter(status: RequestStatus, filter: OrderFilter) {
+  if (filter === "all") return true;
+  if (filter === "review") return status === "reviewing" || status === "quote_sent";
+  if (filter === "production") return ["approved", "in_production", "ready", "shipped"].includes(status);
+  return status === filter;
+}
+
+function monthKeyInNewYork(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(value);
+  const year = parts.find((part) => part.type === "year")?.value ?? String(value.getFullYear());
+  const month = parts.find((part) => part.type === "month")?.value ?? String(value.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
 
 const prettyPlacement = (value: string) =>
   value
@@ -147,6 +162,20 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
     [quotes]
   );
 
+  const paidPaymentsByRequest = useMemo(() => {
+    const grouped = new Map<string, FinancialPaymentRow[]>();
+    for (const payment of payments) {
+      if (payment.status !== "paid") continue;
+      const current = grouped.get(payment.request_id) ?? [];
+      current.push(payment);
+      grouped.set(payment.request_id, current);
+    }
+    for (const rows of grouped.values()) {
+      rows.sort((a, b) => new Date(b.paid_at || b.created_at).getTime() - new Date(a.paid_at || a.created_at).getTime());
+    }
+    return grouped;
+  }, [payments]);
+
   const counts = useMemo(
     () => ({
       new: requests.filter((r) => r.status === "new").length,
@@ -154,7 +183,9 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
       production: requests.filter((r) => ["approved", "in_production", "ready", "shipped"].includes(r.status)).length,
       completed: requests.filter((r) => r.status === "completed").length,
       messageUnread: messageThreads.reduce((sum, thread) => sum + thread.adminUnreadCount, 0),
-      receivedThisMonth: payments.filter((payment) => payment.status === "paid" && (payment.paid_at || payment.created_at).slice(0, 7) === new Date().toISOString().slice(0, 7)).reduce((sum, payment) => sum + Number(payment.amount_cents || 0), 0),
+      receivedThisMonth: payments
+        .filter((payment) => payment.status === "paid" && monthKeyInNewYork(new Date(payment.paid_at || payment.created_at)) === monthKeyInNewYork())
+        .reduce((sum, payment) => sum + Number(payment.amount_cents || 0), 0),
       showcasePending: showcasePosts.filter((r) => r.status === "pending").length,
     }),
     [requests, showcasePosts, messageThreads, payments]
@@ -163,7 +194,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
   const visibleRequests = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...requests]
-      .filter((request) => orderFilter === "all" || request.status === orderFilter)
+      .filter((request) => matchesOrderFilter(request.status, orderFilter))
       .filter((request) => {
         if (!normalized) return true;
         const haystack = [
@@ -201,10 +232,10 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("new")}>
           <span>New requests</span><strong>{counts.new}</strong><small>Needs attention</small>
         </button>
-        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("reviewing")}>
+        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("review")}>
           <span>Review / proof</span><strong>{counts.review}</strong><small>Preparing approval</small>
         </button>
-        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("approved")}>
+        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("production")}>
           <span>Production</span><strong>{counts.production}</strong><small>Approved to ready</small>
         </button>
         <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("completed")}>
@@ -262,7 +293,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
             {orderFilters.map((filter) => (
               <button key={filter.value} type="button" className={orderFilter === filter.value ? "active" : ""} onClick={() => setOrderFilter(filter.value)}>
                 {filter.label}
-                <span>{filter.value === "all" ? requests.length : requests.filter((r) => r.status === filter.value).length}</span>
+                <span>{requests.filter((request) => matchesOrderFilter(request.status, filter.value)).length}</span>
               </button>
             ))}
           </div>
@@ -275,6 +306,8 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
             ) : visibleRequests.map((request) => {
               const isOpen = openRequestId === request.id;
               const quote = quoteByRequest.get(request.id) ?? null;
+              const requestPayments = paidPaymentsByRequest.get(request.id) ?? [];
+              const latestReceipt = requestPayments.find((payment) => Boolean(payment.receipt_token)) ?? null;
               return (
                 <article id={`order-${request.id}`} className={`adminRequestCompact ${isOpen ? "isOpen" : ""}`} key={request.id}>
                   <div className="adminRequestSummary">
@@ -305,6 +338,30 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
 
                   {isOpen ? (
                     <div className="adminRequestExpanded">
+                      <section className="adminOrderDocuments" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
+                        <div className="adminOrderDocumentsHeading">
+                          <div><span className="eyebrow">Documents</span><strong>Quick access</strong></div>
+                          <small>Open the latest customer-facing order documents without digging through the sections below.</small>
+                        </div>
+                        <div className="adminOrderDocumentButtons">
+                          {quote?.public_token ? (
+                            <a className="btn secondary" href={`/proforma/${quote.public_token}`} target="_blank" rel="noreferrer">Pro Forma + Proof ↗</a>
+                          ) : (
+                            <span className="btn secondary isDisabled" aria-disabled="true" title="Available after a proof + quote is created">Pro Forma + Proof</span>
+                          )}
+                          {quote?.public_token && quote.status === "approved" ? (
+                            <a className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank" rel="noreferrer">Invoice ↗</a>
+                          ) : (
+                            <span className="btn secondary isDisabled" aria-disabled="true" title="Available after customer approval">Invoice</span>
+                          )}
+                          {latestReceipt?.receipt_token ? (
+                            <a className="btn secondary" href={`/receipt/${latestReceipt.receipt_token}`} target="_blank" rel="noreferrer">Latest Receipt ↗</a>
+                          ) : (
+                            <span className="btn secondary isDisabled" aria-disabled="true" title="Receipt available after payment">Receipt · available after payment</span>
+                          )}
+                        </div>
+                      </section>
+
                       <div className="adminDetailGrid">
                         <section className="adminDetailGroup">
                           <div className="adminDetailGroupTitle"><span>01</span><h4>Contact</h4></div>
@@ -398,6 +455,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             paymentStatus={request.payment_status}
                             policyAccepted={Boolean(quote.paymentPolicyAccepted)}
                             policyAcceptedAt={quote.paymentPolicyAcceptedAt || null}
+                            payments={requestPayments}
                           />
                         </section>
                       ) : null}

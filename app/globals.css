@@ -5924,3 +5924,235 @@ p { line-height: 1.65; }
   .invoicePage { width: 100% !important; max-width: none !important; padding: 0 !important; }
   .invoicePaper { border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }
 }
+
+/* =========================================================
+   Admin usability pass — quick documents, receipt history,
+   smoother showcase framing, and in-page photo lightbox.
+   ========================================================= */
+.adminOrderDocuments {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 13px 14px;
+  border: 1px solid #dcd4ca;
+  border-radius: 13px;
+  background: #f5f1eb;
+}
+.adminOrderDocumentsHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.adminOrderDocumentsHeading > div { display: grid; gap: 2px; }
+.adminOrderDocumentsHeading > div > strong { font-size: .92rem; }
+.adminOrderDocumentsHeading > small { max-width: 560px; color: var(--muted); font-size: .72rem; line-height: 1.4; text-align: right; }
+.adminOrderDocumentButtons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.adminOrderDocumentButtons .btn {
+  width: 100%;
+  min-height: 40px;
+  justify-content: center;
+  text-align: center;
+  font-size: .76rem;
+}
+.adminOrderDocumentButtons .isDisabled {
+  opacity: .48;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: #f7f4ef;
+  color: #766f67;
+}
+
+.manualPaymentHistory {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid #ded7ce;
+  border-radius: 13px;
+  background: #faf8f4;
+}
+.manualPaymentHistoryHead {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.manualPaymentHistoryHead > div { display: grid; gap: 2px; }
+.manualPaymentHistoryHead > div > strong { font-size: .9rem; }
+.manualPaymentHistoryHead small { color: var(--muted); font-size: .7rem; }
+.manualPaymentHistoryList { display: grid; gap: 6px; }
+.manualPaymentHistoryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid #e8e2da;
+  border-radius: 10px;
+  background: #fff;
+}
+.manualPaymentHistoryRow > div { display: grid; gap: 2px; min-width: 0; }
+.manualPaymentHistoryRow > div > strong { font-size: .8rem; }
+.manualPaymentHistoryRow > div > small { color: var(--muted); font-size: .68rem; overflow-wrap: anywhere; }
+.manualPaymentHistoryRow > strong { font-size: .82rem; white-space: nowrap; }
+.manualPaymentHistoryRow .btn { min-height: 32px; padding: 6px 9px; font-size: .68rem; white-space: nowrap; }
+.manualPaymentReceiptMissing { color: var(--muted); font-size: .68rem; }
+.manualPaymentNoReceipts {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed #d5cec4;
+  border-radius: 11px;
+  background: #faf8f4;
+}
+.manualPaymentNoReceipts strong { font-size: .78rem; }
+.manualPaymentNoReceipts span { color: var(--muted); font-size: .72rem; }
+
+.showcasePreviewSavedState.isUnsaved {
+  border-color: #c59b66;
+  background: #fff4e5;
+  color: #70451e !important;
+}
+.showcasePreviewSavedState.isSaved {
+  border-color: #cbdac8;
+  background: #eef6ec;
+  color: #315536 !important;
+}
+.showcasePreviewStage {
+  touch-action: none !important;
+  cursor: grab;
+}
+.showcasePreviewStage:active { cursor: grabbing; }
+.showcasePreviewStage img { transition: none; }
+
+.showcaseFullSizeLink {
+  font: inherit;
+  cursor: pointer;
+}
+
+.showcasePhotoLightbox {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(12, 11, 10, .92);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.showcasePhotoLightboxPanel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(1180px, 100%);
+  height: min(900px, calc(100vh - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 18px;
+  background: #171513;
+  box-shadow: 0 28px 90px rgba(0,0,0,.55);
+}
+.showcasePhotoLightboxToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.14);
+  color: #fff;
+}
+.showcasePhotoLightboxToolbar > span { font-size: .75rem; font-weight: 850; }
+.showcasePhotoLightboxToolbar > div { display: flex; align-items: center; gap: 6px; }
+.showcasePhotoLightboxToolbar button {
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.showcasePhotoLightboxToolbar button:disabled { opacity: .35; cursor: default; }
+.showcasePhotoLightboxToolbar .showcasePhotoLightboxClose { margin-left: 5px; font-size: 1.15rem; }
+.showcasePhotoLightboxCanvas {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  background: #0d0c0b;
+}
+.showcasePhotoLightboxCanvas > img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  transition: transform .14s ease;
+  user-select: none;
+}
+.showcasePhotoLightboxArrow {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255,255,255,.4);
+  border-radius: 999px;
+  background: rgba(20,20,20,.66);
+  color: #fff;
+  font-size: 1.65rem;
+  cursor: pointer;
+}
+.showcasePhotoLightboxArrow.isPrevious { left: 12px; }
+.showcasePhotoLightboxArrow.isNext { right: 12px; }
+.showcasePhotoLightboxThumbs {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 9px 12px 11px;
+  border-top: 1px solid rgba(255,255,255,.14);
+}
+.showcasePhotoLightboxThumbs button {
+  flex: 0 0 58px;
+  width: 58px;
+  height: 44px;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #292521;
+  opacity: .62;
+  cursor: pointer;
+}
+.showcasePhotoLightboxThumbs button.isActive { border-color: #fff; opacity: 1; }
+.showcasePhotoLightboxThumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+@media (max-width: 760px) {
+  .adminOrderDocumentsHeading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .adminOrderDocumentsHeading > small { text-align: left; }
+  .adminOrderDocumentButtons { grid-template-columns: 1fr; }
+  .manualPaymentHistoryHead { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .manualPaymentHistoryRow { grid-template-columns: minmax(0,1fr) auto; }
+  .manualPaymentHistoryRow .btn,
+  .manualPaymentReceiptMissing { grid-column: 1 / -1; width: 100%; text-align: center; justify-content: center; }
+  .manualPaymentNoReceipts { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .showcasePhotoLightbox { padding: 6px; }
+  .showcasePhotoLightboxPanel { height: calc(100vh - 12px); border-radius: 13px; }
+  .showcasePhotoLightboxToolbar { padding-left: 10px; }
+  .showcasePhotoLightboxArrow { width: 38px; height: 38px; }
+  .showcasePhotoLightboxArrow.isPrevious { left: 7px; }
+  .showcasePhotoLightboxArrow.isNext { right: 7px; }
+  .showcasePhotoLightboxThumbs { justify-content: flex-start; }
+}

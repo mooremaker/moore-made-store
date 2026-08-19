@@ -15,10 +15,15 @@ type Props = {
 const BUCKET = "showcase-files";
 const MAX_PHOTOS = 5;
 
+function samePreview(a: ShowcasePhotoPreview, b: ShowcasePhotoPreview) {
+  return a.x === b.x && a.y === b.y && a.zoom === b.zoom;
+}
+
 export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const touchStartX = useRef<number | null>(null);
+  const dragPointerId = useRef<number | null>(null);
   const [photos, setPhotos] = useState(initialPhotos);
   const [activeIndex, setActiveIndex] = useState(0);
   const [busyPath, setBusyPath] = useState<string | null>(null);
@@ -30,6 +35,8 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
 
   const remaining = Math.max(0, MAX_PHOTOS - photos.length);
   const activePhoto = photos[activeIndex] ?? null;
+  const savedPreview = activePhoto?.preview ?? DEFAULT_SHOWCASE_PHOTO_PREVIEW;
+  const previewDirty = Boolean(activePhoto && !samePreview(previewDraft, savedPreview));
 
   useEffect(() => {
     if (!photos.length) setActiveIndex(0);
@@ -38,6 +45,8 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
 
   useEffect(() => {
     setPreviewDraft(activePhoto?.preview ?? { ...DEFAULT_SHOWCASE_PHOTO_PREVIEW });
+    setNotice("");
+    setError("");
   }, [activePhoto?.path]);
 
   function move(direction: -1 | 1) {
@@ -45,16 +54,35 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
     setActiveIndex((current) => (current + direction + photos.length) % photos.length);
   }
 
-  function setFocalPoint(event: ReactPointerEvent<HTMLDivElement>) {
+  function updateFocalPoint(event: ReactPointerEvent<HTMLDivElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
     setPreviewDraft((current) => ({ ...current, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }));
+    setNotice("");
+  }
+
+  function handlePreviewPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    dragPointerId.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateFocalPoint(event);
+  }
+
+  function handlePreviewPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragPointerId.current !== event.pointerId) return;
+    updateFocalPoint(event);
+  }
+
+  function finishPreviewPointer(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragPointerId.current !== event.pointerId) return;
+    dragPointerId.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   async function savePreview() {
-    if (!activePhoto) return;
+    if (!activePhoto || !previewDirty) return;
     setSavingPreview(true);
     setError("");
     setNotice("");
@@ -70,7 +98,6 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
       setPhotos((current) => current.map((photo) => photo.path === activePhoto.path ? { ...photo, preview: saved } : photo));
       setPreviewDraft(saved);
       setNotice(`Preview framing saved for photo ${activeIndex + 1}.`);
-      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save the preview framing.");
     } finally {
@@ -220,16 +247,19 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
             <div className="showcasePreviewEditorHeading">
               <div>
                 <strong>Main-page preview</strong>
-                <span>Choose how this photo is framed in compact review cards. The full photo is never changed.</span>
+                <span>Drag across the preview to choose the focal point, then fine-tune with the sliders. The full photo is never changed.</span>
               </div>
-              <span className="showcasePreviewSavedState">Photo {activeIndex + 1}</span>
+              <span className={`showcasePreviewSavedState ${previewDirty ? "isUnsaved" : "isSaved"}`}>{previewDirty ? "Unsaved changes" : "Saved"}</span>
             </div>
 
             <div
-              className="showcasePreviewStage"
-              onPointerDown={setFocalPoint}
+              className={`showcasePreviewStage ${dragPointerId.current != null ? "isDragging" : ""}`}
+              onPointerDown={handlePreviewPointerDown}
+              onPointerMove={handlePreviewPointerMove}
+              onPointerUp={finishPreviewPointer}
+              onPointerCancel={finishPreviewPointer}
               role="application"
-              aria-label="Click or tap the part of the photo you want centered in the compact preview"
+              aria-label="Drag the photo focal point to control the compact preview"
             >
               <img
                 src={activePhoto.url}
@@ -238,29 +268,30 @@ export function ShowcasePhotoManager({ postId, initialPhotos }: Props) {
                 style={{ objectPosition: `${previewDraft.x}% ${previewDraft.y}%`, transform: `scale(${previewDraft.zoom})`, transformOrigin: `${previewDraft.x}% ${previewDraft.y}%` }}
               />
               <span className="showcasePreviewTarget" style={{ left: `${previewDraft.x}%`, top: `${previewDraft.y}%` }} aria-hidden="true" />
-              <span className="showcasePreviewHint">Click or tap where you want the preview centered</span>
+              <span className="showcasePreviewHint">Drag or tap where you want the preview centered</span>
             </div>
 
             <div className="showcasePreviewControls">
               <label>
-                <span>Horizontal</span>
-                <input type="range" min="0" max="100" step="1" value={previewDraft.x} onChange={(event) => setPreviewDraft((current) => ({ ...current, x: Number(event.currentTarget.value) }))} />
+                <span>Horizontal · {Math.round(previewDraft.x)}%</span>
+                <input type="range" min="0" max="100" step="1" value={previewDraft.x} onChange={(event) => { const x = Number(event.currentTarget.value); setPreviewDraft((current) => ({ ...current, x })); setNotice(""); }} />
               </label>
               <label>
-                <span>Vertical</span>
-                <input type="range" min="0" max="100" step="1" value={previewDraft.y} onChange={(event) => setPreviewDraft((current) => ({ ...current, y: Number(event.currentTarget.value) }))} />
+                <span>Vertical · {Math.round(previewDraft.y)}%</span>
+                <input type="range" min="0" max="100" step="1" value={previewDraft.y} onChange={(event) => { const y = Number(event.currentTarget.value); setPreviewDraft((current) => ({ ...current, y })); setNotice(""); }} />
               </label>
               <label>
-                <span>Zoom</span>
-                <input type="range" min="1" max="2.25" step="0.05" value={previewDraft.zoom} onChange={(event) => setPreviewDraft((current) => ({ ...current, zoom: Number(event.currentTarget.value) }))} />
+                <span>Zoom · {previewDraft.zoom.toFixed(2)}×</span>
+                <input type="range" min="1" max="2.25" step="0.05" value={previewDraft.zoom} onChange={(event) => { const zoom = Number(event.currentTarget.value); setPreviewDraft((current) => ({ ...current, zoom })); setNotice(""); }} />
               </label>
             </div>
 
             <div className="showcasePreviewActions">
+              <button type="button" className="btn secondary" onClick={() => setPreviewDraft({ ...savedPreview })} disabled={savingPreview || !previewDirty}>Reset to saved</button>
               <button type="button" className="btn secondary" onClick={() => setPreviewDraft({ ...DEFAULT_SHOWCASE_PHOTO_PREVIEW })} disabled={savingPreview}>Reset center</button>
-              <button type="button" className="btn" onClick={savePreview} disabled={savingPreview}>{savingPreview ? "Saving..." : "Save preview framing"}</button>
+              <button type="button" className="btn" onClick={savePreview} disabled={savingPreview || !previewDirty}>{savingPreview ? "Saving..." : previewDirty ? "Save preview framing" : "Saved"}</button>
             </div>
-            <p className="fieldHelp">This saved framing is reused automatically anywhere Moore Made shows this photo in a cropped thumbnail. The large review page and popup continue to show the full original image.</p>
+            <p className="fieldHelp">The saved framing is reused automatically anywhere Moore Made shows this photo in a cropped thumbnail. The large review view continues to use the full original image.</p>
           </section>
 
           <div className="showcaseCurrentPhotoActions">

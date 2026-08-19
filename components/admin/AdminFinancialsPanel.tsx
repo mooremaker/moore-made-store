@@ -45,17 +45,28 @@ type GoalFundingAction = { goalId: string; direction: "allocate" | "withdraw" } 
 
 function localDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" }).format(new Date(value));
 }
 
 function localDateTime(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).format(new Date(value));
+}
+
+function monthKeyForNewYork(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value ?? String(date.getFullYear());
+  const month = parts.find((part) => part.type === "month")?.value ?? String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
 function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return monthKeyForNewYork(new Date());
 }
 
 function csvEscape(value: unknown) {
@@ -201,7 +212,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
 
   const totals = useMemo(() => {
     const receivedAll = paidPayments.reduce((sum, payment) => sum + Number(payment.amount_cents || 0), 0);
-    const receivedMonth = paidPayments.filter((payment) => (payment.paid_at || payment.created_at).slice(0, 7) === monthKey).reduce((sum, payment) => sum + Number(payment.amount_cents || 0), 0);
+    const receivedMonth = paidPayments.filter((payment) => monthKeyForNewYork(payment.paid_at || payment.created_at) === monthKey).reduce((sum, payment) => sum + Number(payment.amount_cents || 0), 0);
     const expensesAll = activeExpenses.reduce((sum, expense) => sum + Number(expense.amount_cents || 0), 0);
     const expensesMonth = activeExpenses.filter((expense) => expense.expense_date.slice(0, 7) === monthKey).reduce((sum, expense) => sum + Number(expense.amount_cents || 0), 0);
     const activeOrderIds = new Set(orders.filter((order) => order.status !== "cancelled").map((order) => order.id));
@@ -218,7 +229,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
   }, [paidPayments, activeExpenses, quotes, orders, quoteByRequest, monthKey, activeFunding]);
 
   const monthlyTrend = useMemo(() => sixMonthKeys().map(({ key, label }) => {
-    const revenue = paidPayments.filter((payment) => (payment.paid_at || payment.created_at).slice(0, 7) === key).reduce((sum, payment) => sum + payment.amount_cents, 0);
+    const revenue = paidPayments.filter((payment) => monthKeyForNewYork(payment.paid_at || payment.created_at) === key).reduce((sum, payment) => sum + payment.amount_cents, 0);
     const monthExpenses = activeExpenses.filter((expense) => expense.expense_date.slice(0, 7) === key).reduce((sum, expense) => sum + expense.amount_cents, 0);
     return { label, revenue, expenses: monthExpenses, net: revenue - monthExpenses };
   }), [paidPayments, activeExpenses]);

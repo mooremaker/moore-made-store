@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { paymentMethodLabel, receiptLabel, type FinancialPaymentRow } from "@/lib/finance-types";
 import { money } from "@/lib/quote-types";
 import { nextPaymentAmount, paymentStatusLabel, type PaymentStatus, type PaymentTerms } from "@/lib/payment-types";
 
@@ -19,10 +20,23 @@ type Props = {
   paymentStatus: PaymentStatus;
   policyAccepted: boolean;
   policyAcceptedAt: string | null;
+  payments: FinancialPaymentRow[];
 };
 
 function dollars(cents: number) {
   return (Math.max(0, cents) / 100).toFixed(2);
+}
+
+function paymentDate(value: string | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  }).format(new Date(value));
 }
 
 export function ManualPaymentControl({
@@ -37,11 +51,18 @@ export function ManualPaymentControl({
   paymentStatus,
   policyAccepted,
   policyAcceptedAt,
+  payments,
 }: Props) {
   const router = useRouter();
   const nextPayment = useMemo(
     () => nextPaymentAmount({ totalCents, terms: paymentTerms, depositAmountCents, amountPaidCents }),
     [totalCents, paymentTerms, depositAmountCents, amountPaidCents]
+  );
+  const paidPayments = useMemo(
+    () => [...payments]
+      .filter((payment) => payment.status === "paid")
+      .sort((a, b) => new Date(b.paid_at || b.created_at).getTime() - new Date(a.paid_at || a.created_at).getTime()),
+    [payments]
   );
   const [amount, setAmount] = useState(dollars(nextPayment.amountCents));
   const [method, setMethod] = useState<PaymentMethod>("cashapp");
@@ -100,7 +121,35 @@ export function ManualPaymentControl({
         <div><span>Recorded paid</span><strong>{money(amountPaidCents)}</strong></div>
         <div><span>Remaining</span><strong>{money(remainingCents)}</strong></div>
       </div>
-      {policyAccepted ? <p className="manualPaymentPolicyAccepted">Final-sale terms accepted ✓{policyAcceptedAt ? ` · ${new Date(policyAcceptedAt).toLocaleString()}` : ""}</p> : null}
+
+      {paidPayments.length ? (
+        <section className="manualPaymentHistory" aria-label={`Payment receipts for ${requestNumber}`}>
+          <div className="manualPaymentHistoryHead">
+            <div><span className="eyebrow">Receipts</span><strong>Payment history</strong></div>
+            <small>{paidPayments.length} payment{paidPayments.length === 1 ? "" : "s"} recorded</small>
+          </div>
+          <div className="manualPaymentHistoryList">
+            {paidPayments.map((payment) => (
+              <div className="manualPaymentHistoryRow" key={payment.id}>
+                <div>
+                  <strong>{receiptLabel(payment.receipt_number)}</strong>
+                  <small>{paymentDate(payment.paid_at || payment.created_at)} · {paymentMethodLabel(payment.payment_method)}</small>
+                </div>
+                <strong>{money(payment.amount_cents)}</strong>
+                {payment.receipt_token ? (
+                  <a className="btn secondary" href={`/receipt/${payment.receipt_token}`} target="_blank" rel="noreferrer">View receipt ↗</a>
+                ) : (
+                  <span className="manualPaymentReceiptMissing">Receipt unavailable</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <div className="manualPaymentNoReceipts"><strong>No receipts yet.</strong><span>The first receipt will appear here after a payment is recorded.</span></div>
+      )}
+
+      {policyAccepted ? <p className="manualPaymentPolicyAccepted">Final-sale terms accepted ✓{policyAcceptedAt ? ` · ${new Date(policyAcceptedAt).toLocaleString("en-US", { timeZone: "America/New_York" })}` : ""}</p> : null}
 
       {!approved ? (
         <div className="requestWarning">Manual payment recording unlocks after the customer approves the proof + quote.</div>
