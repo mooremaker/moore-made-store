@@ -20,6 +20,9 @@ export async function PATCH(request: Request) {
     status: body.status,
     approved_at: body.status === "approved" ? now : null,
   };
+  if (body.status === "rejected") {
+    update.homepage_featured = false;
+  }
   if (body.status === "approved") {
     update.published_snapshot = {
       customer_name: post.customer_name,

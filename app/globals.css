@@ -6156,3 +6156,409 @@ p { line-height: 1.65; }
   .showcasePhotoLightboxArrow.isNext { right: 7px; }
   .showcasePhotoLightboxThumbs { justify-content: flex-start; }
 }
+
+
+/* =========================================================
+   Order privacy + always-visible documents + production estimates
+   ========================================================= */
+.adminOrderDocumentsAlways {
+  margin: 0 16px 14px;
+  background: #faf7f2;
+}
+.fulfillmentStack { display: grid; gap: 12px; }
+.estimatedFulfillmentPanel {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid #d9d0c5;
+  border-radius: 14px;
+  background: #faf7f2;
+}
+.estimatedFulfillmentHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.estimatedFulfillmentHead > div { display: grid; gap: 3px; }
+.estimatedFulfillmentHead strong { font-size: 1rem; }
+.estimateStatus {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid #d5cec4;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #fff;
+  font-size: .72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.estimateStatus.isSent { color: #315536; border-color: #b8cfbb; background: #f2f8f2; }
+.estimatedFulfillmentFields { align-items: end; }
+.estimateDisclaimer {
+  padding: 11px 12px;
+  border-left: 3px solid #92704c;
+  background: #f3eee7;
+  color: #5f574f;
+  font-size: .78rem;
+  line-height: 1.55;
+}
+.estimatedFulfillmentActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.accountEstimatedFulfillment {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #d9d0c5;
+  border-radius: 14px;
+  background: #faf7f2;
+}
+.accountEstimatedFulfillment > div { display: grid; gap: 3px; }
+.accountEstimatedDate { font-size: 1.35rem; font-weight: 900; }
+.accountEstimatedFulfillment p { margin: 0; line-height: 1.55; }
+.accountEstimatedFulfillment small { color: var(--muted); line-height: 1.55; }
+.accountAdminDeleteOrder { display: grid; gap: 6px; }
+.accountAdminDeleteOrder .formError { margin: 0; }
+
+@media (max-width: 700px) {
+  .adminOrderDocumentsAlways { margin: 0 12px 12px; }
+  .estimatedFulfillmentHead { flex-direction: column; }
+  .estimatedFulfillmentActions { display: grid; grid-template-columns: 1fr; }
+  .estimatedFulfillmentActions .btn { width: 100%; }
+}
+
+.homeShowcaseOrderLoading { min-height: 270px; }
+
+/* =========================================================
+   Phase 6.24 — one featured homepage review + grouped customers
+   ========================================================= */
+.homeSingleFeaturedWrap {
+  max-width: 620px;
+  margin-inline: auto;
+}
+.homeSingleFeaturedGrid {
+  display: block !important;
+}
+.homeSingleFeaturedGrid > .homeCompactReview {
+  display: block !important;
+  width: 100%;
+}
+.homeSingleFeaturedReview .homeCompactReviewMedia {
+  height: clamp(220px, 34vw, 340px);
+}
+.homeSingleFeaturedReview .homeCompactReviewBody {
+  padding: 15px 16px 16px;
+}
+.homeSingleFeaturedReview h3 {
+  font-size: 1.08rem;
+}
+.homeSingleFeaturedReview .homeCompactReviewBody > p {
+  font-size: .82rem;
+  min-height: 0;
+  -webkit-line-clamp: 3;
+}
+.homeSingleReviewNav,
+.showcaseCustomerReviewNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.homeSingleReviewNav .showcaseArrow,
+.showcaseCustomerReviewNav .showcaseArrow {
+  width: 32px;
+  height: 32px;
+}
+.homeSingleReviewNav .homeShowcaseCounter,
+.showcaseCustomerReviewNav > span {
+  min-width: 112px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 850;
+}
+
+.showcaseCustomerGroup {
+  min-width: 0;
+  align-self: start;
+}
+.showcaseCustomerReviewNav {
+  margin-top: 8px;
+}
+.showcaseCustomerReviewNav > span {
+  min-width: 90px;
+}
+
+.showcaseHomepageFeatureControl {
+  display: grid;
+  gap: 4px;
+}
+.showcaseFeaturedButton {
+  width: 100%;
+  white-space: nowrap;
+}
+.showcaseFeaturedButton.isFeatured {
+  background: #f4e3c7;
+  border-color: #b7894f;
+  color: #70451e;
+}
+.showcaseHomepageFeatureControl small {
+  color: var(--muted);
+  font-size: .66rem;
+  text-align: center;
+}
+.showcaseFeatureError {
+  margin: 0;
+  padding: 5px 7px;
+  font-size: .63rem !important;
+}
+
+@media (max-width: 760px) {
+  .homeSingleFeaturedWrap {
+    max-width: none;
+  }
+  .homeSingleFeaturedReview .homeCompactReviewMedia {
+    height: 210px;
+  }
+  .homeSingleFeaturedReview .homeCompactReviewBody {
+    padding: 11px 12px 12px;
+  }
+  .homeSingleFeaturedReview .homeCompactReviewBody > p {
+    font-size: .74rem;
+  }
+}
+
+/* =========================================================
+   Phase 6.25 — single featured review desktop layout + compact admin actions
+   ========================================================= */
+
+/* Keep the section heading and the one featured card on the same visual rail. */
+@media (min-width: 761px) {
+  .homeShowcaseSection .showcaseSectionHead,
+  .homeShowcaseSection .homeSingleFeaturedWrap {
+    width: min(100%, 1080px);
+    margin-inline: auto;
+  }
+
+  .homeSingleFeaturedWrap {
+    max-width: 1080px;
+  }
+
+  .homeSingleFeaturedGrid > .homeSingleFeaturedReview {
+    display: grid !important;
+    grid-template-columns: minmax(0, 58%) minmax(320px, 42%);
+    width: 100%;
+    min-height: 340px;
+    max-height: 380px;
+  }
+
+  .homeSingleFeaturedReview .homeCompactReviewMedia {
+    height: 100%;
+    min-height: 340px;
+    max-height: 380px;
+    border-radius: 0;
+  }
+
+  .homeSingleFeaturedReview .homeCompactReviewBody {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 28px 30px 24px;
+    gap: 9px;
+  }
+
+  .homeSingleFeaturedReview .homeCompactReviewMeta {
+    font-size: .68rem;
+  }
+
+  .homeSingleFeaturedReview h3 {
+    font-size: 1.35rem;
+    line-height: 1.08;
+  }
+
+  .homeSingleFeaturedReview .homeCompactReviewBody > p {
+    display: -webkit-box;
+    -webkit-line-clamp: 7;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 2px;
+    color: #4c4640;
+    font-size: .9rem;
+    line-height: 1.55;
+  }
+
+  .homeSingleFeaturedReview .homeCompactReviewActions {
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  .homeSingleFeaturedReview .homeCompactReviewActions .textLink {
+    font-size: .74rem;
+  }
+}
+
+.homeSingleReviewInlineNav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  margin-top: 5px;
+}
+.homeSingleReviewInlineNav .showcaseArrow {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+.homeSingleReviewInlineNav > span {
+  min-width: 92px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+/* Review admin actions should read as compact utilities, not full-width forms. */
+.adminShowcaseSummary {
+  grid-template-columns: 82px minmax(0, 1fr) max-content;
+}
+.adminShowcaseThumb {
+  width: 82px;
+}
+.adminShowcaseSummary .adminRequestQuickActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+}
+.adminShowcaseSummary .adminRequestQuickActions .statusControl {
+  width: auto;
+  justify-content: flex-end;
+}
+.adminShowcaseSummary .adminRequestQuickActions .statusControl select {
+  width: 148px;
+  max-width: 148px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: .72rem;
+}
+.adminShowcaseSummary .showcaseHomepageFeatureControl {
+  width: auto;
+  justify-items: end;
+}
+.adminShowcaseSummary .showcaseFeaturedButton,
+.adminShowcaseSummary .adminViewButton {
+  width: 148px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: .72rem;
+  line-height: 1.1;
+}
+.adminShowcaseSummary .showcaseHomepageFeatureControl small {
+  max-width: 148px;
+  font-size: .61rem;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .homeSingleReviewInlineNav {
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .homeSingleFeaturedReview .homeCompactReviewBody {
+    gap: 6px;
+  }
+  .homeSingleFeaturedReview .homeCompactReviewActions {
+    margin-top: 2px;
+  }
+
+  .adminShowcaseSummary {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .adminShowcaseThumb {
+    width: 72px;
+  }
+  .adminShowcaseSummary .adminRequestQuickActions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .adminShowcaseSummary .adminRequestQuickActions .statusControl select,
+  .adminShowcaseSummary .showcaseFeaturedButton,
+  .adminShowcaseSummary .adminViewButton {
+    width: auto;
+    max-width: 100%;
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+  .adminShowcaseSummary .showcaseHomepageFeatureControl small {
+    display: none;
+  }
+}
+
+@media (max-width: 500px) {
+  .adminShowcaseSummary {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+  .adminShowcaseThumb {
+    width: 62px;
+  }
+  .adminShowcaseSummary .adminRequestQuickActions {
+    justify-content: flex-start;
+  }
+  .adminShowcaseSummary .adminRequestQuickActions .statusControl select,
+  .adminShowcaseSummary .showcaseFeaturedButton,
+  .adminShowcaseSummary .adminViewButton {
+    font-size: .68rem;
+  }
+}
+
+/* =========================================================
+   Phase 6.26 — mobile showcase header link alignment
+   Keep "View all reviews" on the eyebrow row instead of letting it
+   hang beneath the headline on narrow screens.
+   ========================================================= */
+@media (max-width: 760px) {
+  .homeShowcaseSection .showcaseSectionHead {
+    position: relative;
+    display: block !important;
+    margin-bottom: 12px !important;
+  }
+
+  .homeShowcaseSection .showcaseSectionHead > div {
+    width: 100%;
+    min-width: 0;
+    padding-right: 112px;
+  }
+
+  .homeShowcaseSection .showcaseSectionHead .eyebrow {
+    min-height: 16px;
+  }
+
+  .homeShowcaseSection .showcaseSectionHead h2 {
+    width: calc(100% + 112px);
+    margin: 3px 0 0 !important;
+    white-space: nowrap;
+  }
+
+  .homeShowcaseSection .showcaseViewAll {
+    position: absolute;
+    top: 1px;
+    right: 0;
+    display: inline-block;
+    width: auto;
+    margin: 0 !important;
+    text-align: right;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+}

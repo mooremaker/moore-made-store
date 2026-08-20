@@ -13,8 +13,8 @@ import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-type RequestRow = { id:string; request_number:number; customer_name:string; email:string; phone:string|null; sms_consent:boolean; product:string; quantity:number; item_type:string|null; colors:string|null; sizes:string|null; logo_size:string|null; print_sides:string|null; placements:string[]|null; artwork_instructions:string|null; deadline:string|null; delivery:string|null; notes:string|null; status:RequestStatus; payment_status:"unpaid"|"deposit_paid"|"paid"; amount_paid_cents:number; artwork_paths:string[]|null; tracking_number:string|null; tracking_url:string|null; fulfillment_note:string|null; fulfillment_notified_at:string|null; cash_payment_request_status:"none"|"pending"|"contacted"|"completed"|"cancelled"; cash_payment_requested_at:string|null; cash_payment_requested_amount_cents:number|null; cash_payment_contacted_at:string|null; created_at:string; };
-type ShowcaseRow = { id:string; customer_name:string; business_name:string|null; email:string; product:string; rating:number; review:string; caption:string|null; social_handle:string|null; status:ShowcaseStatus; photo_paths:string[]|null; photo_preview_settings:unknown; created_at:string; };
+type RequestRow = { id:string; request_number:number; customer_name:string; email:string; phone:string|null; sms_consent:boolean; product:string; quantity:number; item_type:string|null; colors:string|null; sizes:string|null; logo_size:string|null; print_sides:string|null; placements:string[]|null; artwork_instructions:string|null; deadline:string|null; delivery:string|null; notes:string|null; status:RequestStatus; payment_status:"unpaid"|"deposit_paid"|"paid"; amount_paid_cents:number; artwork_paths:string[]|null; tracking_number:string|null; tracking_url:string|null; fulfillment_note:string|null; fulfillment_notified_at:string|null; estimated_fulfillment_date:string|null; estimated_fulfillment_note:string|null; estimated_fulfillment_notified_at:string|null; estimated_fulfillment_notified_for_date:string|null; cash_payment_request_status:"none"|"pending"|"contacted"|"completed"|"cancelled"; cash_payment_requested_at:string|null; cash_payment_requested_amount_cents:number|null; cash_payment_contacted_at:string|null; created_at:string; };
+type ShowcaseRow = { id:string; customer_name:string; business_name:string|null; email:string; product:string; rating:number; review:string; caption:string|null; social_handle:string|null; status:ShowcaseStatus; homepage_featured:boolean; photo_paths:string[]|null; photo_preview_settings:unknown; created_at:string; };
 type MessageThreadRow = { id:string; customer_user_id:string; request_id:string|null; subject:string; topic:MessageTopic; status:MessageThreadStatus; assigned_admin_user_id:string|null; customer_unread_count:number; admin_unread_count:number; last_message_at:string; created_at:string; };
 type MessageEntryRow = { id:string; thread_id:string; sender_user_id:string|null; sender_role:"customer"|"admin"|"system"; sender_display_name:string; body:string; is_internal:boolean; created_at:string; };
 type MessageAttachmentRow = { id:string; message_id:string; storage_path:string; original_filename:string; mime_type:string|null; size_bytes:number|null; };
@@ -31,7 +31,7 @@ export default async function AdminPage() {
 
   const { data, error } = await supabase
     .from("custom_requests")
-    .select("id,request_number,customer_name,email,phone,sms_consent,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,artwork_instructions,deadline,delivery,notes,status,payment_status,amount_paid_cents,artwork_paths,tracking_number,tracking_url,fulfillment_note,fulfillment_notified_at,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents,cash_payment_contacted_at,created_at")
+    .select("id,request_number,customer_name,email,phone,sms_consent,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,artwork_instructions,deadline,delivery,notes,status,payment_status,amount_paid_cents,artwork_paths,tracking_number,tracking_url,fulfillment_note,fulfillment_notified_at,estimated_fulfillment_date,estimated_fulfillment_note,estimated_fulfillment_notified_at,estimated_fulfillment_notified_for_date,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents,cash_payment_contacted_at,created_at")
     .order("created_at", { ascending: false });
   const requests = (data ?? []) as RequestRow[];
   const rowsWithFiles: AdminRequestRow[] = await Promise.all(requests.map(async (row) => ({
@@ -117,7 +117,7 @@ export default async function AdminPage() {
 
   const { data: showcaseData, error: showcaseError } = await supabase
     .from("showcase_posts")
-    .select("id,customer_name,business_name,email,product,rating,review,caption,social_handle,status,photo_paths,photo_preview_settings,created_at")
+    .select("id,customer_name,business_name,email,product,rating,review,caption,social_handle,status,homepage_featured,photo_paths,photo_preview_settings,created_at")
     .neq("status", "draft")
     .order("created_at", { ascending: false });
   const showcaseRows = (showcaseData ?? []) as ShowcaseRow[];

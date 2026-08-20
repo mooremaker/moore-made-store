@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/account/ProfileForm";
+import { DeleteTestOrderButton } from "@/components/account/DeleteTestOrderButton";
 import { claimVerifiedGuestRecords, getCurrentUser, getUserRole } from "@/lib/auth";
 import { formatRequestNumber, REQUEST_STATUS_LABELS, type RequestStatus } from "@/lib/custom-request-types";
 import { money, QUOTE_STATUS_LABELS, type QuoteStatus } from "@/lib/quote-types";
@@ -13,6 +14,7 @@ export const metadata = { robots: { index: false, follow: false } };
 
 type RequestRow = {
   id: string; request_number: number; product: string; quantity: number; status: RequestStatus; deadline: string | null; delivery: string | null; created_at: string; artwork_paths: string[] | null; tracking_number: string | null; tracking_url: string | null; fulfillment_note: string | null; payment_status: PaymentStatus; amount_paid_cents: number;
+  estimated_fulfillment_date: string | null; estimated_fulfillment_note: string | null; estimated_fulfillment_notified_at: string | null; estimated_fulfillment_notified_for_date: string | null;
 };
 type QuoteRow = { id: string; request_id: string; public_token: string; status: QuoteStatus; total_cents: number; valid_until: string | null; proof_version: number; payment_terms: PaymentTerms; deposit_amount_cents: number | null; };
 type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; published_snapshot:unknown|null; updated_at:string; };
@@ -33,9 +35,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const supabase = await createSupabaseServerClient();
   const [{ data: profile }, { data: requestData }, { data: showcaseData }, { data: messageThreadData }] = await Promise.all([
     supabase.from("profiles").select("full_name,phone").eq("id", user.id).maybeSingle(),
-    supabase.from("custom_requests").select("id,request_number,product,quantity,status,deadline,delivery,created_at,artwork_paths,tracking_number,tracking_url,fulfillment_note,payment_status,amount_paid_cents").order("created_at", { ascending: false }),
-    supabase.from("showcase_posts").select("id,product,rating,status,created_at,updated_at,published_snapshot").order("updated_at", { ascending: false }),
-    supabase.from("message_threads").select("customer_unread_count"),
+    supabase.from("custom_requests").select("id,request_number,product,quantity,status,deadline,delivery,created_at,artwork_paths,tracking_number,tracking_url,fulfillment_note,payment_status,amount_paid_cents,estimated_fulfillment_date,estimated_fulfillment_note,estimated_fulfillment_notified_at,estimated_fulfillment_notified_for_date").eq("customer_user_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("showcase_posts").select("id,product,rating,status,created_at,updated_at,published_snapshot").eq("customer_user_id", user.id).order("updated_at", { ascending: false }),
+    supabase.from("message_threads").select("customer_unread_count").eq("customer_user_id", user.id),
   ]);
 
   const requests = (requestData ?? []) as RequestRow[];
@@ -107,8 +109,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       {quote && ["sent","changes_requested","approved"].includes(quote.status) ? <Link className="btn" href={`/quote/${quote.public_token}`}>{quote.status === "approved" && request.payment_status !== "paid" ? "Open payment" : "Review proof + quote"}</Link> : null}
                       {quote?.status === "approved" ? <Link className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank">Invoice</Link> : null}
                       <Link className="btn secondary" href={`/account/messages?order=${request.id}`}>Message Moore Made</Link>
+                      {role === "admin" && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
                     {receipts.length ? <div className="accountReceipts"><strong>Payment receipts</strong><div>{receipts.map((receipt) => receipt.receipt_token ? <a key={receipt.id} href={`/receipt/${receipt.receipt_token}`} target="_blank" rel="noreferrer"><span>{receiptLabel(receipt.receipt_number)}</span><small>{paymentMethodLabel(receipt.payment_method)} · {money(receipt.amount_cents)}</small></a> : null)}</div></div> : null}
+                    {request.estimated_fulfillment_date && !["ready","shipped","completed","cancelled"].includes(request.status) ? <div className="accountEstimatedFulfillment">
+                      <div><span className="eyebrow">Production estimate</span><strong>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated ship date" : "Estimated pickup-ready date"}</strong></div>
+                      <span className="accountEstimatedDate">{dateLabel(request.estimated_fulfillment_date)}</span>
+                      {request.estimated_fulfillment_note ? <p>{request.estimated_fulfillment_note}</p> : null}
+                      <small>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated only and not guaranteed. This is the date Moore Made expects to hand the package to the carrier, not a guaranteed delivery date. Carrier transit and delivery timing are outside Moore Made’s control." : "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for pickup."}</small>
+                    </div> : null}
                     {files.length ? <div className="accountFiles"><strong>Your uploaded artwork</strong><div>{files.map((file) => <a key={file.url} href={file.url} target="_blank" rel="noreferrer">{file.name}</a>)}</div><small>Private links expire after 15 minutes.</small></div> : null}
                     {request.status === "shipped" && (request.tracking_url || request.tracking_number) ? <div className="accountFulfillment"><strong>Shipping</strong>{request.tracking_number ? <span>Tracking: {request.tracking_number}</span> : null}{request.tracking_url ? <a href={request.tracking_url} target="_blank" rel="noreferrer">Track shipment →</a> : null}</div> : null}
                     {request.status === "ready" && request.fulfillment_note ? <div className="accountFulfillment"><strong>Pickup note</strong><span>{request.fulfillment_note}</span></div> : null}

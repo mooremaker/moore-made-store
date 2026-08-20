@@ -22,8 +22,17 @@ const photoPreloads =
 const STORAGE_PREFIX =
   "moore-made-showcase-start-photo:";
 
+function stablePhotoIdentity(src: string) {
+  try {
+    const url = new URL(src);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return src.split("?")[0] ?? src;
+  }
+}
+
 function makePhotoSignature(photoUrls: string[]) {
-  return photoUrls.join("\u001f");
+  return photoUrls.map(stablePhotoIdentity).join("\u001f");
 }
 
 function readPreviousSelection(

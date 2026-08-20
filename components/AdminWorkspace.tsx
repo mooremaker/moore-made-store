@@ -9,6 +9,7 @@ import { RequestStatusControl } from "@/components/RequestStatusControl";
 import { ShowcaseStatusControl } from "@/components/ShowcaseStatusControl";
 import { ShowcaseDeleteButton } from "@/components/ShowcaseDeleteButton";
 import { ShowcasePhotoManager } from "@/components/ShowcasePhotoManager";
+import { ShowcaseHomepageFeatureControl } from "@/components/ShowcaseHomepageFeatureControl";
 import { AdminMessagesPanel } from "@/components/messages/AdminMessagesPanel";
 import { AdminFinancialsPanel } from "@/components/admin/AdminFinancialsPanel";
 import { MockupStudio } from "@/components/admin/MockupStudio";
@@ -52,6 +53,10 @@ export type AdminRequestRow = {
   tracking_url: string | null;
   fulfillment_note: string | null;
   fulfillment_notified_at: string | null;
+  estimated_fulfillment_date: string | null;
+  estimated_fulfillment_note: string | null;
+  estimated_fulfillment_notified_at: string | null;
+  estimated_fulfillment_notified_for_date: string | null;
   cash_payment_request_status: "none" | "pending" | "contacted" | "completed" | "cancelled";
   cash_payment_requested_at: string | null;
   cash_payment_requested_amount_cents: number | null;
@@ -71,6 +76,7 @@ export type AdminShowcaseRow = {
   caption: string | null;
   social_handle: string | null;
   status: ShowcaseStatus;
+  homepage_featured: boolean;
   photo_paths: string[] | null;
   created_at: string;
   photoLinks: (FileLink & { preview: ShowcasePhotoPreview })[];
@@ -336,32 +342,32 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     </div>
                   </div>
 
+                  <section className="adminOrderDocuments adminOrderDocumentsAlways" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
+                    <div className="adminOrderDocumentsHeading">
+                      <div><span className="eyebrow">Documents</span><strong>Quick access</strong></div>
+                      <small>These stay available without opening the full order details.</small>
+                    </div>
+                    <div className="adminOrderDocumentButtons">
+                      {quote?.public_token ? (
+                        <a className="btn secondary" href={`/proforma/${quote.public_token}`} target="_blank" rel="noreferrer">Pro Forma + Proof ↗</a>
+                      ) : (
+                        <span className="btn secondary isDisabled" aria-disabled="true" title="Available after a proof + quote is created">Pro Forma + Proof</span>
+                      )}
+                      {quote?.public_token && quote.status === "approved" ? (
+                        <a className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank" rel="noreferrer">Invoice ↗</a>
+                      ) : (
+                        <span className="btn secondary isDisabled" aria-disabled="true" title="Available after customer approval">Invoice · after approval</span>
+                      )}
+                      {latestReceipt?.receipt_token ? (
+                        <a className="btn secondary" href={`/receipt/${latestReceipt.receipt_token}`} target="_blank" rel="noreferrer">Latest Receipt ↗</a>
+                      ) : (
+                        <span className="btn secondary isDisabled" aria-disabled="true" title="Receipt available after payment">Receipt · after payment</span>
+                      )}
+                    </div>
+                  </section>
+
                   {isOpen ? (
                     <div className="adminRequestExpanded">
-                      <section className="adminOrderDocuments" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
-                        <div className="adminOrderDocumentsHeading">
-                          <div><span className="eyebrow">Documents</span><strong>Quick access</strong></div>
-                          <small>Open the latest customer-facing order documents without digging through the sections below.</small>
-                        </div>
-                        <div className="adminOrderDocumentButtons">
-                          {quote?.public_token ? (
-                            <a className="btn secondary" href={`/proforma/${quote.public_token}`} target="_blank" rel="noreferrer">Pro Forma + Proof ↗</a>
-                          ) : (
-                            <span className="btn secondary isDisabled" aria-disabled="true" title="Available after a proof + quote is created">Pro Forma + Proof</span>
-                          )}
-                          {quote?.public_token && quote.status === "approved" ? (
-                            <a className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank" rel="noreferrer">Invoice ↗</a>
-                          ) : (
-                            <span className="btn secondary isDisabled" aria-disabled="true" title="Available after customer approval">Invoice</span>
-                          )}
-                          {latestReceipt?.receipt_token ? (
-                            <a className="btn secondary" href={`/receipt/${latestReceipt.receipt_token}`} target="_blank" rel="noreferrer">Latest Receipt ↗</a>
-                          ) : (
-                            <span className="btn secondary isDisabled" aria-disabled="true" title="Receipt available after payment">Receipt · available after payment</span>
-                          )}
-                        </div>
-                      </section>
-
                       <div className="adminDetailGrid">
                         <section className="adminDetailGroup">
                           <div className="adminDetailGroupTitle"><span>01</span><h4>Contact</h4></div>
@@ -471,6 +477,10 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             initialTrackingNumber={request.tracking_number}
                             initialTrackingUrl={request.tracking_url}
                             initialNote={request.fulfillment_note}
+                            initialEstimatedDate={request.estimated_fulfillment_date}
+                            initialEstimatedNote={request.estimated_fulfillment_note}
+                            initialEstimatedNotifiedAt={request.estimated_fulfillment_notified_at}
+                            initialEstimatedNotifiedForDate={request.estimated_fulfillment_notified_for_date}
                             paymentStatus={request.payment_status}
                           />
                         ) : <p className="muted adminFulfillmentLocked">Final customer notification becomes available after the proof + quote is approved.</p>}
@@ -491,7 +501,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
       ) : (
         <section className="adminWorkspacePanel">
           <div className="adminSectionIntro">
-            <div><div className="eyebrow">Made by You</div><h2>Customer showcase approvals</h2><p>Review customer photos and reviews here. Nothing appears publicly until you approve it.</p></div>
+            <div><div className="eyebrow">Made by You</div><h2>Customer showcase approvals</h2><p>Review customer photos and reviews here. Approve each review separately, then choose one approved review as the homepage feature. If that customer has more reviews, visitors can cycle through them without taking extra spots.</p></div>
           </div>
 
           {!showcaseReady ? <div className="formError">Made by You is not set up in Supabase yet. Run supabase/moore_made_phase2_1_made_by_you.sql.</div> : null}
@@ -522,6 +532,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     </div>
                     <div className="adminRequestQuickActions">
                       <ShowcaseStatusControl id={post.id} initialStatus={post.status} />
+                      <ShowcaseHomepageFeatureControl id={post.id} status={post.status} featured={post.homepage_featured} />
                       <button className="btn secondary adminViewButton" type="button" onClick={() => setOpenShowcaseId(isOpen ? null : post.id)}>{isOpen ? "Close" : "Review post"}</button>
                       {isOpen ? <ShowcaseDeleteButton id={post.id} /> : null}
                     </div>
