@@ -120,7 +120,6 @@ export function ProductVisual({
           <div className="productVisualShape" aria-hidden="true">
             {kind === "mug" ? <span className="productVisualHandle" /> : null}
             {kind === "tote" ? <span className="productVisualToteHandle" /> : null}
-            {kind === "custom" ? <span className="productVisualCustomMark">+</span> : null}
           </div>
         )}
       </div>

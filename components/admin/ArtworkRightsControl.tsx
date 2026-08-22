@@ -41,7 +41,12 @@ export function ArtworkRightsControl({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId, status, note }),
       });
-      const body = await response.json();
+      const contentType = response.headers.get("content-type") || "";
+      const body = contentType.includes("application/json")
+        ? await response.json()
+        : { error: response.status === 404
+            ? "The artwork-review API was missing from this deployment. Upload the latest project and try again."
+            : "The server returned an unexpected response. Please refresh and try again." };
       if (!response.ok) throw new Error(body.error || "Could not save artwork review.");
       setMessage("Artwork-rights review saved.");
     } catch (err) {

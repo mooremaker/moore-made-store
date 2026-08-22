@@ -97,7 +97,7 @@ export function CustomerMessagesWorkspace({ threads, orders, initialThreadId, in
       <section className="messageConversation card">
         {creating ? (
           <form className="messageCreateForm" onSubmit={createThread}>
-            <div className="messageConversationHead"><div><div className="eyebrow">Contact Moore Made</div><h2>Start a conversation</h2><p>Ask about an order, product, artwork, payment, pickup/shipping, or anything else.</p></div></div>
+            <div className="messageConversationHead"><div><div className="eyebrow">Contact Moore Made</div><h2>Start a conversation</h2><p>Ask about an order, product, artwork, payment, pickup, local delivery, shipping, or anything else.</p></div></div>
             <div className="field"><label htmlFor="messageRequestId">Is this about an order?</label><select id="messageRequestId" name="requestId" defaultValue={initialRequestId || ""}><option value="">No — general question</option>{orders.map((order) => <option key={order.id} value={order.id}>{formatRequestNumber(order.requestNumber)} · {order.product}</option>)}</select></div>
             <div className="twoCol messageNewMeta">
               <div className="field"><label htmlFor="messageTopic">Topic</label><select id="messageTopic" name="topic" defaultValue="other">{(Object.keys(MESSAGE_TOPIC_LABELS) as MessageTopic[]).filter((value) => value !== "order").map((value) => <option key={value} value={value}>{MESSAGE_TOPIC_LABELS[value]}</option>)}</select></div>

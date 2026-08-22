@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { products } from "@/lib/catalog";
 import { money } from "@/lib/quote-types";
 import { recommendedRevenueForMargin, type BusinessSettingsRecord, type ProductPricingRecord } from "@/lib/pricing-types";
+import { starterPricingFor } from "@/lib/pricing-suggestions";
 
 type EditablePricing = {
   active: boolean;
@@ -37,14 +38,15 @@ export function AdminProductPricingPanel({
   const initialMap = useMemo(() => new Map(records.map((row) => [row.product_slug, row])), [records]);
   const [editing, setEditing] = useState<Record<string, EditablePricing>>(() => Object.fromEntries(products.map((product) => {
     const row = initialMap.get(product.slug);
+    const starter = starterPricingFor(product.slug);
     return [product.slug, {
       active: row?.active ?? true,
-      blank: dollars(row?.blank_cost_cents),
-      print: dollars(row?.print_cost_cents),
-      packaging: dollars(row?.packaging_cost_cents),
-      laborHours: String(row?.default_labor_hours ?? 1),
+      blank: dollars(row?.blank_cost_cents ?? starter.blankCostCents),
+      print: dollars(row?.print_cost_cents ?? starter.printCostCents),
+      packaging: dollars(row?.packaging_cost_cents ?? starter.packagingCostCents),
+      laborHours: String(row?.default_labor_hours ?? starter.laborHours),
       laborRate: dollars(row?.labor_rate_cents ?? settings?.default_labor_rate_cents ?? 1000),
-      margin: ((row?.target_margin_basis_points ?? 5000) / 100).toFixed(0),
+      margin: ((row?.target_margin_basis_points ?? starter.targetMarginBasisPoints) / 100).toFixed(0),
       taxCode: row?.tax_code || settings?.default_tax_code || "txcd_99999999",
       notes: row?.notes || "",
     } satisfies EditablePricing];
@@ -68,6 +70,18 @@ export function AdminProductPricingPanel({
 
   function patch(slug: string, next: Partial<EditablePricing>) {
     setEditing((current) => ({ ...current, [slug]: { ...current[slug], ...next } }));
+  }
+
+  function applyStarter(slug: string) {
+    const starter = starterPricingFor(slug);
+    patch(slug, {
+      blank: dollars(starter.blankCostCents),
+      print: dollars(starter.printCostCents),
+      packaging: dollars(starter.packagingCostCents),
+      laborHours: String(starter.laborHours),
+      margin: (starter.targetMarginBasisPoints / 100).toFixed(0),
+    });
+    setMessage("Starter estimates filled in. Replace them with your actual supplier and production costs whenever you know them.");
   }
 
   async function saveProduct(slug: string) {
@@ -133,7 +147,7 @@ export function AdminProductPricingPanel({
 
   return (
     <section className="adminWorkspacePanel productPricingAdmin">
-      <div className="adminSectionIntro"><div><div className="eyebrow">Private pricing engine</div><h2>Products & pricing</h2><p>These numbers are admin-only. Nothing here appears as a public Shop price. They help build fair quotes and estimate profit.</p></div></div>
+      <div className="adminSectionIntro"><div><div className="eyebrow">Private pricing engine</div><h2>Products & pricing</h2><p>Unsaved products begin with editable starter estimates. Replace them with your actual blank, transfer, and packaging costs as you receive invoices; nothing here appears as a public Shop price.</p></div></div>
 
       {message ? <div className="formSuccess">{message}</div> : null}
       {error ? <div className="formError">{error}</div> : null}
@@ -178,7 +192,7 @@ export function AdminProductPricingPanel({
               </div>
               <div className="pricingRecommendation"><span>Example cost incl. default labor</span><strong>{money(sampleCost)}</strong><span>Suggested revenue at {Number(row.margin) || 0}% margin</span><strong>{money(recommended)}</strong></div>
               <details className="pricingAdvanced"><summary>Advanced</summary><label className="field"><span>Stripe Tax code</span><input value={row.taxCode} onChange={(e) => patch(product.slug, { taxCode: e.target.value })} /></label><label className="field"><span>Internal notes</span><textarea value={row.notes} onChange={(e) => patch(product.slug, { notes: e.target.value })} /></label></details>
-              <button type="button" className="btn" onClick={() => saveProduct(product.slug)} disabled={savingSlug === product.slug}>{savingSlug === product.slug ? "Saving…" : "Save pricing defaults"}</button>
+              <div className="goalFundingFormActions"><button type="button" className="btn" onClick={() => saveProduct(product.slug)} disabled={savingSlug === product.slug}>{savingSlug === product.slug ? "Saving…" : "Save pricing defaults"}</button><button type="button" className="btn secondary" onClick={() => applyStarter(product.slug)}>Restore starter estimates</button></div>
             </article>
           );
         })}

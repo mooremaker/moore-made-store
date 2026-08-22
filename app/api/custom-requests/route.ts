@@ -81,6 +81,8 @@ export async function POST(request: Request) {
     const structuredQuantity = orderItemsQuantity(orderItems);
     const quantity = structuredQuantity > 0 ? structuredQuantity : Number(body.quantity || 0);
     const shippingAddress = normalizeShippingAddress(body.shippingAddress);
+    const fulfillmentMethod = text(body.delivery, 120);
+    const destinationFulfillment = fulfillmentMethod === "Shipping" || fulfillmentMethod === "Local delivery";
 
     const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -94,6 +96,15 @@ export async function POST(request: Request) {
     if (!Number.isFinite(quantity) || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
       return NextResponse.json(
         { error: `Quantity must be a whole number between 1 and ${MAX_QUANTITY.toLocaleString()}.` },
+        { status: 400 }
+      );
+    }
+
+    if (destinationFulfillment && (!shippingAddress?.line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode || !shippingAddress.country)) {
+      return NextResponse.json(
+        { error: fulfillmentMethod === "Local delivery"
+          ? "Please complete the local delivery address before submitting your request."
+          : "Please complete the shipping address before submitting your request." },
         { status: 400 }
       );
     }
@@ -146,7 +157,7 @@ export async function POST(request: Request) {
         placements,
         artwork_instructions: text(body.artworkInstructions, 5000) || null,
         deadline: text(body.deadline, 20) || null,
-        delivery: text(body.delivery, 120) || null,
+        delivery: fulfillmentMethod || null,
         notes: text(body.notes, 5000) || null,
         requested_discount_code: text(body.discountCode, 80).toUpperCase() || null,
         order_items: orderItems,
@@ -197,6 +208,7 @@ export async function POST(request: Request) {
       ["Style", text(body.itemType, 300)],
       ["Colors", text(body.colors, 500)],
       ["Needed by", text(body.deadline, 20)],
+      ["Fulfillment", fulfillmentMethod],
       ["Discount code", text(body.discountCode, 80).toUpperCase()],
     ].filter(([, value]) => value);
 

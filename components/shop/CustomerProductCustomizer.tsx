@@ -297,9 +297,11 @@ export function CustomerProductCustomizer({
   function validateContact() {
     if (!name.trim()) return "Please enter your name.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return "Please enter a valid email address.";
-    if (delivery === "Shipping") {
+    if (delivery === "Shipping" || delivery === "Local delivery") {
       if (!shippingAddress.line1.trim() || !shippingAddress.city.trim() || !shippingAddress.state.trim() || !shippingAddress.postalCode.trim() || !shippingAddress.country.trim()) {
-        return "Please complete the shipping address so we can calculate shipping and sales tax accurately.";
+        return delivery === "Local delivery"
+          ? "Please complete the delivery address so we can plan local delivery and calculate sales tax accurately."
+          : "Please complete the shipping address so we can calculate shipping and sales tax accurately.";
       }
     }
     return "";
@@ -387,7 +389,7 @@ export function CustomerProductCustomizer({
         artworkInstructions,
         deadline,
         delivery,
-        shippingAddress: delivery === "Shipping" ? { ...shippingAddress, name: shippingAddress.name.trim() || name.trim() } : null,
+        shippingAddress: delivery === "Shipping" || delivery === "Local delivery" ? { ...shippingAddress, name: shippingAddress.name.trim() || name.trim() } : null,
         notes: notes.trim(),
         discountCode: discountCode.trim(),
         artworkRightsAccepted: hasCustomerArtwork ? artworkRightsAccepted : false,
@@ -624,12 +626,12 @@ export function CustomerProductCustomizer({
             <label className="field"><span>Phone <small>Optional</small></span><input value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={80} type="tel" autoComplete="tel" /></label>
             <label className={`customerSmsConsent ${phone.trim() ? "" : "isDisabled"}`}><input type="checkbox" checked={smsConsent} onChange={(event) => setSmsConsent(event.target.checked)} disabled={!phone.trim()} /><span><strong>Text updates</strong><small>{phone.trim() ? "Yes, Moore Made may text me about this order." : "Add a phone number above to enable order text updates."}</small></span></label>
             <label className="field"><span>Needed by <small>Optional</small></span><input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></label>
-            <label className="field"><span>Pickup or shipping?</span><select value={delivery} onChange={(event) => setDelivery(event.target.value)}><option value="">Not sure yet</option><option>Local pickup</option><option>Shipping</option></select></label>
+            <label className="field"><span>Fulfillment method</span><select value={delivery} onChange={(event) => setDelivery(event.target.value)}><option value="">Not sure yet</option><option>Local pickup</option><option>Local delivery</option><option>Shipping</option></select></label>
           </div>
 
-          {delivery === "Shipping" ? (
+          {delivery === "Shipping" || delivery === "Local delivery" ? (
             <div className="shippingAddressPanel">
-              <div><strong>Shipping address</strong><span>We&apos;ll use this for shipping and the automatic sales-tax calculation when your quote is prepared.</span></div>
+              <div><strong>{delivery === "Local delivery" ? "Delivery address" : "Shipping address"}</strong><span>{delivery === "Local delivery" ? "We’ll use this to plan local delivery and calculate sales tax accurately when your quote is prepared." : "We’ll use this for shipping and the automatic sales-tax calculation when your quote is prepared."}</span></div>
               <div className="customerOrderGrid">
                 <label className="field"><span>Recipient</span><input value={shippingAddress.name} onChange={(event) => setShippingAddress((address) => ({ ...address, name: event.target.value }))} autoComplete="shipping name" /></label>
                 <label className="field"><span>Street address *</span><input value={shippingAddress.line1} onChange={(event) => setShippingAddress((address) => ({ ...address, line1: event.target.value }))} autoComplete="shipping address-line1" /></label>
@@ -663,7 +665,7 @@ export function CustomerProductCustomizer({
             <div><span>Fulfillment</span><strong>{delivery || "Not sure yet"}</strong></div>
             <div><span>Pricing</span><strong>Personalized quote after review</strong></div>
           </div>
-          {delivery === "Shipping" ? <div className="customerReviewAddress"><span>Ship to</span><strong>{shippingAddress.line1}{shippingAddress.line2 ? `, ${shippingAddress.line2}` : ""}, {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postalCode}</strong></div> : null}
+          {delivery === "Shipping" || delivery === "Local delivery" ? <div className="customerReviewAddress"><span>{delivery === "Local delivery" ? "Deliver to" : "Ship to"}</span><strong>{shippingAddress.line1}{shippingAddress.line2 ? `, ${shippingAddress.line2}` : ""}, {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postalCode}</strong></div> : null}
           <div className="customerReviewNotice"><strong>No payment is due now.</strong><span>Moore Made will review your product mix, artwork, supplies, labor, shipping, discount, and applicable tax. You&apos;ll receive a final proof + quote to approve before payment.</span></div>
           {hasCustomerArtwork ? <label className={`artworkRightsCustomerCheck ${artworkRightsAccepted ? "isChecked" : ""}`}>
             <input type="checkbox" checked={artworkRightsAccepted} onChange={(event) => setArtworkRightsAccepted(event.target.checked)} />

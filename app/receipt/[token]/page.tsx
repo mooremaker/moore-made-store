@@ -50,7 +50,7 @@ export default async function ReceiptPage({ params }: Props) {
   if (!payment) notFound();
 
   const [{ data: order }, { data: quoteData }, { data: paidRows }] = await Promise.all([
-    supabase.from("custom_requests").select("request_number,customer_name,product,quantity").eq("id", payment.request_id).single(),
+    supabase.from("custom_requests").select("request_number,customer_name,product,quantity,delivery").eq("id", payment.request_id).single(),
     supabase.from("quotes").select("public_token,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents").eq("id", payment.quote_id).single(),
     supabase.from("payments").select("amount_cents,paid_at,status").eq("request_id", payment.request_id).eq("status", "paid"),
   ]);
@@ -67,6 +67,11 @@ export default async function ReceiptPage({ params }: Props) {
   const remainingCents = Math.max(0, totalCents - paidToDate);
   const orderNumber = formatRequestNumber(order.request_number);
   const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
+  const fulfillmentChargeLabel = String(order.delivery || "").toLowerCase().includes("delivery")
+    ? "Local delivery"
+    : String(order.delivery || "").toLowerCase().includes("ship")
+      ? "Shipping"
+      : "Fulfillment";
 
   return (
     <div className="shell receiptPage">
@@ -104,7 +109,7 @@ export default async function ReceiptPage({ params }: Props) {
           <div className="receiptOrderTotals">
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
-            {quote.shipping_cents ? <div><span>Shipping</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
+            {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="receiptOrderGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
@@ -133,8 +138,74 @@ export default async function ReceiptPage({ params }: Props) {
         <footer className="receiptFooter">
           <strong>Thank you for choosing Moore Made.</strong>
           <p>This receipt confirms the payment above for {orderNumber}. The order breakdown is included so your payment always stays connected to the approved work.</p>
-          <p className="receiptFinalSaleNotice"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p>
+          <p className="receiptFinalSaleNotice"><span><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable.</span><span>If there is an issue with your finished order, contact Moore Made so we can help make it right.</span></p>
           <small>Moore Made LLC · mooremade.store · Custom Order Terms: /terms/custom-orders</small>
+        </footer>
+      </article>
+
+      <article className="receiptPrintSheet" aria-label="Printable payment receipt">
+        <header className="receiptPrintHeader">
+          <Image src="/moore-made-header-logo.png" width={168} height={56} alt="Moore Made" className="receiptPrintLogo" />
+          <div className="receiptPrintTitle">
+            <span className={`receiptPrintStatus ${payment.status === "voided" ? "isVoided" : "isPaid"}`}>{payment.status === "voided" ? "VOIDED" : "PAID"}</span>
+            <strong>PAYMENT RECEIPT</strong>
+            <span>{receiptLabel(payment.receipt_number)}</span>
+            <small>{dateTime(payment.paid_at)}</small>
+          </div>
+        </header>
+
+        {payment.status === "voided" ? <div className="receiptPrintVoid"><strong>VOIDED / CORRECTED PAYMENT</strong><span>This payment no longer counts toward the order balance.{payment.void_reason ? ` Reason: ${payment.void_reason}` : ""}</span></div> : null}
+
+        <section className="receiptPrintMeta">
+          <div><span>Customer</span><strong>{order.customer_name}</strong>{payment.payer_email ? <small>{payment.payer_email}</small> : null}</div>
+          <div><span>Order</span><strong>{orderNumber}</strong><small>{order.product} · Qty {order.quantity}</small></div>
+        </section>
+
+        <section className="receiptPrintItems">
+          <div className="receiptPrintSectionLabel">Order details</div>
+          <div className="receiptPrintLine receiptPrintLineHeader"><span>Item</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+          {lineItems.length ? lineItems.map((item, index) => (
+            <div className="receiptPrintLine" key={`print-${item.description}-${index}`}>
+              <span>{item.description}</span>
+              <span>{item.quantity}</span>
+              <span>{money(item.unitPriceCents)}</span>
+              <strong>{money(item.quantity * item.unitPriceCents)}</strong>
+            </div>
+          )) : (
+            <div className="receiptPrintLine">
+              <span>{order.product}</span>
+              <span>{order.quantity}</span>
+              <span>—</span>
+              <strong>{money(quote.subtotal_cents)}</strong>
+            </div>
+          )}
+        </section>
+
+        <section className="receiptPrintSummary">
+          <div className="receiptPrintTotals">
+            <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
+            {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
+            {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            <div className="receiptPrintGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
+          </div>
+
+          <div className="receiptPrintPayment">
+            <div className="receiptPrintSectionLabel">Payment</div>
+            <div><span>This payment</span><strong>{money(payment.amount_cents)}</strong></div>
+            <div><span>Method</span><strong>{paymentMethodLabel(payment.payment_method)}</strong></div>
+            {payment.payer_name ? <div><span>Paid by</span><strong>{payment.payer_name}</strong></div> : null}
+            {payment.manual_reference ? <div><span>Reference</span><strong>{payment.manual_reference}</strong></div> : null}
+            <div><span>Paid through receipt</span><strong>{money(paidToDate)}</strong></div>
+            <div className="receiptPrintBalance"><span>Balance remaining</span><strong>{money(remainingCents)}</strong></div>
+          </div>
+        </section>
+
+        <footer className="receiptPrintFooter">
+          <div><strong>Thank you for choosing Moore Made.</strong><span>Your Idea. Moore Made.</span></div>
+          <p><span><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable.</span><span>If there is an issue with your finished order, contact Moore Made so we can help make it right.</span></p>
+          <small>Moore Made LLC · mooremade.store · Order {orderNumber}</small>
         </footer>
       </article>
     </div>

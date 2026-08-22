@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { QuoteResponseButtons } from "@/components/QuoteResponseButtons";
 import { PaymentCheckoutButton } from "@/components/PaymentCheckoutButton";
-import { CashPaymentRequestButton } from "@/components/CashPaymentRequestButton";
 import { PaymentPolicyGate } from "@/components/PaymentPolicyGate";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { money, QUOTE_STATUS_LABELS, type QuoteLineItem, type QuoteProofItem, type QuoteStatus } from "@/lib/quote-types";
@@ -100,6 +99,13 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
   const request = Array.isArray(quote.custom_requests) ? quote.custom_requests[0] : quote.custom_requests;
   if (!request) notFound();
 
+  const fulfillmentValue = String(request.delivery || "").toLowerCase();
+  const isShipping = fulfillmentValue.includes("ship");
+  const isLocalDelivery = fulfillmentValue.includes("delivery") && !isShipping;
+  const fulfillmentChargeLabel = isLocalDelivery ? "Local delivery" : isShipping ? "Shipping" : "Fulfillment";
+  const balanceFulfillmentText = isShipping ? "shipped" : isLocalDelivery ? "marked ready for delivery" : "marked ready for pickup";
+  const finalFulfillmentEmailText = isShipping ? "shipping email, including tracking when available" : isLocalDelivery ? "local delivery email" : "pickup email";
+
   const mockupSnapshot = await signMockupDocumentForDisplay(quote.mockup_snapshot, 3600);
 
   const { data: proofData } = await supabase
@@ -150,8 +156,6 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
     amountPaidCents,
   });
   const paymentLabel = paymentStep.kind === "deposit" ? "Pay deposit" : paymentStep.kind === "balance" ? "Pay remaining balance" : "Pay full amount";
-  const cashAppConfigured = Boolean((process.env.CASHAPP_PAYMENT_URL || "").trim());
-  const paymentReference = formatRequestNumber(request.request_number);
   const currentProofVersion = Math.max(1, Number(quote.proof_version || 1));
   const { data: policyAcceptance, error: policyAcceptanceError } = await supabase
     .from("order_policy_acceptances")
@@ -209,7 +213,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
             <div><dt>Front / back</dt><dd>{request.print_sides || "Not specified"}</dd></div>
             <div><dt>Placement</dt><dd>{request.placements?.length ? request.placements.map(prettyPlacement).join(" · ") : "Not specified"}</dd></div>
             <div><dt>Design size</dt><dd>{request.logo_size || "Not specified"}</dd></div>
-            <div><dt>Pickup / shipping</dt><dd>{request.delivery || "Not specified"}</dd></div>
+            <div><dt>Fulfillment method</dt><dd>{request.delivery || "Not specified"}</dd></div>
             <div><dt>Requested date</dt><dd>{prettyDate(request.deadline)}</dd></div>
             {request.sizes ? <div className="publicOrderDetailsWide"><dt>Sizes / quantities</dt><dd><pre>{request.sizes}</pre></dd></div> : null}
           </dl>
@@ -227,7 +231,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
           <div className="publicQuoteTotals">
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
-            {quote.shipping_cents ? <div><span>Shipping</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
+            {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>Tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>{quote.applied_discount_code ? `Discount (${quote.applied_discount_code})` : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="publicQuoteGrandTotal"><span>Total</span><strong>{money(quote.total_cents)}</strong></div>
@@ -242,7 +246,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
         <section className="publicProofSection publicApprovalSection">
           <div className="publicProofSectionHead"><div><span className="eyebrow">04 · Approval</span><h2>Approve the entire order once</h2></div></div>
           <p className="publicApprovalIntro">If every proof and the pricing are correct, approve everything below. If only one item needs work, identify that specific product in the change request instead of restarting the entire conversation.</p>
-          {active ? <QuoteResponseButtons token={token} proofItems={proofItems.map((item) => ({ id: item.id, title: item.title }))} /> : <div className="quoteInactiveMessage">{quote.status === "approved" ? "This complete proof + quote is approved. Complete the payment step below to keep the order moving." : quote.status === "changes_requested" ? "Your change request was received. Moore Made will update the affected proof(s) and send a new complete version when it is ready." : quote.status === "declined" ? "This quote was declined. Contact Moore Made if you'd like an updated version." : !allProofsAvailable && quote.status === "sent" ? "One or more proof files are unavailable, so approval is temporarily disabled. Please contact Moore Made." : "This approval is no longer active. Contact Moore Made if you need an updated proof + quote."}</div>}
+          {active ? <QuoteResponseButtons token={token} proofItems={proofItems.map((item) => ({ id: item.id, title: item.title }))} delivery={request.delivery} /> : <div className="quoteInactiveMessage">{quote.status === "approved" ? "This complete proof + quote is approved. Complete the payment step below to keep the order moving." : quote.status === "changes_requested" ? "Your change request was received. Moore Made will update the affected proof(s) and send a new complete version when it is ready." : quote.status === "declined" ? "This quote was declined. Contact Moore Made if you'd like an updated version." : !allProofsAvailable && quote.status === "sent" ? "One or more proof files are unavailable, so approval is temporarily disabled. Please contact Moore Made." : "This approval is no longer active. Contact Moore Made if you need an updated proof + quote."}</div>}
         </section>
 
         {quote.status === "approved" ? <section className="publicProofSection publicPaymentSection">
@@ -256,7 +260,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
             <div><span>Status</span><strong>{paymentStatusLabel(request.payment_status || "unpaid")}</strong></div>
           </div>
           {paymentStep.amountCents > 0 ? <>
-            <p className="publicApprovalIntro">{paymentStep.kind === "deposit" ? `A ${money(paymentStep.amountCents)} custom deposit is required to begin production. The remaining balance stays attached to this order.` : paymentStep.kind === "balance" ? "Your deposit is recorded. Pay the remaining balance before the order can be marked ready for pickup or shipped." : "Full payment is required to begin production."}</p>
+            <p className="publicApprovalIntro">{paymentStep.kind === "deposit" ? `A ${money(paymentStep.amountCents)} custom deposit is required to begin production. The remaining balance stays attached to this order.` : paymentStep.kind === "balance" ? `Your deposit is recorded. Pay the remaining balance before the order can be ${balanceFulfillmentText}.` : "Full payment is required to begin production."}</p>
 
             <PaymentPolicyGate
               token={token}
@@ -275,37 +279,21 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
                   <PaymentCheckoutButton token={token} amountCents={paymentStep.amountCents} label={paymentLabel} />
                 </div> : null}
 
-                {cashAppConfigured ? <div className={`cashAppPaymentPanel ${isStripeConfigured() ? "digitalPaymentSecondary" : ""}`}>
+                {!isStripeConfigured() ? <div className="digitalPaymentPanel cashAppPaymentPendingSetup">
                   <div>
-                    <span className="eyebrow">{isStripeConfigured() ? "Alternative digital payment" : "Cash App payment"}</span>
-                    <h3>Send {money(paymentStep.amountCents)}</h3>
-                    <p>{paymentStep.kind === "deposit" ? "This is the custom deposit required to begin production." : paymentStep.kind === "balance" ? "This is the remaining balance on your order." : "Full payment is required to begin production."}</p>
-                  </div>
-                  <div className="cashAppReference">
-                    <span>Please include this order number in the payment note</span>
-                    <strong>{paymentReference}</strong>
-                  </div>
-                  <a className="btn cashAppPaymentButton" href={`/api/payments/cashapp?token=${encodeURIComponent(token)}`} target="_blank" rel="noreferrer">Pay with Cash App ↗</a>
-                </div> : !isStripeConfigured() ? <div className="cashAppPaymentPanel cashAppPaymentPendingSetup">
-                  <div>
-                    <span className="eyebrow">Digital payment</span>
-                    <h3>Cash App link coming shortly</h3>
-                    <p>Your approved order and amount due are saved. Moore Made will add its Cash App payment link here before digital payment is requested.</p>
+                    <span className="eyebrow">Secure online payment</span>
+                    <h3>Stripe Checkout is being configured</h3>
+                    <p>Your approved order and balance are saved. Moore Made will notify you as soon as secure card payment is available.</p>
                   </div>
                 </div> : null}
 
-                <CashPaymentRequestButton
-                  token={token}
-                  amountCents={paymentStep.amountCents}
-                  initialStatus={request.cash_payment_request_status || "none"}
-                />
               </div>
             </PaymentPolicyGate>
 
             <div className="cashAppNextSteps paymentConfirmationSteps">
               <strong>What happens after payment?</strong>
-              <p>Digital payments are confirmed automatically when supported. Cash App or cash payments are verified by Moore Made before the order is marked paid.</p>
-              <p>Once payment is recorded, we&apos;ll email a confirmation. When your order is finished, you&apos;ll receive a separate pickup or shipping email, including tracking when available.</p>
+              <p>Payments are completed securely through Stripe and confirmed automatically.</p>
+              <p>Once payment is recorded, we&apos;ll email a confirmation. When your order is finished, you&apos;ll receive a separate {finalFulfillmentEmailText}.</p>
             </div>
           </> : <div className="quoteResponseSuccess"><strong>Paid in full ✓</strong><p>No balance remains on this order.</p></div>}
         </section> : null}

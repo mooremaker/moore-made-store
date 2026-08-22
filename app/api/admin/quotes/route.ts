@@ -370,13 +370,18 @@ export async function POST(request: Request) {
 
     const reference = formatRequestNumber(customerRequest.request_number);
     const quoteUrl = `${publicSiteUrl()}/quote/${quote.public_token}`;
+    const fulfillmentChargeLabel = String(customerRequest.delivery || "").toLowerCase().includes("delivery")
+      ? "Local delivery"
+      : String(customerRequest.delivery || "").toLowerCase().includes("ship")
+        ? "Shipping"
+        : "Fulfillment";
     const lineRows = lineItems
       .map((item) => `<tr><td style="padding:8px 12px 8px 0;">${escapeHtml(item.description)}</td><td style="padding:8px 12px;text-align:center;">${item.quantity}</td><td style="padding:8px 0;text-align:right;font-weight:700;">${escapeHtml(money(item.quantity * item.unitPriceCents))}</td></tr>`)
       .join("");
 
     const extraRows = [
       setupFeeCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Setup fee</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(setupFeeCents))}</td></tr>` : "",
-      shippingCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Shipping</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(shippingCents))}</td></tr>` : "",
+      shippingCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">${escapeHtml(fulfillmentChargeLabel)}</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(shippingCents))}</td></tr>` : "",
       taxCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Tax</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(taxCents))}</td></tr>` : "",
       finalDiscountCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Discount</td><td style="padding:6px 0;text-align:right;font-weight:700;">−${escapeHtml(money(finalDiscountCents))}</td></tr>` : "",
     ].join("");

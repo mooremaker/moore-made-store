@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
 import { FulfillmentActions } from "@/components/FulfillmentActions";
 import { ManualPaymentControl } from "@/components/ManualPaymentControl";
-import { CashPaymentAdminAlert } from "@/components/CashPaymentAdminAlert";
 import { RequestStatusControl } from "@/components/RequestStatusControl";
 import { ShowcaseStatusControl } from "@/components/ShowcaseStatusControl";
 import { ShowcaseDeleteButton } from "@/components/ShowcaseDeleteButton";
 import { ShowcasePhotoManager } from "@/components/ShowcasePhotoManager";
 import { ShowcaseHomepageFeatureControl } from "@/components/ShowcaseHomepageFeatureControl";
+import { ShowcaseCustomerPrimaryControl } from "@/components/ShowcaseCustomerPrimaryControl";
+import { DeleteTestOrderButton } from "@/components/account/DeleteTestOrderButton";
 import { AdminMessagesPanel } from "@/components/messages/AdminMessagesPanel";
 import { AdminFinancialsPanel } from "@/components/admin/AdminFinancialsPanel";
 import { MockupStudio } from "@/components/admin/MockupStudio";
@@ -39,6 +40,7 @@ type FileLink = { path: string; url: string };
 
 export type AdminRequestRow = {
   id: string;
+  is_admin_test_order: boolean;
   request_number: number;
   customer_name: string;
   email: string;
@@ -97,6 +99,7 @@ export type AdminShowcaseRow = {
   social_handle: string | null;
   status: ShowcaseStatus;
   homepage_featured: boolean;
+  customer_primary: boolean;
   photo_paths: string[] | null;
   created_at: string;
   photoLinks: (FileLink & { preview: ShowcasePhotoPreview })[];
@@ -353,8 +356,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     <div className="adminRequestIdentity">
                       <div className="adminRequestKicker">
                         <span className="requestNumber">{formatRequestNumber(request.request_number)}</span>
-                        <span className={`statusBadge status-${request.status}`}>{REQUEST_STATUS_LABELS[request.status]}</span>
-                        {request.cash_payment_request_status === "pending" ? <span className="statusBadge cashRequestSummaryBadge">Cash requested</span> : null}
+                        <span className={`statusBadge status-${request.status}`}>{request.status === "ready" && String(request.delivery || "").toLowerCase().includes("delivery") ? "Ready for delivery" : REQUEST_STATUS_LABELS[request.status]}</span>
                       </div>
                       <h3>{request.customer_name}</h3>
                       <p>{request.product}{request.item_type ? ` · ${request.item_type}` : ""}</p>
@@ -368,10 +370,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     </div>
 
                     <div className="adminRequestQuickActions">
-                      <RequestStatusControl id={request.id} initialStatus={request.status} />
+                      <RequestStatusControl id={request.id} initialStatus={request.status} delivery={request.delivery} />
                       <button className="btn adminViewButton" type="button" onClick={() => setOpenRequestId(isOpen ? null : request.id)} aria-expanded={isOpen}>
                         {isOpen ? "Close details" : "View details"}
                       </button>
+                      {request.is_admin_test_order && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
                   </div>
 
@@ -419,7 +422,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             <div><dt>Style</dt><dd className="adminWrapValue">{request.item_type || "Not specified"}</dd></div>
                             <div><dt>Colors</dt><dd className="adminWrapValue">{request.colors || "Not specified"}</dd></div>
                             <div><dt>Front / back</dt><dd>{request.print_sides || "Not specified"}</dd></div>
-                            <div><dt>Delivery</dt><dd>{request.delivery || "Not specified"}</dd></div>
+                            <div><dt>Fulfillment</dt><dd>{request.delivery || "Not specified"}</dd></div>
                             <div><dt>Needed by</dt><dd>{prettyDate(request.deadline)}</dd></div>
                             <div><dt>Payment</dt><dd>{request.payment_status === "paid" ? `Paid in full · ${money(request.amount_paid_cents)}` : request.payment_status === "deposit_paid" ? `Deposit paid · ${money(request.amount_paid_cents)} paid` : "Payment due"}</dd></div>
                           </dl>
@@ -430,7 +433,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                               <div><strong>{orderItemQuantity(item)} pcs</strong><small>{compactSizeSummary(item) || "No size breakdown"}</small></div>
                             </div>)}
                           </div> : null}
-                          {request.shipping_address ? <div className="adminShippingAddress"><span>Shipping address</span><p>{request.shipping_address.name ? `${request.shipping_address.name} · ` : ""}{request.shipping_address.line1}{request.shipping_address.line2 ? `, ${request.shipping_address.line2}` : ""}<br />{request.shipping_address.city}, {request.shipping_address.state} {request.shipping_address.postalCode} · {request.shipping_address.country}</p></div> : null}
+                          {request.shipping_address ? <div className="adminShippingAddress"><span>{String(request.delivery || "").toLowerCase().includes("delivery") ? "Local delivery address" : "Shipping address"}</span><p>{request.shipping_address.name ? `${request.shipping_address.name} · ` : ""}{request.shipping_address.line1}{request.shipping_address.line2 ? `, ${request.shipping_address.line2}` : ""}<br />{request.shipping_address.city}, {request.shipping_address.state} {request.shipping_address.postalCode} · {request.shipping_address.country}</p></div> : null}
                         </section>
 
                         <section className="adminDetailGroup adminDetailGroupWide">
@@ -485,23 +488,6 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         ) : <div className="requestWarning">Proof + quote approval is not set up yet. Run the Phase 2D scalable proofs SQL migration.</div>}
                       </section>
 
-                      {request.cash_payment_request_status === "pending" || request.cash_payment_request_status === "contacted" ? (
-                        <section className="adminQuoteSection adminCashRequestSection">
-                          <div className="adminDetailGroupTitle"><span>$</span><h4>Cash payment arrangement</h4></div>
-                          <CashPaymentAdminAlert
-                            requestId={request.id}
-                            requestNumber={formatRequestNumber(request.request_number)}
-                            customerName={request.customer_name}
-                            email={request.email}
-                            phone={request.phone}
-                            smsConsent={request.sms_consent}
-                            amountCents={request.cash_payment_requested_amount_cents}
-                            initialStatus={request.cash_payment_request_status}
-                            requestedAt={request.cash_payment_requested_at}
-                          />
-                        </section>
-                      ) : null}
-
                       {quote ? (
                         <section className="adminQuoteSection adminPaymentSection">
                           <div className="adminDetailGroupTitle"><span>$</span><h4>Payment</h4></div>
@@ -550,7 +536,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
 
                       <section className="adminQuoteSection adminNotificationSection">
                         <div className="adminDetailGroupTitle"><span>✉</span><h4>Email notifications</h4></div>
-                        <OrderNotificationControl requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} customerEmail={request.email} orderStatus={request.status} paymentStatus={request.payment_status} />
+                        <OrderNotificationControl requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} customerEmail={request.email} orderStatus={request.status} paymentStatus={request.payment_status} delivery={request.delivery} />
                       </section>
 
                       <div className="requestCreated">Submitted {submittedDate(request.created_at)}</div>
@@ -572,7 +558,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
       ) : (
         <section className="adminWorkspacePanel">
           <div className="adminSectionIntro">
-            <div><div className="eyebrow">Made by You</div><h2>Customer showcase approvals</h2><p>Review customer photos and reviews here. Approve each review separately, then choose one approved review as the homepage feature. If that customer has more reviews, visitors can cycle through them without taking extra spots.</p></div>
+            <div><div className="eyebrow">Made by You</div><h2>Customer showcase approvals</h2><p>Review customer photos and reviews here. A customer&apos;s oldest approved review appears first by default. Use “Main customer review” to choose a different one, and “Feature homepage” to choose the single review highlighted on the homepage.</p></div>
           </div>
 
           {!showcaseReady ? <div className="formError">Made by You is not set up in Supabase yet. Run supabase/moore_made_phase2_1_made_by_you.sql.</div> : null}
@@ -604,6 +590,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     <div className="adminRequestQuickActions">
                       <ShowcaseStatusControl id={post.id} initialStatus={post.status} />
                       <ShowcaseHomepageFeatureControl id={post.id} status={post.status} featured={post.homepage_featured} />
+                      <ShowcaseCustomerPrimaryControl id={post.id} status={post.status} primary={post.customer_primary} />
                       <button className="btn secondary adminViewButton" type="button" onClick={() => setOpenShowcaseId(isOpen ? null : post.id)}>{isOpen ? "Close" : "Review post"}</button>
                       {isOpen ? <ShowcaseDeleteButton id={post.id} /> : null}
                     </div>

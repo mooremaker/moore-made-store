@@ -173,7 +173,6 @@ p { line-height: 1.65; }
   .checkboxGrid { grid-template-columns: 1fr; }
 }
 
-
 /* Homepage hero redesign */
 .heroSingle {
   padding: 72px 0 44px;
@@ -1636,7 +1635,7 @@ p { line-height: 1.65; }
 }
 .fulfillmentMode {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
 }
 .fulfillmentMode button {
@@ -6380,7 +6379,7 @@ p { line-height: 1.65; }
 
   .homeSingleFeaturedReview .homeCompactReviewBody > p {
     display: -webkit-box;
-    -webkit-line-clamp: 7;
+    -webkit-line-clamp: 10;
     -webkit-box-orient: vertical;
     overflow: hidden;
     margin-top: 2px;
@@ -8069,4 +8068,404 @@ p { line-height: 1.65; }
   .finishedGalleryPage { padding: 18px 10px; }
   .finishedGalleryCard { padding: 18px 14px; border-radius: 17px; }
   .finishedGalleryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* =========================================================
+   Compact one-page customer receipt for Letter printing
+   ========================================================= */
+.receiptPrintSheet { display: none; }
+
+@page receipt {
+  size: Letter portrait;
+  margin: 0.35in;
+}
+
+@media print {
+  .receiptPage .receiptPaper { display: none !important; }
+  .receiptPrintSheet {
+    page: receipt;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+    font-size: 9.5pt;
+    line-height: 1.25;
+  }
+  .receiptPrintSheet,
+  .receiptPrintSheet * {
+    box-sizing: border-box;
+  }
+  .receiptPrintHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 22px;
+    padding-bottom: 10px;
+    border-bottom: 1.5px solid #1e1e1e;
+  }
+  .receiptPrintLogo {
+    display: block !important;
+    width: 150px !important;
+    max-width: 150px !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+  .receiptPrintTitle {
+    display: grid;
+    justify-items: end;
+    gap: 1px;
+    text-align: right;
+  }
+  .receiptPrintTitle > strong {
+    margin-top: 3px;
+    font-size: 15pt;
+    line-height: 1;
+    letter-spacing: .02em;
+  }
+  .receiptPrintTitle > span:not(.receiptPrintStatus) { font-weight: 800; }
+  .receiptPrintTitle small { color: #555; font-size: 8.5pt; }
+  .receiptPrintStatus {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 8px;
+    border: 1px solid #1e1e1e;
+    border-radius: 999px;
+    font-size: 8pt;
+    font-weight: 900;
+    letter-spacing: .09em;
+  }
+  .receiptPrintStatus.isPaid { background: #f1f1ee; }
+  .receiptPrintStatus.isVoided { border-width: 2px; }
+  .receiptPrintVoid {
+    display: grid;
+    gap: 2px;
+    margin-top: 8px;
+    padding: 7px 9px;
+    border: 2px solid #111;
+    font-size: 8.5pt;
+  }
+  .receiptPrintMeta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-top: 9px;
+    border: 1px solid #bdbdb8;
+  }
+  .receiptPrintMeta > div {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    padding: 7px 9px;
+  }
+  .receiptPrintMeta > div + div { border-left: 1px solid #bdbdb8; }
+  .receiptPrintMeta span,
+  .receiptPrintPayment span,
+  .receiptPrintTotals span {
+    color: #4f4f4b;
+  }
+  .receiptPrintMeta > div > span,
+  .receiptPrintSectionLabel {
+    font-size: 7.2pt;
+    font-weight: 900;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .receiptPrintMeta strong { font-size: 10pt; }
+  .receiptPrintMeta small {
+    min-width: 0;
+    color: #555;
+    font-size: 8pt;
+    overflow-wrap: anywhere;
+  }
+  .receiptPrintItems { margin-top: 10px; }
+  .receiptPrintSectionLabel { margin-bottom: 4px; color: #333; }
+  .receiptPrintLine {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 38px 70px 76px;
+    gap: 6px;
+    align-items: center;
+    min-height: 22px;
+    padding: 4px 7px;
+    border: 1px solid #d2d2ce;
+    border-top: 0;
+    font-size: 8.7pt;
+  }
+  .receiptPrintLineHeader {
+    min-height: 20px;
+    border-top: 1px solid #d2d2ce;
+    background: #f2f2ef !important;
+    font-size: 7.2pt;
+    font-weight: 900;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .receiptPrintLine > :nth-child(2),
+  .receiptPrintLine > :nth-child(3) { text-align: center; }
+  .receiptPrintLine > :last-child { text-align: right; }
+  .receiptPrintLine > :first-child { overflow-wrap: anywhere; }
+  .receiptPrintSummary {
+    display: grid;
+    grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+    gap: 14px;
+    margin-top: 10px;
+    align-items: start;
+  }
+  .receiptPrintTotals,
+  .receiptPrintPayment {
+    display: grid;
+    gap: 0;
+    border: 1px solid #bdbdb8;
+  }
+  .receiptPrintPayment > .receiptPrintSectionLabel {
+    margin: 0;
+    padding: 5px 8px;
+    border-bottom: 1px solid #d2d2ce;
+    background: #f2f2ef !important;
+  }
+  .receiptPrintTotals > div,
+  .receiptPrintPayment > div:not(.receiptPrintSectionLabel) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 4px 8px;
+    border-top: 1px solid #e1e1dd;
+    font-size: 8.5pt;
+  }
+  .receiptPrintTotals > div:first-child { border-top: 0; }
+  .receiptPrintGrandTotal,
+  .receiptPrintBalance {
+    border-top: 1.5px solid #111 !important;
+    background: #f7f7f4 !important;
+    font-size: 9.5pt !important;
+  }
+  .receiptPrintGrandTotal span,
+  .receiptPrintBalance span { color: #111; font-weight: 900; }
+  .receiptPrintGrandTotal strong,
+  .receiptPrintBalance strong { font-size: 10.5pt; }
+  .receiptPrintFooter {
+    display: grid;
+    gap: 5px;
+    margin-top: 11px;
+    padding-top: 8px;
+    border-top: 1.5px solid #1e1e1e;
+    font-size: 7.8pt;
+  }
+  .receiptPrintFooter > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .receiptPrintFooter > div > strong { font-size: 9.5pt; }
+  .receiptPrintFooter > div > span { color: #555; font-style: italic; }
+  .receiptPrintFooter p { margin: 0; color: #333; }
+  .receiptPrintFooter small { color: #555; font-size: 7pt; }
+}
+
+/* =========================================================
+   Phase 6.39 — clearer Shop hierarchy + expanded home review
+   ========================================================= */
+.homeSingleFeaturedReview.isReviewExpanded {
+  max-height: none !important;
+}
+.homeSingleFeaturedReview.isReviewExpanded .homeCompactReviewMedia {
+  max-height: none !important;
+}
+.homeSingleFeaturedReview.isReviewExpanded .homeCompactReviewBody > p {
+  display: block !important;
+  overflow: visible !important;
+  min-height: 0 !important;
+  -webkit-line-clamp: unset !important;
+}
+
+.shopHeroPaths {
+  gap: 22px;
+}
+.shopHeroPaths > .shopHeroPathInfo {
+  padding: 2px 0 2px 14px;
+  border: 0;
+  border-left: 2px solid #b9aa9b;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.shopSectionHead {
+  display: block;
+  margin-bottom: 18px;
+}
+.shopSectionHead > div {
+  width: 100%;
+}
+.shopSectionHead h2 {
+  max-width: 100%;
+  margin: 5px 0 0;
+  font-size: clamp(1.45rem, 6.5vw, 2.8rem);
+  line-height: 1.02;
+  letter-spacing: -.045em;
+  white-space: nowrap;
+}
+.shopSectionHead > p {
+  max-width: none;
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.shopProductCardBody {
+  gap: 9px;
+}
+.shopProductCardBody > p {
+  -webkit-line-clamp: 4;
+}
+.shopCustomizeButton {
+  margin-top: 4px;
+}
+
+@media (max-width: 680px) {
+  .shopHeroPaths {
+    gap: 17px;
+  }
+  .shopHeroPaths > .shopHeroPathInfo {
+    padding-left: 12px;
+  }
+  .shopSectionHead {
+    display: block;
+    margin-bottom: 15px;
+  }
+  .shopSectionHead h2 {
+    font-size: clamp(1.4rem, 6.3vw, 1.72rem);
+  }
+  .shopSectionHead > p {
+    margin-top: 12px;
+    font-size: .9rem;
+  }
+  .homeSingleFeaturedReview.isReviewExpanded .homeCompactReviewBody > p {
+    font-size: .74rem;
+    line-height: 1.45;
+  }
+}
+
+@media (max-width: 360px) {
+  .shopSectionHead h2 {
+    font-size: 1.25rem;
+  }
+}
+
+/* =========================================================
+   Phase 6.40 — manual proofs + clear outsourced pricing
+   ========================================================= */
+.manualProofUploadInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.manualProofUploadButton {
+  cursor: pointer;
+}
+.manualQuoteNotice {
+  margin: 14px 0 10px;
+  padding: 13px 15px;
+  border: 1px solid #d8d0c6;
+  border-radius: 13px;
+  background: #f7f4ef;
+}
+.manualQuoteNotice > div {
+  display: grid;
+  gap: 3px;
+}
+.manualQuoteNotice span,
+.outsourcedCostQuickEntry label > span,
+.quotePricingSuggestionDetails summary span {
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.manualQuoteNotice strong {
+  font-size: 1rem;
+}
+.manualQuoteNotice small,
+.outsourcedCostQuickEntry p,
+.quotePricingSuggestionDetails summary small {
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.4;
+}
+.outsourcedCostQuickEntry {
+  display: grid;
+  grid-template-columns: minmax(220px, 340px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: end;
+  margin: 10px 0;
+  padding: 14px 15px;
+  border: 1px solid #cbb8a5;
+  border-radius: 13px;
+  background: #fffaf3;
+}
+.outsourcedCostQuickEntry label > span {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+.outsourcedCostQuickEntry label > span small {
+  color: #795a3c;
+  font-size: .62rem;
+}
+.outsourcedCostQuickEntry p {
+  margin: 0 0 5px;
+}
+.quotePricingSuggestionDetails {
+  margin: 10px 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #fff;
+  overflow: hidden;
+}
+.quotePricingSuggestionDetails > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 15px;
+  cursor: pointer;
+  list-style-position: inside;
+}
+.quotePricingSuggestionDetails[open] > summary {
+  border-bottom: 1px solid var(--border);
+  background: #f8f6f2;
+}
+.quotePricingSuggestionDetails .quotePricingSuggestion {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.receiptFinalSaleNotice > span,
+.invoiceFinalSale > span,
+.receiptPrintFooter p > span {
+  display: block;
+}
+.receiptFinalSaleNotice > span + span,
+.invoiceFinalSale > span + span,
+.receiptPrintFooter p > span + span {
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .outsourcedCostQuickEntry {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .quotePricingSuggestionDetails > summary {
+    display: grid;
+    gap: 3px;
+  }
 }

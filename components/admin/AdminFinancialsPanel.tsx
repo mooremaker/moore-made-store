@@ -186,6 +186,8 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
   const [goalFundingAction, setGoalFundingAction] = useState<GoalFundingAction>(null);
   const [goalFundingSaving, setGoalFundingSaving] = useState(false);
   const [goalStatusSaving, setGoalStatusSaving] = useState<string | null>(null);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [goalEditSaving, setGoalEditSaving] = useState(false);
   const quickFormRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -232,7 +234,16 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
     const approvedQuotes = quotes.filter((quote) => quote.status === "approved" && activeOrderIds.has(quote.request_id));
     const approvedEstimatedCost = approvedQuotes.reduce((sum, quote) => sum + Number(quote.internal_total_cost_cents || 0), 0);
     const approvedEstimatedProfit = approvedQuotes.reduce((sum, quote) => sum + Number(quote.estimated_profit_cents || 0), 0);
-    return { receivedAll, receivedMonth, expensesAll, expensesMonth, approvedValue, outstanding, netMonth: receivedMonth - expensesMonth, fundingIn, operatingNet, approvedEstimatedCost, approvedEstimatedProfit };
+    const approvedLaborHours = approvedQuotes.reduce((sum, quote) => sum + Number(quote.labor_hours || 0), 0);
+    const approvedCostBreakdown = approvedQuotes.reduce((sum, quote) => ({
+      supplies: sum.supplies + Number(quote.internal_supply_cost_cents || 0) + Number(quote.internal_print_cost_cents || 0) + Number(quote.internal_packaging_cost_cents || 0),
+      labor: sum.labor + Number(quote.labor_cost_cents || 0),
+      shipping: sum.shipping + Number(quote.internal_shipping_cost_cents || 0),
+      fees: sum.fees + Number(quote.internal_payment_fee_cents || 0),
+      other: sum.other + Number(quote.internal_other_cost_cents || 0),
+    }), { supplies: 0, labor: 0, shipping: 0, fees: 0, other: 0 });
+    const approvedNonLaborCost = Math.max(0, approvedEstimatedCost - approvedCostBreakdown.labor);
+    return { receivedAll, receivedMonth, expensesAll, expensesMonth, approvedValue, outstanding, netMonth: receivedMonth - expensesMonth, fundingIn, operatingNet, approvedEstimatedCost, approvedEstimatedProfit, approvedCostBreakdown, approvedLaborHours, approvedNonLaborCost };
   }, [paidPayments, activeExpenses, quotes, orders, quoteByRequest, monthKey, activeFunding]);
 
   const monthlyTrend = useMemo(() => sixMonthKeys().map(({ key, label }) => {
@@ -368,6 +379,32 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
     setGoalStatusSaving(null);
     if (!response.ok) { setFinanceError(data.error || "Could not update goal status."); return; }
     router.refresh();
+  }
+
+  async function editGoal(event: FormEvent<HTMLFormElement>, goal: BusinessGoalRow) {
+    event.preventDefault();
+    setGoalEditSaving(true); setFinanceError("");
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/admin/goals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: goal.id,
+        action: "edit",
+        name: form.get("name"),
+        description: form.get("description"),
+        targetAmountCents: Math.round(Number(form.get("targetAmount") || 0) * 100),
+        priority: form.get("priority"),
+        status: form.get("status"),
+        targetDate: form.get("targetDate"),
+        fundingSource: form.get("fundingSource"),
+        note: form.get("note"),
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setGoalEditSaving(false);
+    if (!response.ok) { setFinanceError(data.error || "Could not save the goal changes."); return; }
+    setEditingGoalId(null); router.refresh();
   }
 
   async function voidGoal(id: string) {
@@ -575,7 +612,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
               <article className="financeMetric">
                 <span className="financeMetricLabel">All-time operating net</span>
                 <strong>{money(totals.operatingNet)}</strong>
-                <small>All recorded customer cash minus expenses</small>
+                <small>All recorded customer payments minus expenses</small>
               </article>
               <article className="financeMetric">
                 <span className="financeMetricLabel">Approved order profit</span>
@@ -583,9 +620,19 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
                 <small>Estimated profit from approved quotes using their internal job costs</small>
               </article>
               <article className="financeMetric">
-                <span className="financeMetricLabel">Approved job costs</span>
-                <strong>{money(totals.approvedEstimatedCost)}</strong>
-                <small>Supplies, labor, shipping, fees, and other costs entered on approved quotes</small>
+                <span className="financeMetricLabel">Approved non-labor job costs</span>
+                <strong>{money(totals.approvedNonLaborCost)}</strong>
+                <small>{[
+                  totals.approvedCostBreakdown.supplies ? `Supplies ${money(totals.approvedCostBreakdown.supplies)}` : "",
+                  totals.approvedCostBreakdown.shipping ? `Shipping ${money(totals.approvedCostBreakdown.shipping)}` : "",
+                  totals.approvedCostBreakdown.fees ? `Fees ${money(totals.approvedCostBreakdown.fees)}` : "",
+                  totals.approvedCostBreakdown.other ? `Other ${money(totals.approvedCostBreakdown.other)}` : "",
+                ].filter(Boolean).join(" · ") || "No non-labor costs saved on approved quotes"}</small>
+              </article>
+              <article className="financeMetric financeLaborMetric">
+                <span className="financeMetricLabel">Approved labor</span>
+                <strong>{totals.approvedLaborHours.toLocaleString(undefined, { maximumFractionDigits: 2 })} hr{totals.approvedLaborHours === 1 ? "" : "s"}</strong>
+                <small>{money(totals.approvedCostBreakdown.labor)} internal labor cost across approved quotes</small>
               </article>
               {goalsReady ? <article className="financeMetric">
                 <span className="financeMetricLabel">Goal funding remaining</span>
@@ -642,7 +689,8 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
             <div className="goalProgress goalProgressLarge"><span style={{ width: `${percent}%` }} /></div>
             <div className="goalMeta"><span>{percent}% funded</span>{goal.target_date ? <span>Target {localDate(`${goal.target_date}T12:00:00`)}</span> : null}{goal.funding_source ? <span>Plan: {goal.funding_source}</span> : null}</div>
             {goal.note ? <p className="goalNote">{goal.note}</p> : null}
-            <div className="goalActions"><button className="btn secondary" type="button" onClick={() => setGoalFundingAction(actionOpen && goalFundingAction?.direction === "allocate" ? null : { goalId: goal.id, direction: "allocate" })}>+ Allocate funds</button><button className="textButton" type="button" disabled={saved <= 0} onClick={() => setGoalFundingAction(actionOpen && goalFundingAction?.direction === "withdraw" ? null : { goalId: goal.id, direction: "withdraw" })}>Move funds out</button><button className="textButton financeDeleteButton" type="button" disabled={voidingGoalId === goal.id} onClick={() => void voidGoal(goal.id)}>{voidingGoalId === goal.id ? "Voiding…" : "Void goal"}</button></div>
+            <div className="goalActions"><button className="btn secondary" type="button" onClick={() => setGoalFundingAction(actionOpen && goalFundingAction?.direction === "allocate" ? null : { goalId: goal.id, direction: "allocate" })}>+ Allocate funds</button><button className="textButton" type="button" onClick={() => setEditingGoalId(editingGoalId === goal.id ? null : goal.id)}>{editingGoalId === goal.id ? "Close editor" : "Edit goal"}</button><button className="textButton" type="button" disabled={saved <= 0} onClick={() => setGoalFundingAction(actionOpen && goalFundingAction?.direction === "withdraw" ? null : { goalId: goal.id, direction: "withdraw" })}>Move funds out</button><button className="textButton financeDeleteButton" type="button" disabled={voidingGoalId === goal.id} onClick={() => void voidGoal(goal.id)}>{voidingGoalId === goal.id ? "Voiding…" : "Void goal"}</button></div>
+            {editingGoalId === goal.id ? <form className="goalFundingForm goalEditForm" onSubmit={(event) => void editGoal(event, goal)}><strong>Edit this goal</strong><div className="twoCol"><label className="field"><span>Goal name</span><input name="name" required maxLength={160} defaultValue={goal.name} /></label><label className="field"><span>Target amount</span><input type="number" name="targetAmount" min="0.01" step="0.01" required defaultValue={(goal.target_amount_cents / 100).toFixed(2)} /></label></div><label className="field"><span>Description</span><textarea name="description" maxLength={1200} defaultValue={goal.description || ""} /></label><div className="twoCol"><label className="field"><span>Priority</span><select name="priority" defaultValue={goal.priority}>{Object.entries(BUSINESS_GOAL_PRIORITY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label className="field"><span>Status</span><select name="status" defaultValue={goal.status}>{Object.entries(BUSINESS_GOAL_STATUS_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div><div className="twoCol"><label className="field"><span>Target date</span><input type="date" name="targetDate" defaultValue={goal.target_date || ""} /></label><label className="field"><span>Planned funding source</span><input name="fundingSource" maxLength={250} defaultValue={goal.funding_source || ""} /></label></div><label className="field"><span>Internal note</span><textarea name="note" maxLength={1500} defaultValue={goal.note || ""} /></label><div className="goalFundingFormActions"><button className="btn" type="submit" disabled={goalEditSaving}>{goalEditSaving ? "Saving…" : "Save goal changes"}</button><button className="textButton" type="button" onClick={() => setEditingGoalId(null)}>Cancel</button></div></form> : null}
             {actionOpen ? <form className="goalFundingForm" onSubmit={(event) => submitGoalFunding(event, goal.id, goalFundingAction!.direction)}><strong>{goalFundingAction?.direction === "allocate" ? "Allocate money to this goal" : "Move money out of this goal"}</strong><div className="twoCol"><label className="field"><span>Amount</span><input type="number" name="amount" min="0.01" step="0.01" required placeholder="0.00" /></label><label className="field"><span>Source / destination</span><input name="fundingSource" placeholder="Business checking, owner capital…" /></label></div><label className="field"><span>Note</span><input name="note" placeholder="Optional reason or reference" /></label><div className="goalFundingFormActions"><button className="btn" type="submit" disabled={goalFundingSaving}>{goalFundingSaving ? "Saving…" : goalFundingAction?.direction === "allocate" ? "Allocate funds" : "Move funds"}</button><button className="textButton" type="button" onClick={() => setGoalFundingAction(null)}>Cancel</button></div></form> : null}
             {(goal.funding_entries || []).length ? <details className="goalHistory"><summary>Funding history ({goal.funding_entries!.length})</summary><div>{goal.funding_entries!.map((entry) => <p key={entry.id}><span>{localDate(`${entry.entry_date}T12:00:00`)}</span><strong>{entry.direction === "allocate" ? "+" : "−"}{money(entry.amount_cents)}</strong><small>{entry.funding_source || entry.note || "No note"}</small></p>)}</div></details> : null}
           </article>;

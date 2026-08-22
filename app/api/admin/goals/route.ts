@@ -69,6 +69,29 @@ export async function PATCH(request: Request) {
 
     const supabase = getSupabaseAdmin();
 
+    if (action === "edit") {
+      const name = clean(body.name, 160);
+      const description = clean(body.description, 1200) || null;
+      const targetAmountCents = Math.round(Number(body.targetAmountCents || 0));
+      const priority = clean(body.priority, 30) as BusinessGoalPriority;
+      const status = clean(body.status, 30) as BusinessGoalStatus;
+      const targetDate = clean(body.targetDate, 10) || null;
+      const fundingSource = clean(body.fundingSource, 250) || null;
+      const note = clean(body.note, 1500) || null;
+      if (!name) return NextResponse.json({ error: "Enter a goal name." }, { status: 400 });
+      if (!Number.isInteger(targetAmountCents) || targetAmountCents <= 0) return NextResponse.json({ error: "Enter a valid target amount." }, { status: 400 });
+      if (!priorities.has(priority)) return NextResponse.json({ error: "Choose a valid priority." }, { status: 400 });
+      if (!statuses.has(status)) return NextResponse.json({ error: "Choose a valid goal status." }, { status: 400 });
+      if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) return NextResponse.json({ error: "Choose a valid target date." }, { status: 400 });
+      const { data, error } = await supabase.from("business_goals").update({
+        name, description, target_amount_cents: targetAmountCents, priority, status,
+        target_date: targetDate, funding_source: fundingSource, note, updated_by: auth.user.id,
+      }).eq("id", id).is("voided_at", null).select("id").maybeSingle();
+      if (error) return NextResponse.json({ error: "Could not save the goal changes." }, { status: 500 });
+      if (!data) return NextResponse.json({ error: "Goal not found." }, { status: 404 });
+      return NextResponse.json({ ok: true });
+    }
+
     if (action === "allocate" || action === "withdraw") {
       const amountCents = Math.round(Number(body.amountCents || 0));
       const fundingSource = clean(body.fundingSource, 250) || null;

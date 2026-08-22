@@ -6,6 +6,7 @@ export type PublicShowcasePost = {
   id: string;
   customerGroupKey: string;
   homepageFeatured: boolean;
+  customerPrimary: boolean;
   customer_name: string;
   business_name: string | null;
   product: string;
@@ -37,6 +38,7 @@ type Row = {
   published_at: string | null;
   photo_preview_settings: unknown;
   homepage_featured: boolean | null;
+  customer_primary: boolean | null;
 };
 
 async function makeCustomerGroupKey(row: Pick<Row, "customer_user_id" | "email">) {
@@ -65,7 +67,7 @@ export async function getApprovedShowcasePosts(limit?: number): Promise<PublicSh
   if (!isSupabaseConfigured()) return [];
   const supabase = getSupabaseAdmin();
   let query = supabase.from("showcase_posts")
-    .select("id,customer_user_id,email,customer_name,business_name,product,rating,review,caption,social_handle,created_at,status,photo_paths,published_snapshot,published_photo_paths,published_at,photo_preview_settings,homepage_featured")
+    .select("id,customer_user_id,email,customer_name,business_name,product,rating,review,caption,social_handle,created_at,status,photo_paths,published_snapshot,published_photo_paths,published_at,photo_preview_settings,homepage_featured,customer_primary")
     .neq("status", "draft")
     .order("homepage_featured", { ascending: false })
     .order("published_at", { ascending: false, nullsFirst: false });
@@ -88,6 +90,7 @@ export async function getApprovedShowcasePosts(limit?: number): Promise<PublicSh
       id: row.id,
       customerGroupKey,
       homepageFeatured: Boolean(row.homepage_featured),
+      customerPrimary: Boolean(row.customer_primary),
       customer_name: values.customer_name,
       business_name: values.business_name,
       product: values.product,

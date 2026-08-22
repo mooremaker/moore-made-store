@@ -6,10 +6,13 @@ import type { PublicShowcasePost } from "@/lib/showcase-data";
 
 export function ShowcaseCustomerGroup({ posts }: { posts: PublicShowcasePost[] }) {
   const orderedPosts = useMemo(() => {
-    const featured = posts.find((post) => post.homepageFeatured);
-    return featured
-      ? [featured, ...posts.filter((post) => post.id !== featured.id)]
-      : posts;
+    const selected = posts.find((post) => post.customerPrimary);
+    const chronological = [...posts].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    return selected
+      ? [selected, ...chronological.filter((post) => post.id !== selected.id)]
+      : chronological;
   }, [posts]);
 
   const [index, setIndex] = useState(0);

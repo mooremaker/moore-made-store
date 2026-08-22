@@ -49,11 +49,14 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
         setOpenSection(2);
         throw new Error("Quantity must be a whole number between 1 and 1,000,000.");
       }
-      if (String(formData.get("delivery") || "") === "Shipping") {
+      const fulfillmentMethod = String(formData.get("delivery") || "");
+      if (fulfillmentMethod === "Shipping" || fulfillmentMethod === "Local delivery") {
         const requiredAddress = ["shippingLine1", "shippingCity", "shippingState", "shippingPostalCode"];
         if (requiredAddress.some((key) => !String(formData.get(key) || "").trim())) {
           setOpenSection(3);
-          throw new Error("Please complete the shipping address so we can calculate shipping and sales tax accurately.");
+          throw new Error(fulfillmentMethod === "Local delivery"
+            ? "Please complete the delivery address so we can plan local delivery and calculate sales tax accurately."
+            : "Please complete the shipping address so we can calculate shipping and sales tax accurately.");
         }
       }
 
@@ -84,7 +87,7 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
         artworkInstructions: formData.get("artworkInstructions"),
         deadline: formData.get("deadline"),
         delivery: formData.get("delivery"),
-        shippingAddress: String(formData.get("delivery") || "") === "Shipping" ? {
+        shippingAddress: ["Shipping", "Local delivery"].includes(String(formData.get("delivery") || "")) ? {
           name: name,
           line1: String(formData.get("shippingLine1") || "").trim(),
           line2: String(formData.get("shippingLine2") || "").trim(),
@@ -287,13 +290,13 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
 
             <div className="twoCol orderTimingGrid">
               <div className="field orderTimingField"><label htmlFor="deadline">Needed by <span className="optionalLabel">Optional</span></label><input id="deadline" name="deadline" type="date" /></div>
-              <div className="field orderTimingField"><label htmlFor="delivery">Pickup or shipping?</label><select id="delivery" name="delivery" value={delivery} onChange={(e) => setDelivery(e.target.value)}><option value="">Select one</option><option>Local pickup</option><option>Shipping</option><option>Not sure yet</option></select></div>
+              <div className="field orderTimingField"><label htmlFor="delivery">Fulfillment method</label><select id="delivery" name="delivery" value={delivery} onChange={(e) => setDelivery(e.target.value)}><option value="">Select one</option><option>Local pickup</option><option>Local delivery</option><option>Shipping</option><option>Not sure yet</option></select></div>
             </div>
-            {delivery === "Shipping" ? <div className="shippingAddressPanel">
-              <strong>Shipping address</strong>
+            {delivery === "Shipping" || delivery === "Local delivery" ? <div className="shippingAddressPanel">
+              <strong>{delivery === "Local delivery" ? "Delivery address" : "Shipping address"}</strong>
               <div className="twoCol"><div className="field"><label htmlFor="shippingLine1">Street *</label><input id="shippingLine1" name="shippingLine1" autoComplete="shipping address-line1" /></div><div className="field"><label htmlFor="shippingLine2">Apt / Suite</label><input id="shippingLine2" name="shippingLine2" autoComplete="shipping address-line2" /></div></div>
               <div className="three"><div className="field"><label htmlFor="shippingCity">City *</label><input id="shippingCity" name="shippingCity" autoComplete="shipping address-level2" /></div><div className="field"><label htmlFor="shippingState">State *</label><input id="shippingState" name="shippingState" maxLength={2} autoComplete="shipping address-level1" /></div><div className="field"><label htmlFor="shippingPostalCode">ZIP *</label><input id="shippingPostalCode" name="shippingPostalCode" autoComplete="shipping postal-code" /></div></div>
-              <span className="fieldHelp">Used only for fulfillment and accurate sales-tax/shipping calculations.</span>
+              <span className="fieldHelp">{delivery === "Local delivery" ? "Used for local delivery planning and accurate sales-tax calculations." : "Used only for fulfillment and accurate sales-tax/shipping calculations."}</span>
             </div> : null}
             <span className="fieldHelp orderTimingHelp">Needed-by dates help us plan but are not guaranteed. Production is typically about a week or longer; shipping adds transit time.</span>
             <div className="twoCol requestFinalDetails"><div className="field"><label htmlFor="notes">Anything else? <span className="optionalLabel">Optional</span></label><textarea id="notes" name="notes" maxLength={5000} placeholder="Budget, inspiration, special packaging, names/numbers, event details, or anything else we should know." /></div><div className="field"><label htmlFor="discountCode">Discount code <span className="optionalLabel">Optional</span></label><input id="discountCode" name="discountCode" maxLength={80} placeholder="Example: FAMILY10" autoCapitalize="characters" /><span className="fieldHelp">We&apos;ll verify the code when preparing your quote and show any approved discount in the final total.</span></div></div>

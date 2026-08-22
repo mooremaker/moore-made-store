@@ -53,18 +53,25 @@ export async function POST(request: Request) {
     if (orderError || !order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
     const delivery = String(order.delivery || "");
-    const shippingAddress = normalizeAddress(order.shipping_address);
+    const normalizedDelivery = delivery.trim().toLowerCase();
+    const isShipping = normalizedDelivery.includes("ship");
+    const isLocalDelivery = normalizedDelivery.includes("delivery") && !isShipping;
+    const isLocalPickup = normalizedDelivery.includes("pickup");
+    const destinationAddress = normalizeAddress(order.shipping_address);
     const pickupAddress = normalizeAddress(settings?.pickup_address);
-    const address = delivery === "Shipping" ? shippingAddress : delivery === "Local pickup" ? pickupAddress : null;
+    const address = isShipping || isLocalDelivery ? destinationAddress : isLocalPickup ? pickupAddress : null;
 
     if (!address) {
-      if (delivery === "Shipping") {
+      if (isShipping) {
         return NextResponse.json({ error: "This order needs a complete shipping address before automatic tax can be calculated." }, { status: 400 });
       }
-      if (delivery === "Local pickup") {
+      if (isLocalDelivery) {
+        return NextResponse.json({ error: "This order needs a complete local delivery address before automatic tax can be calculated." }, { status: 400 });
+      }
+      if (isLocalPickup) {
         return NextResponse.json({ error: "Add Moore Made's pickup/business address under Admin → Products & pricing before calculating pickup tax." }, { status: 400 });
       }
-      return NextResponse.json({ error: "Choose Shipping or Local pickup before calculating automatic sales tax." }, { status: 400 });
+      return NextResponse.json({ error: "Choose Local pickup, Local delivery, or Shipping before calculating automatic sales tax." }, { status: 400 });
     }
 
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -118,7 +125,7 @@ export async function POST(request: Request) {
         state: address.state,
         postalCode: address.postalCode,
         country: address.country,
-        source: delivery === "Shipping" ? "shipping" : "pickup",
+        source: isShipping ? "shipping" : isLocalDelivery ? "delivery" : "pickup",
       },
       breakdown: {
         taxAmountExclusive: Number((calculation as any).tax_amount_exclusive || 0),

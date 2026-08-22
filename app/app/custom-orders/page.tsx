@@ -116,10 +116,11 @@ export default function CustomOrdersPage() {
             <input id="deadline" name="deadline" type="date" />
           </div>
           <div className="field">
-            <label htmlFor="delivery">Pickup or shipping?</label>
+            <label htmlFor="delivery">Fulfillment method</label>
             <select id="delivery" name="delivery" defaultValue="">
               <option value="" disabled>Select one</option>
               <option>Local pickup</option>
+              <option>Local delivery</option>
               <option>Shipping</option>
               <option>Not sure yet</option>
             </select>

@@ -13,8 +13,8 @@ export default async function ShopPage() {
           Browse what we can make, choose your colors and placement, then upload your own artwork or tell us the idea you want created. You stay in control of the look from the beginning.
         </p>
         <div className="shopHeroPaths">
-          <div><strong>I have artwork</strong><span>Upload it, place it, resize it, and show us exactly what you have in mind.</span></div>
-          <div><strong>I have an idea</strong><span>Pick the product and layout anyway. Tell us what belongs in each spot and we&apos;ll help create it.</span></div>
+          <div className="shopHeroPathInfo"><strong>I have artwork</strong><span>Upload it, place it, resize it, and show us exactly what you have in mind.</span></div>
+          <div className="shopHeroPathInfo"><strong>I have an idea</strong><span>Pick the product and layout anyway. Tell us what belongs in each spot and we&apos;ll help create it.</span></div>
         </div>
         <div className="actions">
           <a className="btn" href="#catalog">Browse the catalog</a>
@@ -25,7 +25,7 @@ export default async function ShopPage() {
       <section className="shopCatalogSection" id="catalog">
         <div className="sectionHead shopSectionHead">
           <div><div className="eyebrow">Choose a canvas</div><h2>What do you want to make?</h2></div>
-          <p>Example Moore Made artwork shows you how each item can look. Replace it with yours — or use the layout as inspiration.</p>
+          <p>Use each example as inspiration, then replace it with your artwork.</p>
         </div>
         <ShopCatalog mockupTemplates={mockupTemplates} />
       </section>

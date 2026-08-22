@@ -11,7 +11,7 @@ function newKey() {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function QuoteResponseButtons({ token, proofItems }: { token: string; proofItems: ProofChoice[] }) {
+export function QuoteResponseButtons({ token, proofItems, delivery }: { token: string; proofItems: ProofChoice[]; delivery?: string | null }) {
   const [working, setWorking] = useState<"approve" | "changes" | null>(null);
   const [result, setResult] = useState<"approved" | "changes_requested" | null>(null);
   const [approvedCheck, setApprovedCheck] = useState(false);
@@ -21,6 +21,9 @@ export function QuoteResponseButtons({ token, proofItems }: { token: string; pro
     { key: newKey(), proofItemId: proofItems[0]?.id ?? "", message: "" },
   ]);
   const [error, setError] = useState("");
+  const fulfillmentValue = String(delivery || "").toLowerCase();
+  const completionText = fulfillmentValue.includes("ship") ? "has shipped" : fulfillmentValue.includes("delivery") ? "is ready for delivery" : "is ready for pickup";
+  const changePlaceholder = fulfillmentValue.includes("delivery") ? "Example: Please change the local delivery date if possible." : fulfillmentValue.includes("ship") ? "Example: Please change the shipping details if possible." : "Example: Please change the pickup date if possible.";
 
   async function respond(responseValue: "approve" | "changes") {
     setError("");
@@ -69,7 +72,7 @@ export function QuoteResponseButtons({ token, proofItems }: { token: string; pro
   }
 
   if (result === "approved") {
-    return <div className="quoteResponseSuccess"><strong>Proof + quote approved ✓</strong><p>You&apos;re all set. Moore Made will move forward using every approved product proof shown on this page and notify you again when your order is ready for pickup or has shipped.</p></div>;
+    return <div className="quoteResponseSuccess"><strong>Proof + quote approved ✓</strong><p>You&apos;re all set. Moore Made will move forward using every approved product proof shown on this page and notify you again when your order {completionText}.</p></div>;
   }
 
   if (result === "changes_requested") {
@@ -91,7 +94,7 @@ export function QuoteResponseButtons({ token, proofItems }: { token: string; pro
       {showChanges ? <div className="proofChangesBox scalableChangesBox">
         <div className="proofChangeIntro"><strong>Only tell us what needs to change.</strong><p>If most products look correct, you don&apos;t need to re-explain them. Select the specific item(s) below.</p></div>
 
-        <label className="field"><span>General order change <small>(optional)</small></span><textarea value={generalChangeRequest} maxLength={3000} onChange={(e) => setGeneralChangeRequest(e.target.value)} placeholder="Example: Please change the pickup date if possible." /></label>
+        <label className="field"><span>General order change <small>(optional)</small></span><textarea value={generalChangeRequest} maxLength={3000} onChange={(e) => setGeneralChangeRequest(e.target.value)} placeholder={changePlaceholder} /></label>
 
         {proofItems.length ? <div className="itemChangeEditors">
           {itemChanges.map((change, index) => <div className="itemChangeEditor" key={change.key}>

@@ -30,7 +30,6 @@ export function ShopCatalog({ mockupTemplates = {} }: { mockupTemplates?: ShopMo
 
       <div className="shopCatalogGrid">
         {visible.map((product) => {
-          const example = product.examples[0];
           const color = product.colors[0]?.value ?? "#e6e0d8";
           return (
             <article className="shopProductCard" key={product.slug}>
@@ -45,13 +44,8 @@ export function ShopCatalog({ mockupTemplates = {} }: { mockupTemplates?: ShopMo
                 />
               </Link>
               <div className="shopProductCardBody">
-                <div className="shopProductMetaRow">
-                  <span className="badge">{product.category}</span>
-                  <span className="shopMadeToOrder">Made to order</span>
-                </div>
                 <h2>{product.name}</h2>
                 <p>{product.description}</p>
-                {example ? <div className="shopExampleLine"><strong>{example.name}</strong><span>{example.description}</span></div> : null}
                 <Link className="btn shopCustomizeButton" href={`/products/${product.slug}`}>Customize this</Link>
               </div>
             </article>

@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { REQUEST_STATUSES, REQUEST_STATUS_LABELS } from "@/lib/custom-request-types";
 import type { RequestStatus } from "@/lib/custom-request-types";
 
-export function RequestStatusControl({ id, initialStatus }: { id: string; initialStatus: RequestStatus }) {
+export function RequestStatusControl({ id, initialStatus, delivery }: { id: string; initialStatus: RequestStatus; delivery?: string | null }) {
   const router = useRouter();
   const [status, setStatus] = useState<RequestStatus>(initialStatus);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const readyLabel = String(delivery || "").toLowerCase().includes("delivery") ? "Ready for delivery" : "Ready for pickup";
 
   async function updateStatus(nextStatus: RequestStatus) {
     if (nextStatus === "ready" || nextStatus === "shipped") {
@@ -41,7 +42,7 @@ export function RequestStatusControl({ id, initialStatus }: { id: string; initia
   return (
     <div className="statusControl">
       <select value={status} onChange={(e) => updateStatus(e.target.value as RequestStatus)} disabled={saving}>
-        {REQUEST_STATUSES.map((value) => <option value={value} key={value}>{REQUEST_STATUS_LABELS[value]}</option>)}
+        {REQUEST_STATUSES.map((value) => <option value={value} key={value}>{value === "ready" ? readyLabel : REQUEST_STATUS_LABELS[value]}</option>)}
       </select>
       <span className="statusSaveMessage">{saving ? "Saving…" : message}</span>
     </div>

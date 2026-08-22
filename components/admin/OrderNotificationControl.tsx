@@ -19,6 +19,7 @@ type Props = {
   customerEmail: string;
   orderStatus: string;
   paymentStatus: string;
+  delivery: string | null;
 };
 
 const LABELS: Record<NotificationType, string> = {
@@ -36,7 +37,7 @@ function localDateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-export function OrderNotificationControl({ requestId, requestNumber, customerEmail, orderStatus, paymentStatus }: Props) {
+export function OrderNotificationControl({ requestId, requestNumber, customerEmail, orderStatus, paymentStatus, delivery }: Props) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<NotificationType>("order_received");
   const [recipientEmails, setRecipientEmails] = useState(customerEmail);
@@ -48,15 +49,23 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const fulfillmentValue = String(delivery || "").toLowerCase();
+  const isShipping = fulfillmentValue.includes("ship");
+  const isLocalDelivery = fulfillmentValue.includes("delivery") && !isShipping;
+  const labels = useMemo<Record<NotificationType, string>>(() => ({
+    ...LABELS,
+    ready: isLocalDelivery ? "Ready for delivery" : "Ready for pickup",
+  }), [isLocalDelivery]);
+
   const available = useMemo(() => {
     const rows: NotificationType[] = ["order_received"];
     if (paymentStatus !== "unpaid") rows.push("payment_receipt");
     if (["in_production", "ready", "shipped", "completed"].includes(orderStatus)) rows.push("production_update");
-    if (["ready", "completed"].includes(orderStatus)) rows.push("ready");
-    if (["shipped", "completed"].includes(orderStatus)) rows.push("shipped");
+    if (orderStatus === "ready" || (orderStatus === "completed" && !isShipping)) rows.push("ready");
+    if (orderStatus === "shipped" || (orderStatus === "completed" && isShipping)) rows.push("shipped");
     rows.push("general");
     return rows;
-  }, [orderStatus, paymentStatus]);
+  }, [orderStatus, paymentStatus, isShipping]);
 
   async function load() {
     try {
@@ -105,14 +114,14 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
       {open ? <div className="orderNotificationBody">
         <div className="orderNotificationNotice"><strong>Grandma-friendly rule:</strong><span>Emails contain clear buttons and customer links always point to the live Moore Made website — never your localhost computer.</span></div>
         <div className="twoCol">
-          <label className="field"><span>Email type</span><select value={type} onChange={(event) => setType(event.target.value as NotificationType)}>{available.map((value) => <option value={value} key={value}>{LABELS[value]}</option>)}</select></label>
+          <label className="field"><span>Email type</span><select value={type} onChange={(event) => setType(event.target.value as NotificationType)}>{available.map((value) => <option value={value} key={value}>{labels[value]}</option>)}</select></label>
           <label className="field"><span>Send to</span><input type="text" inputMode="email" value={recipientEmails} onChange={(event) => setRecipientEmails(event.target.value)} placeholder="customer@example.com" /><small>Comma-separated emails are okay.</small></label>
         </div>
         {type === "general" ? <div className="orderNotificationCustom">
           <label className="field"><span>Email subject</span><input value={customSubject} maxLength={180} onChange={(event) => setCustomSubject(event.target.value)} placeholder="Quick update on your order" /></label>
           <label className="field"><span>Message</span><textarea value={customMessage} maxLength={4000} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Write the customer-friendly update here…" /></label>
         </div> : <div className="fieldHelp">This uses the order's current saved information. It sends an email only — it does not move the order backward, create a new quote, or duplicate a payment.</div>}
-        <button className="btn" type="button" disabled={working} onClick={send}>{working ? "Sending…" : `Send ${LABELS[type].toLowerCase()}`}</button>
+        <button className="btn" type="button" disabled={working} onClick={send}>{working ? "Sending…" : `Send ${labels[type].toLowerCase()}`}</button>
         {message ? <div className="formSuccess">{message}</div> : null}
         {error ? <div className="formError">{error}</div> : null}
 

@@ -16,6 +16,7 @@ type RequestView = {
   customer_name: string;
   product: string;
   quantity: number;
+  delivery: string | null;
 };
 
 type QuoteView = {
@@ -67,7 +68,7 @@ export default async function ProFormaPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("quotes")
-    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity)")
+    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity,delivery)")
     .eq("public_token", token)
     .single();
 
@@ -110,6 +111,11 @@ export default async function ProFormaPage({ params }: Props) {
   const orderNumber = formatRequestNumber(request.request_number);
   const issueDate = quote.sent_at || quote.created_at;
   const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
+  const fulfillmentChargeLabel = String(request.delivery || "").toLowerCase().includes("delivery")
+    ? "Local delivery"
+    : String(request.delivery || "").toLowerCase().includes("ship")
+      ? "Shipping"
+      : "Fulfillment";
 
   return (
     <div className="shell proformaPage">
@@ -137,6 +143,7 @@ export default async function ProFormaPage({ params }: Props) {
           <div><span>Valid through</span><strong>{prettyDate(quote.valid_until)}</strong></div>
           <div><span>Proof version</span><strong>Version {Math.max(1, Number(quote.proof_version || 1))}</strong></div>
           <div><span>Requested quantity</span><strong>{request.quantity}</strong></div>
+          <div><span>Fulfillment</span><strong>{request.delivery || "To be confirmed"}</strong></div>
         </section>
 
         <section className="proformaSection">
@@ -156,7 +163,7 @@ export default async function ProFormaPage({ params }: Props) {
           <div className="proformaTotals">
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
-            {quote.shipping_cents ? <div><span>Shipping</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
+            {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="proformaGrandTotal"><span>Pro forma total</span><strong>{money(quote.total_cents)}</strong></div>

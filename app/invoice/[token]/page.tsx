@@ -66,6 +66,11 @@ export default async function InvoicePage({ params }: Props) {
   const invoiceNumber = `INV-${orderNumber}`;
   const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
   const issueDate = quote.responded_at || quote.sent_at || quote.created_at;
+  const fulfillmentChargeLabel = String(order.delivery || "").toLowerCase().includes("delivery")
+    ? "Local delivery"
+    : String(order.delivery || "").toLowerCase().includes("ship")
+      ? "Shipping"
+      : "Fulfillment";
 
   return (
     <div className="shell invoicePage">
@@ -92,7 +97,7 @@ export default async function InvoicePage({ params }: Props) {
           <div className="invoiceTotals">
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
-            {quote.shipping_cents ? <div><span>Shipping</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
+            {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="invoiceGrandTotal"><span>Invoice total</span><strong>{money(totalCents)}</strong></div>
@@ -112,7 +117,7 @@ export default async function InvoicePage({ params }: Props) {
 
         {payments.length ? <section className="invoicePayments"><div className="invoiceSectionHeading"><div><span className="eyebrow">Payment history</span><h2>Payments applied</h2></div></div>{payments.map((payment) => <div className="invoicePaymentRow" key={payment.id}><span>{prettyDate(payment.paid_at || payment.created_at)}</span><span>{paymentMethodLabel(payment.payment_method)}</span><strong>{money(payment.amount_cents)}</strong></div>)}</section> : null}
 
-        <footer className="invoiceFooter"><strong>Moore Made LLC</strong><p>mooremade.store · Custom goods designed and produced by Moore Made.</p><p className="invoiceFinalSale"><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable. If you are unhappy with your finished order, contact Moore Made and we will do our best to rectify the issue.</p></footer>
+        <footer className="invoiceFooter"><strong>Moore Made LLC</strong><p>mooremade.store · Custom goods designed and produced by Moore Made.</p><p className="invoiceFinalSale"><span><strong>Custom order — all sales final.</strong> Deposits and payments are non-refundable.</span><span>If there is an issue with your finished order, contact Moore Made so we can help make it right.</span></p></footer>
       </article>
     </div>
   );

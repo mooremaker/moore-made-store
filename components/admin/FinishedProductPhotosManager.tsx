@@ -227,7 +227,7 @@ export function FinishedProductPhotosManager({ requestId, requestNumber, custome
           </div> : null}
         </div>
         <label className="field"><span>Send to</span><input type="text" inputMode="email" value={recipientEmails} onChange={(event) => setRecipientEmails(event.target.value)} placeholder="customer@example.com" /><small>Comma-separated emails are okay.</small></label>
-        <label className="field"><span>Optional message</span><textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Your order is finished! Here are a few photos before pickup/shipping." /></label>
+        <label className="field"><span>Optional message</span><textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Your order is finished! Here are a few photos before pickup, local delivery, or shipping." /></label>
         <button className="btn" type="button" disabled={sending} onClick={() => void sendPhotos()}>{sending ? "Sending…" : "Email finished product photos"}</button>
       </div> : null}
 

@@ -38,4 +38,15 @@ create index if not exists custom_requests_cash_payment_pending_idx
   );
 
 -- Tell PostgREST/Supabase to refresh its schema cache immediately.
+alter table public.showcase_posts
+  add column if not exists customer_primary boolean not null default false;
+
+create unique index if not exists showcase_posts_one_primary_per_user_idx
+  on public.showcase_posts (customer_user_id)
+  where customer_primary = true and customer_user_id is not null;
+
+create unique index if not exists showcase_posts_one_primary_per_email_idx
+  on public.showcase_posts (lower(email))
+  where customer_primary = true;
+
 notify pgrst, 'reload schema';

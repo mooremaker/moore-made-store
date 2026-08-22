@@ -132,7 +132,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 <details className="accountOrderCard" key={request.id}>
                   <summary>
                     <div className="accountOrderMain"><strong>{formatRequestNumber(request.request_number)}</strong><span>{request.product}</span></div>
-                    <div className="accountOrderMeta"><span className={`statusPill status-${request.status}`}>{REQUEST_STATUS_LABELS[request.status]}</span><span>Qty {request.quantity}</span><span>{dateLabel(request.created_at)}</span></div>
+                    <div className="accountOrderMeta"><span className={`statusPill status-${request.status}`}>{request.status === "ready" && String(request.delivery || "").toLowerCase().includes("delivery") ? "Ready for delivery" : REQUEST_STATUS_LABELS[request.status]}</span><span>Qty {request.quantity}</span><span>{dateLabel(request.created_at)}</span></div>
                   </summary>
                   <div className="accountOrderBody">
                     <div className="accountInfoGrid">
@@ -150,10 +150,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     </div>
                     {receipts.length ? <div className="accountReceipts"><strong>Payment receipts</strong><div>{receipts.map((receipt) => receipt.receipt_token ? <a key={receipt.id} href={`/receipt/${receipt.receipt_token}`} target="_blank" rel="noreferrer"><span>{receiptLabel(receipt.receipt_number)}</span><small>{paymentMethodLabel(receipt.payment_method)} · {money(receipt.amount_cents)}</small></a> : null)}</div></div> : null}
                     {request.estimated_fulfillment_date && !["ready","shipped","completed","cancelled"].includes(request.status) ? <div className="accountEstimatedFulfillment">
-                      <div><span className="eyebrow">Production estimate</span><strong>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated ship date" : "Estimated pickup-ready date"}</strong></div>
+                      <div><span className="eyebrow">Production estimate</span><strong>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated ship date" : (request.delivery || "").toLowerCase().includes("delivery") ? "Estimated delivery-ready date" : "Estimated pickup-ready date"}</strong></div>
                       <span className="accountEstimatedDate">{dateLabel(request.estimated_fulfillment_date)}</span>
                       {request.estimated_fulfillment_note ? <p>{request.estimated_fulfillment_note}</p> : null}
-                      <small>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated only and not guaranteed. This is the date Moore Made expects to hand the package to the carrier, not a guaranteed delivery date. Carrier transit and delivery timing are outside Moore Made’s control." : "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for pickup."}</small>
+                      <small>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated only and not guaranteed. This is the date Moore Made expects to hand the package to the carrier, not a guaranteed delivery date. Carrier transit and delivery timing are outside Moore Made’s control." : (request.delivery || "").toLowerCase().includes("delivery") ? "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for local delivery." : "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for pickup."}</small>
                     </div> : null}
                     {savedMockup ? <SavedMockupPreview document={savedMockup} compact title="Your saved mockup" className="accountSavedMockup" /> : null}
                     {finishedPhotos.length ? <div className="accountFinishedPhotos">
@@ -163,7 +163,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     </div> : null}
                     {files.length ? <div className="accountFiles"><strong>Your uploaded artwork</strong><div>{files.map((file) => <a key={file.url} href={file.url} target="_blank" rel="noreferrer">{file.name}</a>)}</div><small>Private links expire after 15 minutes.</small></div> : null}
                     {request.status === "shipped" && (request.tracking_url || request.tracking_number) ? <div className="accountFulfillment"><strong>Shipping</strong>{request.tracking_number ? <span>Tracking: {request.tracking_number}</span> : null}{request.tracking_url ? <a href={request.tracking_url} target="_blank" rel="noreferrer">Track shipment →</a> : null}</div> : null}
-                    {request.status === "ready" && request.fulfillment_note ? <div className="accountFulfillment"><strong>Pickup note</strong><span>{request.fulfillment_note}</span></div> : null}
+                    {request.status === "ready" && request.fulfillment_note ? <div className="accountFulfillment"><strong>{String(request.delivery || "").toLowerCase().includes("delivery") ? "Delivery note" : "Pickup note"}</strong><span>{request.fulfillment_note}</span></div> : null}
                   </div>
                 </details>
               );

@@ -174,20 +174,26 @@ export async function POST(request: Request) {
       if (!['in_production','ready','shipped','completed'].includes(String(order.status))) {
         return NextResponse.json({ error: "This order is not in production yet." }, { status: 409 });
       }
-      const isShipping = String(order.delivery || "").toLowerCase().includes("ship");
-      const dateLabel = isShipping ? "Estimated ship date" : "Estimated pickup-ready date";
+      const fulfillmentValue = String(order.delivery || "").toLowerCase();
+      const isShipping = fulfillmentValue.includes("ship");
+      const isLocalDelivery = fulfillmentValue.includes("delivery") && !isShipping;
+      const dateLabel = isShipping ? "Estimated ship date" : isLocalDelivery ? "Estimated delivery-ready date" : "Estimated pickup-ready date";
       const dateHtml = order.estimated_fulfillment_date ? `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:14px;padding:16px;margin:0 0 18px;"><div style="font-size:12px;font-weight:800;text-transform:uppercase;color:#6b6b6b;">${escapeHtml(dateLabel)}</div><div style="font-size:24px;font-weight:900;margin-top:5px;">${escapeHtml(displayDate(order.estimated_fulfillment_date))}</div></div>` : "";
       const noteHtml = order.estimated_fulfillment_note ? `<p style="line-height:1.7;margin:0 0 18px;"><strong>Note from Moore Made:</strong><br>${escapeHtml(order.estimated_fulfillment_note).replaceAll("\n", "<br>")}</p>` : "";
       subject = `Moore Made production update — ${reference}`;
       title = "Your order is in production.";
-      htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, here's an update on order <strong>${escapeHtml(reference)}</strong>.</p>${dateHtml}${noteHtml}<p style="font-size:13px;line-height:1.6;color:#6b6b6b;margin:0;">Dates are estimates, not guarantees. We'll send another notification when the order is officially ready or shipped.</p>`;
+      htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, here's an update on order <strong>${escapeHtml(reference)}</strong>.</p>${dateHtml}${noteHtml}<p style="font-size:13px;line-height:1.6;color:#6b6b6b;margin:0;">Dates are estimates, not guarantees. We'll send another notification when the order reaches its final fulfillment step.</p>`;
     } else if (type === "ready") {
-      if (!['ready','completed'].includes(String(order.status))) return NextResponse.json({ error: "This order is not marked ready for pickup." }, { status: 409 });
-      subject = `Your Moore Made order is ready for pickup — ${reference}`;
-      title = "Your order is ready for pickup.";
-      htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, your <strong>${escapeHtml(order.product)}</strong> order <strong>${escapeHtml(reference)}</strong> is ready for pickup.</p>${order.fulfillment_note ? `<p style="line-height:1.7;margin:0 0 16px;">${escapeHtml(order.fulfillment_note).replaceAll("\n", "<br>")}</p>` : ""}<p style="line-height:1.7;margin:0;color:#6b6b6b;">Thanks for choosing Moore Made.</p>`;
+      const fulfillmentValue = String(order.delivery || "").toLowerCase();
+      const isShipping = fulfillmentValue.includes("ship");
+      if (!['ready','completed'].includes(String(order.status)) || isShipping) return NextResponse.json({ error: "This order is not marked ready for pickup or local delivery." }, { status: 409 });
+      const isLocalDelivery = fulfillmentValue.includes("delivery");
+      subject = isLocalDelivery ? `Your Moore Made order is ready for delivery — ${reference}` : `Your Moore Made order is ready for pickup — ${reference}`;
+      title = isLocalDelivery ? "Your order is ready for delivery." : "Your order is ready for pickup.";
+      htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, your <strong>${escapeHtml(order.product)}</strong> order <strong>${escapeHtml(reference)}</strong> ${isLocalDelivery ? "is ready for local delivery." : "is ready for pickup."}</p>${order.fulfillment_note ? `<p style="line-height:1.7;margin:0 0 16px;">${escapeHtml(order.fulfillment_note).replaceAll("\n", "<br>")}</p>` : ""}<p style="line-height:1.7;margin:0;color:#6b6b6b;">Thanks for choosing Moore Made.</p>`;
     } else if (type === "shipped") {
-      if (!['shipped','completed'].includes(String(order.status))) return NextResponse.json({ error: "This order is not marked shipped." }, { status: 409 });
+      const isShipping = String(order.delivery || "").toLowerCase().includes("ship");
+      if (!['shipped','completed'].includes(String(order.status)) || !isShipping) return NextResponse.json({ error: "This order is not marked shipped." }, { status: 409 });
       subject = `Your Moore Made order has shipped — ${reference}`;
       title = "Your order is on the way.";
       const tracking = order.tracking_number || order.tracking_url ? `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:14px;padding:16px;margin:0 0 18px;line-height:1.65;">${order.tracking_number ? `<div><strong>Tracking:</strong> ${escapeHtml(order.tracking_number)}</div>` : ""}${order.tracking_url ? `<div style="margin-top:8px;"><a href="${escapeHtml(order.tracking_url)}" style="color:#171717;font-weight:800;">Track shipment →</a></div>` : ""}</div>` : "";

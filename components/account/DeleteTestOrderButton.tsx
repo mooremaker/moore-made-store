@@ -9,7 +9,7 @@ export function DeleteTestOrderButton({ requestId, requestNumber }: { requestId:
   const [error, setError] = useState("");
 
   async function remove() {
-    if (!window.confirm(`Permanently delete cancelled test order ${requestNumber}? This cannot be undone. Orders with quote/payment history cannot be deleted.`)) return;
+    if (!window.confirm(`Permanently delete your cancelled test order ${requestNumber}? Its test quote and related draft records will also be removed. This cannot be undone.`)) return;
     setWorking(true);
     setError("");
     try {

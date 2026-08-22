@@ -57,13 +57,17 @@ export async function POST(request: Request) {
       });
     }
 
-    const isShipping = String(row.delivery || "").toLowerCase().includes("ship");
-    const label = isShipping ? "Estimated ship date" : "Estimated pickup-ready date";
+    const fulfillmentValue = String(row.delivery || "").toLowerCase();
+    const isShipping = fulfillmentValue.includes("ship");
+    const isLocalDelivery = fulfillmentValue.includes("delivery") && !isShipping;
+    const label = isShipping ? "Estimated ship date" : isLocalDelivery ? "Estimated delivery-ready date" : "Estimated pickup-ready date";
     const reference = formatRequestNumber(row.request_number);
     const changed = Boolean(row.estimated_fulfillment_date && row.estimated_fulfillment_date !== estimatedDate);
     const disclaimer = isShipping
       ? "This date is an estimate and is not guaranteed. It represents when Moore Made expects to hand your order to the shipping carrier. It is not a guaranteed delivery date, and carrier transit or delivery timing cannot be guaranteed."
-      : "This date is an estimate and is not guaranteed. Moore Made will notify you again when your order is officially ready for pickup.";
+      : isLocalDelivery
+        ? "This date is an estimate and is not guaranteed. Moore Made will notify you again when your order is officially ready for local delivery."
+        : "This date is an estimate and is not guaranteed. Moore Made will notify you again when your order is officially ready for pickup.";
     const noteHtml = estimatedNote ? `<p style="line-height:1.65;margin:0 0 18px;"><strong>Note from Moore Made:</strong><br>${escapeHtml(estimatedNote).replaceAll("\n", "<br>")}</p>` : "";
     const accountUrl = `${publicSiteUrl()}/account`;
 
