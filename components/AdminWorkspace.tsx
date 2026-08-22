@@ -38,6 +38,11 @@ import { money, type QuoteRecord } from "@/lib/quote-types";
 
 type FileLink = { path: string; url: string };
 
+function customerArtworkFileName(path: string, index: number) {
+  const storedName = path.split("/").pop() || `artwork-${index + 1}`;
+  return storedName.replace(/^\d+-\d+-/, "") || `artwork-${index + 1}`;
+}
+
 export type AdminRequestRow = {
   id: string;
   is_admin_test_order: boolean;
@@ -462,7 +467,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                       <div className="requestFiles adminFilesBlock">
                         <span>Artwork files</span>
                         {request.fileLinks.length ? (
-                          <div className="fileLinkRow">{request.fileLinks.map((file, index) => <a className="fileChip" href={file.url} target="_blank" rel="noreferrer" key={file.path}>Open file {index + 1} ↗</a>)}</div>
+                          <><div className="fileLinkRow">{request.fileLinks.map((file, index) => <a className="fileChip" href={file.url} target="_blank" rel="noreferrer" key={file.path} title={`Open the original customer upload: ${customerArtworkFileName(file.path, index)}`}>Download original · {customerArtworkFileName(file.path, index)} ↗</a>)}</div><p className="muted adminArtworkQualityNote">Check resolution, transparency, and print readiness. Do not promise that low-resolution art can simply be enhanced. Vector redraw/vectorization is preferred for logos. For detailed artwork, send a recreated proof for customer approval because cleanup can change lettering, shapes, faces, or colors. Add all artwork-preparation work to the quote.</p></>
                         ) : <p className="muted">No artwork uploaded.</p>}
                       </div>
 

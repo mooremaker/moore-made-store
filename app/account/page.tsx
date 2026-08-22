@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/account/ProfileForm";
+import { BusinessProfileForm, type BusinessLogoAsset } from "@/components/account/BusinessProfileForm";
 import { DeleteTestOrderButton } from "@/components/account/DeleteTestOrderButton";
+import { ReorderRequestButton } from "@/components/account/ReorderRequestButton";
 import { claimVerifiedGuestRecords, getCurrentUser, getUserRole } from "@/lib/auth";
 import { formatRequestNumber, REQUEST_STATUS_LABELS, type RequestStatus } from "@/lib/custom-request-types";
 import { money, QUOTE_STATUS_LABELS, type QuoteStatus } from "@/lib/quote-types";
@@ -38,6 +40,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
   await claimVerifiedGuestRecords(user);
   const supabase = await createSupabaseServerClient();
+  const admin = getSupabaseAdmin();
   const [{ data: profile }, { data: requestData }, { data: showcaseData }, { data: messageThreadData }] = await Promise.all([
     supabase.from("profiles").select("full_name,phone").eq("id", user.id).maybeSingle(),
     supabase.from("custom_requests").select("id,request_number,product,quantity,status,deadline,delivery,created_at,artwork_paths,tracking_number,tracking_url,fulfillment_note,payment_status,amount_paid_cents,estimated_fulfillment_date,estimated_fulfillment_note,estimated_fulfillment_notified_at,estimated_fulfillment_notified_for_date").eq("customer_user_id", user.id).order("created_at", { ascending: false }),
@@ -46,6 +49,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   ]);
 
   const requests = (requestData ?? []) as RequestRow[];
+  const [{ data: businessProfileData }, { data: brandAssetData }] = await Promise.all([
+    admin.from("customer_business_profiles").select("business_name,website,brand_colors,brand_notes").eq("customer_user_id", user.id).maybeSingle(),
+    admin.from("client_brand_assets").select("id,label,storage_bucket,storage_path,original_filename,production_approved").eq("customer_user_id", user.id).eq("asset_kind", "logo").order("updated_at", { ascending: false }).limit(10),
+  ]);
+  const businessLogos: BusinessLogoAsset[] = [];
+  for (const asset of brandAssetData ?? []) {
+    const { data: signed } = await admin.storage.from(asset.storage_bucket || "customer-brand-assets").createSignedUrl(asset.storage_path, 60 * 60);
+    businessLogos.push({ id: asset.id, label: asset.label, original_filename: asset.original_filename, production_approved: Boolean(asset.production_approved), url: signed?.signedUrl || null });
+  }
   const requestIds = requests.map((row) => row.id);
   const { data: quoteData } = requestIds.length
     ? await supabase.from("quotes").select("id,request_id,public_token,status,total_cents,valid_until,proof_version,payment_terms,deposit_amount_cents").in("request_id", requestIds)
@@ -59,7 +71,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const receiptsByRequest = new Map<string, ReceiptRow[]>();
   for (const receipt of receiptRows) receiptsByRequest.set(receipt.request_id, [...(receiptsByRequest.get(receipt.request_id) ?? []), receipt]);
 
-  const admin = getSupabaseAdmin();
   const mockupsByRequest = new Map<string, MockupDocument>();
   if (requestIds.length) {
     const { data: mockupData } = await admin
@@ -111,13 +122,19 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
       {params.admin === "denied" ? <div className="formError">This account is signed in, but it is not approved for Moore Made admin access.</div> : null}
 
-      <section className="card accountProfileCard">
-        <div className="accountSectionHead"><div><div className="eyebrow">Account</div><h2>Your details</h2></div><span className="accountEmail">{user.email}</span></div>
-        <ProfileForm initialName={profile?.full_name ?? ""} initialPhone={profile?.phone ?? ""} />
-      </section>
+      <details className="card accountProfileCard accountExpandableSection">
+        <summary className="accountExpandableSummary"><div><div className="eyebrow">Account</div><h2>Your details</h2><p>{user.email}</p></div><span className="accountExpandIcon">Open</span></summary>
+        <div className="accountExpandableBody"><ProfileForm initialName={profile?.full_name ?? ""} initialPhone={profile?.phone ?? ""} /></div>
+      </details>
 
-      <section className="accountSection">
-        <div className="accountSectionHead"><div><div className="eyebrow">Orders</div><h2>Your Moore Made requests</h2></div><Link className="btn" href="/custom-orders">Start a new request</Link></div>
+      <details className="card accountBusinessProfileCard accountExpandableSection">
+        <summary className="accountExpandableSummary"><div><div className="eyebrow">Business profile</div><h2>Your reusable brand kit</h2><p>Colors, logos, and business details saved for future orders.</p></div><span className="accountExpandIcon">Open</span></summary>
+        <div className="accountExpandableBody"><div className="accountBusinessPrivacyRow"><span className="accountBusinessBadge">Private to your account</span><p>Keep your business name, exact colors, and logos ready for future Moore Made orders.</p></div><BusinessProfileForm initialBusinessName={businessProfileData?.business_name ?? ""} initialWebsite={businessProfileData?.website ?? ""} initialColors={Array.isArray(businessProfileData?.brand_colors) ? businessProfileData.brand_colors.filter((color): color is string => typeof color === "string") : []} initialNotes={businessProfileData?.brand_notes ?? ""} initialLogos={businessLogos} /></div>
+      </details>
+
+      <details className="card accountSection accountExpandableSection">
+        <summary className="accountExpandableSummary"><div><div className="eyebrow">Orders</div><h2>Your Moore Made requests</h2><p>{requests.length} request{requests.length === 1 ? "" : "s"}</p></div><span className="accountExpandIcon">Open</span></summary>
+        <div className="accountExpandableBody"><div className="accountExpandableActions"><Link className="btn" href="/custom-orders">Start a new request</Link></div>
         {requests.length === 0 ? (
           <div className="empty accountEmpty"><h3>No orders attached yet.</h3><p>Requests placed while signed in appear here automatically. If you previously ordered as a guest using this verified email, eligible requests are attached when you sign in.</p></div>
         ) : (
@@ -146,6 +163,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       {quote && ["sent","changes_requested","approved"].includes(quote.status) ? <Link className="btn" href={`/quote/${quote.public_token}`}>{quote.status === "approved" && request.payment_status !== "paid" ? "Open payment" : "Review proof + quote"}</Link> : null}
                       {quote?.status === "approved" ? <Link className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank">Invoice</Link> : null}
                       <Link className="btn secondary" href={`/account/messages?order=${request.id}`}>Message Moore Made</Link>
+                      {request.status !== "cancelled" ? <ReorderRequestButton requestId={request.id} /> : null}
                       {role === "admin" && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
                     {receipts.length ? <div className="accountReceipts"><strong>Payment receipts</strong><div>{receipts.map((receipt) => receipt.receipt_token ? <a key={receipt.id} href={`/receipt/${receipt.receipt_token}`} target="_blank" rel="noreferrer"><span>{receiptLabel(receipt.receipt_number)}</span><small>{paymentMethodLabel(receipt.payment_method)} · {money(receipt.amount_cents)}</small></a> : null)}</div></div> : null}
@@ -170,15 +188,18 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             })}
           </div>
         )}
-      </section>
+        </div>
+      </details>
 
-      <section className="accountSection">
-        <div className="accountSectionHead"><div><div className="eyebrow">Made by You</div><h2>Your showcase submissions</h2></div><Link className="btn secondary" href="/made-by-you/submit">Share an order</Link></div>
+      <details className="card accountSection accountExpandableSection">
+        <summary className="accountExpandableSummary"><div><div className="eyebrow">Made by You</div><h2>Your showcase submissions</h2><p>{(showcaseData ?? []).length} submission{(showcaseData ?? []).length === 1 ? "" : "s"}</p></div><span className="accountExpandIcon">Open</span></summary>
+        <div className="accountExpandableBody"><div className="accountExpandableActions"><Link className="btn secondary" href="/made-by-you/submit">Share an order</Link></div>
         {(showcaseData ?? []).length ? <div className="accountShowcaseList">{((showcaseData ?? []) as ShowcaseRow[]).map((post) => {
           const label = post.status === "approved" ? "Published" : post.status === "draft" ? (post.published_snapshot ? "Draft changes" : "Draft") : post.status === "rejected" ? (post.published_snapshot ? "Changes not published" : "Not published") : (post.published_snapshot ? "Changes awaiting approval" : "Awaiting approval");
           return <div className="card accountShowcaseRow" key={post.id}><div><strong>{post.product === "Untitled review" ? "Untitled review" : post.product}</strong><span>{"★".repeat(post.rating)}</span><small className="muted">Updated {dateLabel(post.updated_at)}</small></div><div className="accountShowcaseActions"><span className="badge">{label}</span><Link className="btn secondary" href={`/account/made-by-you/${post.id}`}>{post.status === "draft" ? "Continue editing" : "Edit review"}</Link></div></div>;
         })}</div> : <p className="muted">You have not submitted a Made by You post yet.</p>}
-      </section>
+        </div>
+      </details>
     </div>
   );
 }

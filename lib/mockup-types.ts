@@ -13,6 +13,7 @@ export type MockupLayer = {
   x: number;
   y: number;
   width: number;
+  height?: number;
   rotation: number;
   opacity: number;
   zIndex: number;
@@ -25,10 +26,13 @@ export type MockupCustomerIntent = {
   placement: string;
   placementLabel?: string;
   idea?: string;
+  details?: string;
   artworkFileName?: string;
+  backgroundRemovalRequested?: boolean;
   x: number;
   y: number;
   width: number;
+  height?: number;
   rotation: number;
 };
 

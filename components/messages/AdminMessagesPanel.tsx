@@ -20,6 +20,7 @@ export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: 
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(threads.find((thread) => thread.adminUnreadCount > 0)?.id || threads[0]?.id || null);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const visible = useMemo(() => {
@@ -66,6 +67,18 @@ export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: 
     router.refresh();
   }
 
+  async function deleteConversation() {
+    if (!selected) return;
+    if (!window.confirm(`Permanently delete the conversation “${selected.subject}”? Its messages and uploaded attachments will be removed and cannot be recovered.`)) return;
+    setDeleting(true); setError("");
+    const response = await fetch(`/api/admin/messages/${selected.id}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    setDeleting(false);
+    if (!response.ok) { setError(data.error || "Could not delete this conversation."); return; }
+    setSelectedId(null);
+    router.refresh();
+  }
+
   return (
     <section className="adminWorkspacePanel adminMessagesPanel">
       <div className="adminSectionIntro">
@@ -107,11 +120,12 @@ export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: 
               <label><span>Status</span><select value={selected.status} onChange={(event) => updateSettings({ status: event.target.value as MessageThreadStatus })}><option value="open">Open</option><option value="resolved">Resolved</option><option value="archived">Archived</option></select></label>
               <label><span>Assigned to</span><select value={selected.assignedAdminUserId || ""} onChange={(event) => updateSettings({ assignedAdminUserId: event.target.value || null })}><option value="">Unassigned</option>{adminUsers.map((admin) => <option key={admin.id} value={admin.id}>{admin.id === currentAdminUserId ? `${admin.name} (me)` : admin.name}</option>)}</select></label>
               {!selected.assignedAdminUserId ? <button className="textButton" type="button" onClick={() => updateSettings({ assignedAdminUserId: currentAdminUserId })}>Assign to me</button> : null}
+              <button className="adminDeleteConversation" type="button" disabled={deleting} onClick={deleteConversation}>{deleting ? "Deleting…" : "Delete conversation"}</button>
             </div>
 
             <div className="adminMessageHistory">
-              {selected.entries.map((entry) => <article key={entry.id} className={`messageBubble adminMessageBubble ${entry.isInternal ? "internalNote" : entry.senderRole === "customer" ? "fromCustomer" : "fromAdmin"}`}>
-                <div className="messageBubbleMeta"><strong>{entry.isInternal ? `Internal note · ${entry.senderDisplayName}` : entry.senderRole === "customer" ? selected.customerName : entry.senderDisplayName}</strong><span>{dateTime(entry.createdAt)}</span></div>
+              {selected.entries.map((entry) => <article key={entry.id} className={`messageBubble adminMessageBubble ${entry.isInternal ? "internalNote" : entry.senderRole === "customer" ? "fromCustomer" : entry.senderRole === "system" ? "fromSystem" : "fromAdmin"}`}>
+                <div className="messageBubbleMeta"><strong>{entry.isInternal ? `Internal note · ${entry.senderDisplayName}` : entry.senderRole === "customer" ? selected.customerName : entry.senderRole === "system" ? "Customer email notification" : entry.senderDisplayName}</strong><span>{dateTime(entry.createdAt)}</span></div>
                 <p>{entry.body}</p>
                 {entry.attachments.length ? <div className="messageAttachments">{entry.attachments.map((file) => <a key={file.id} href={file.url} target="_blank" rel="noreferrer">{file.originalName} ↗</a>)}</div> : null}
               </article>)}

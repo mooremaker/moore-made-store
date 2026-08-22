@@ -37,7 +37,7 @@ export default function CustomOrderTermsPage() {
 
         <section>
           <h3>3. Handmade and custom variations</h3>
-          <p>Custom and hand-finished production may result in minor variations in placement, color, sizing, finish, texture, or appearance. Colors can also appear different between screens, digital proofs, materials, inks, transfers, and finished products. Minor variations that are inherent to custom or hand-finished production are not, by themselves, grounds for a refund.</p>
+          <p>Digital mockups and proofs are visual production guides. Because each item is individually produced and applicable products are hand-pressed, the finished product may have minor variations in placement, scale, color, sizing, finish, texture, or appearance. Colors can also appear different between screens, digital proofs, materials, inks, transfers, and finished products. Minor variations that are inherent to custom or hand-finished production are not, by themselves, grounds for a refund.</p>
         </section>
 
         <section>
@@ -48,6 +48,7 @@ export default function CustomOrderTermsPage() {
         <section>
           <h3>5. Customer-supplied artwork</h3>
           <p>By supplying artwork, logos, photographs, trademarks, text, or other content, the customer represents that they have the right or permission needed for Moore Made to reproduce that material for the requested order. The customer authorizes Moore Made to use the submitted material only as reasonably necessary to prepare, produce, and fulfill the order.</p>
+          <p>When needed for print quality, Moore Made may clean up, vectorize, or digitally redraw customer-supplied artwork. Low-resolution artwork cannot always be safely enhanced, and detailed artwork may require customer review because recreation can affect lettering, shapes, faces, or colors. Any meaningful artwork change or artwork-preparation charge will be disclosed in the final proof and quote for customer approval before production.</p>
         </section>
 
         <section>

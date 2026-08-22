@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail, siteUrl } from "@/lib/email";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { formatRequestNumber } from "@/lib/custom-request-types";
+import type { MessageTopic } from "@/lib/message-types";
 
 export const MESSAGE_BUCKET = "message-files";
 export const MAX_MESSAGE_FILES = 10;
@@ -136,4 +138,81 @@ export async function notifyCustomerOfAdminReply(input: {
        <a href="${publicSiteUrl()}/account/messages?thread=${encodeURIComponent(input.threadId)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View and reply</a>`
     ),
   });
+}
+
+export async function recordCustomerEmailNotification(input: {
+  requestId: string;
+  recipientEmails: string | string[];
+  subject: string;
+  body: string;
+  topic?: MessageTopic;
+  label?: string;
+}) {
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: order } = await admin
+      .from("custom_requests")
+      .select("id,customer_user_id,email,request_number,product")
+      .eq("id", input.requestId)
+      .maybeSingle();
+    if (!order?.customer_user_id || !order.email) return { recorded: false as const, reason: "no_customer_account" };
+
+    const recipients = (Array.isArray(input.recipientEmails) ? input.recipientEmails : [input.recipientEmails])
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    if (!recipients.includes(String(order.email).trim().toLowerCase())) {
+      return { recorded: false as const, reason: "customer_not_recipient" };
+    }
+
+    const now = new Date().toISOString();
+    let { data: thread } = await admin
+      .from("message_threads")
+      .select("id,customer_unread_count")
+      .eq("request_id", input.requestId)
+      .maybeSingle();
+
+    if (!thread) {
+      const reference = formatRequestNumber(order.request_number);
+      const created = await admin.from("message_threads").insert({
+        customer_user_id: order.customer_user_id,
+        request_id: input.requestId,
+        subject: `${reference} · ${order.product}`.slice(0, 180),
+        topic: input.topic || "order",
+        status: "open",
+        customer_unread_count: 0,
+        admin_unread_count: 0,
+        last_message_at: now,
+      }).select("id,customer_unread_count").maybeSingle();
+      thread = created.data;
+      if (!thread && created.error) {
+        const retry = await admin.from("message_threads").select("id,customer_unread_count").eq("request_id", input.requestId).maybeSingle();
+        thread = retry.data;
+      }
+    }
+    if (!thread) return { recorded: false as const, reason: "thread_unavailable" };
+
+    const messageBody = [input.label || "Email notification", input.subject, input.body]
+      .map((value) => cleanMessageText(value, 6000))
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 6000);
+    const { error: entryError } = await admin.from("message_entries").insert({
+      thread_id: thread.id,
+      sender_user_id: null,
+      sender_role: "system",
+      sender_display_name: "Moore Made email",
+      body: messageBody,
+      is_internal: false,
+    });
+    if (entryError) throw entryError;
+
+    await admin.from("message_threads").update({
+      customer_unread_count: Number(thread.customer_unread_count || 0) + 1,
+      last_message_at: now,
+    }).eq("id", thread.id);
+    return { recorded: true as const, threadId: thread.id };
+  } catch (error) {
+    console.error("Customer email notification history failed", error);
+    return { recorded: false as const, reason: "save_failed" };
+  }
 }

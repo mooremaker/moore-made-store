@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/auth";
 import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 const BUCKET = "finished-product-files";
 const MAX_PHOTOS = 12;
@@ -251,6 +252,7 @@ export async function POST(request: Request) {
       }
 
       if (!sent.length) return NextResponse.json({ error: failed[0]?.error || "Email could not be sent.", sent, failed }, { status: 502 });
+      await recordCustomerEmailNotification({ requestId, recipientEmails: sent, subject, body: `Finished product photos are ready to view.${note ? ` Note: ${note}` : ""}`, topic: "order", label: "Finished product photo email sent" });
       return NextResponse.json({ ok: true, sent, failed, galleryUrl });
     }
 

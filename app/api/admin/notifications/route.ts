@@ -4,6 +4,7 @@ import { formatRequestNumber } from "@/lib/custom-request-types";
 import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail } from "@/lib/email";
 import { money, type QuoteLineItem } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 const TYPES = ["quote_approval", "order_received", "payment_receipt", "production_update", "ready", "shipped", "general"] as const;
 type NotificationType = (typeof TYPES)[number];
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
     let subject = "";
     let title = "";
     let htmlBody = "";
+    let notificationSummary = "";
 
     if (type === "quote_approval") {
       if (!quote || quote.status !== "sent" || !quote.public_token) {
@@ -142,6 +144,7 @@ export async function POST(request: Request) {
         : `<p style="margin:8px 0 0;">${escapeHtml(order.product)}</p>`;
       subject = `Action needed: review your Moore Made proof + quote — ${reference}`;
       title = "Your Moore Made order is ready for review.";
+      notificationSummary = `Your current proof + quote is ready to review. Total: ${money(Number(quote.total_cents || 0))}. Proof version ${Math.max(1, Number(quote.proof_version || 1))}.`;
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, your current Moore Made proof + quote is waiting for you.</p>
         <div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:14px;padding:16px;margin:0 0 18px;line-height:1.65;">
           <div><strong>Order:</strong> ${escapeHtml(reference)}</div>
@@ -155,6 +158,7 @@ export async function POST(request: Request) {
     } else if (type === "order_received") {
       subject = `We received your Moore Made request — ${reference}`;
       title = "Your request is safely in our hands.";
+      notificationSummary = `We received your ${order.product} request. Moore Made will review it and prepare your mockup + personalized quote.`;
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, we received your <strong>${escapeHtml(order.product)}</strong> request <strong>${escapeHtml(reference)}</strong>.</p>
         <p style="line-height:1.7;margin:0 0 16px;">Moore Made will review the details and prepare your mockup + personalized quote. No payment is due until the proof and quote are ready for approval.</p>
         <p style="line-height:1.7;margin:0;color:#6b6b6b;">If we need clarification, we'll contact you.</p>`;
@@ -163,6 +167,7 @@ export async function POST(request: Request) {
       const receiptUrl = latestPayment.receipt_token ? `${publicSiteUrl()}/receipt/${latestPayment.receipt_token}` : "";
       subject = `Payment receipt — ${reference}`;
       title = "Payment received.";
+      notificationSummary = `Payment received: ${money(Number(latestPayment.amount_cents || 0))}.${latestPayment.payment_method ? ` Method: ${latestPayment.payment_method}.` : ""}`;
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, this is a copy of the latest payment confirmation for Moore Made order <strong>${escapeHtml(reference)}</strong>.</p>
         <div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:14px;padding:16px;margin:0 0 18px;line-height:1.65;">
           <div><strong>Payment:</strong> ${escapeHtml(money(Number(latestPayment.amount_cents || 0)))}</div>
@@ -182,6 +187,7 @@ export async function POST(request: Request) {
       const noteHtml = order.estimated_fulfillment_note ? `<p style="line-height:1.7;margin:0 0 18px;"><strong>Note from Moore Made:</strong><br>${escapeHtml(order.estimated_fulfillment_note).replaceAll("\n", "<br>")}</p>` : "";
       subject = `Moore Made production update — ${reference}`;
       title = "Your order is in production.";
+      notificationSummary = `Your order is in production.${order.estimated_fulfillment_date ? ` ${dateLabel}: ${displayDate(order.estimated_fulfillment_date)}.` : ""}${order.estimated_fulfillment_note ? ` Note: ${order.estimated_fulfillment_note}` : ""}`;
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, here's an update on order <strong>${escapeHtml(reference)}</strong>.</p>${dateHtml}${noteHtml}<p style="font-size:13px;line-height:1.6;color:#6b6b6b;margin:0;">Dates are estimates, not guarantees. We'll send another notification when the order reaches its final fulfillment step.</p>`;
     } else if (type === "ready") {
       const fulfillmentValue = String(order.delivery || "").toLowerCase();
@@ -190,12 +196,14 @@ export async function POST(request: Request) {
       const isLocalDelivery = fulfillmentValue.includes("delivery");
       subject = isLocalDelivery ? `Your Moore Made order is ready for delivery — ${reference}` : `Your Moore Made order is ready for pickup — ${reference}`;
       title = isLocalDelivery ? "Your order is ready for delivery." : "Your order is ready for pickup.";
+      notificationSummary = `${title}${order.fulfillment_note ? ` ${order.fulfillment_note}` : ""}`;
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, your <strong>${escapeHtml(order.product)}</strong> order <strong>${escapeHtml(reference)}</strong> ${isLocalDelivery ? "is ready for local delivery." : "is ready for pickup."}</p>${order.fulfillment_note ? `<p style="line-height:1.7;margin:0 0 16px;">${escapeHtml(order.fulfillment_note).replaceAll("\n", "<br>")}</p>` : ""}<p style="line-height:1.7;margin:0;color:#6b6b6b;">Thanks for choosing Moore Made.</p>`;
     } else if (type === "shipped") {
       const isShipping = String(order.delivery || "").toLowerCase().includes("ship");
       if (!['shipped','completed'].includes(String(order.status)) || !isShipping) return NextResponse.json({ error: "This order is not marked shipped." }, { status: 409 });
       subject = `Your Moore Made order has shipped — ${reference}`;
       title = "Your order is on the way.";
+      notificationSummary = `Your order has shipped.${order.tracking_number ? ` Tracking: ${order.tracking_number}.` : ""}${order.fulfillment_note ? ` ${order.fulfillment_note}` : ""}`;
       const tracking = order.tracking_number || order.tracking_url ? `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:14px;padding:16px;margin:0 0 18px;line-height:1.65;">${order.tracking_number ? `<div><strong>Tracking:</strong> ${escapeHtml(order.tracking_number)}</div>` : ""}${order.tracking_url ? `<div style="margin-top:8px;"><a href="${escapeHtml(order.tracking_url)}" style="color:#171717;font-weight:800;">Track shipment →</a></div>` : ""}</div>` : "";
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, your <strong>${escapeHtml(order.product)}</strong> order <strong>${escapeHtml(reference)}</strong> has shipped.</p>${tracking}${order.fulfillment_note ? `<p style="line-height:1.7;margin:0 0 16px;">${escapeHtml(order.fulfillment_note).replaceAll("\n", "<br>")}</p>` : ""}<p style="line-height:1.7;margin:0;color:#6b6b6b;">Thanks for choosing Moore Made.</p>`;
     } else {
@@ -204,6 +212,7 @@ export async function POST(request: Request) {
       if (customSubject.length < 3 || customMessage.length < 3) return NextResponse.json({ error: "Add a subject and message for a general update." }, { status: 400 });
       subject = `${customSubject} — ${reference}`;
       title = customSubject;
+      notificationSummary = customMessage;
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)},</p><p style="line-height:1.75;margin:0 0 18px;">${escapeHtml(customMessage).replaceAll("\n", "<br>")}</p><div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:12px 14px;font-size:13px;"><strong>Order:</strong> ${escapeHtml(reference)}</div>`;
     }
 
@@ -227,6 +236,14 @@ export async function POST(request: Request) {
     }
 
     if (!sent.length) return NextResponse.json({ error: failed[0]?.error || "Email could not be sent.", sent, failed }, { status: 502 });
+    await recordCustomerEmailNotification({
+      requestId,
+      recipientEmails: sent,
+      subject,
+      body: notificationSummary || title,
+      topic: type === "payment_receipt" ? "payment" : type === "ready" || type === "shipped" || type === "production_update" ? "shipping" : "order",
+      label: "Email sent from Moore Made notifications",
+    });
     return NextResponse.json({ ok: true, sent, failed, approvalUrl: type === "quote_approval" && quote?.public_token ? `${publicSiteUrl()}/quote/${quote.public_token}` : null });
   } catch (error) {
     console.error("Admin notification email failed", error);

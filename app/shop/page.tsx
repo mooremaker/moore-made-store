@@ -8,7 +8,10 @@ export default async function ShopPage() {
     <div className="shell shopPage">
       <section className="pageHero shopHero">
         <div className="eyebrow">Moore Made shop</div>
-        <h1>See something you like? <span>Make it yours.</span></h1>
+        <h1 className="shopHeroTitle">
+          <span className="shopHeroTitleQuestion">See something you like?</span>
+          <span className="shopHeroTitleAnswer">Make it yours.</span>
+        </h1>
         <p className="lead">
           Browse what we can make, choose your colors and placement, then upload your own artwork or tell us the idea you want created. You stay in control of the look from the beginning.
         </p>

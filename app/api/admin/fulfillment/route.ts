@@ -3,6 +3,7 @@ import { requireAdminApi } from "@/lib/auth";
 import { emailShell, escapeHtml, sendMooreMadeEmail } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 type FulfillmentMode = "pickup" | "delivery" | "shipping";
 
@@ -114,6 +115,8 @@ export async function POST(request: Request) {
     if (!emailResult.ok) {
       return NextResponse.json({ error: "The order status was saved, but the customer email could not be sent. Fix the email issue and send this notification again.", saved: true }, { status: 502 });
     }
+
+    await recordCustomerEmailNotification({ requestId: id, recipientEmails: row.email, subject, body: `${title}${trackingNumber ? ` Tracking: ${trackingNumber}.` : ""}${note ? ` ${note}` : ""}`, topic: "shipping", label: "Fulfillment email sent" });
 
     return NextResponse.json({ ok: true, status, delivery: deliveryLabel(mode) });
   } catch (error) {

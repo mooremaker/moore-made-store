@@ -50,20 +50,20 @@ export function SavedMockupPreview({
                   <div className="savedMockupBaseStage">
                     <img className="savedMockupBase" src={view.base.url} alt={`${view.name} product`} />
                     {(view.layers || []).map((layer) => layer.asset.url ? (
-                      <div className="savedMockupLayer" key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
+                      <div className="savedMockupLayer" key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: layer.height ? `${layer.height}%` : undefined, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
                         <img src={layer.asset.url} alt={layer.asset.originalName} />
                       </div>
                     ) : null)}
                   </div>
                 ) : (
-                  <ProductVisual kind={kind} color={color} className="savedMockupProductVisual">
+                  <ProductVisual kind={kind} view={view.template?.viewKey === "back" ? "back" : "front"} label={view.template?.viewKey === "back" ? "BACK" : "FRONT"} color={color} className="savedMockupProductVisual">
                     {(view.layers || []).map((layer) => layer.asset.url ? (
-                      <div className="savedMockupLayer" key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
+                      <div className="savedMockupLayer" key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: layer.height ? `${layer.height}%` : undefined, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
                         <img src={layer.asset.url} alt={layer.asset.originalName} />
                       </div>
                     ) : null)}
                     {view.customerIntent?.enabled && view.customerIntent.source === "idea" ? (
-                      <div className="savedMockupIdea" style={{ left: `${view.customerIntent.x}%`, top: `${view.customerIntent.y}%`, width: `${view.customerIntent.width}%`, transform: `translate(-50%, -50%) rotate(${view.customerIntent.rotation}deg)` } as CSSProperties}>
+                      <div className="savedMockupIdea" style={{ left: `${view.customerIntent.x}%`, top: `${view.customerIntent.y}%`, width: `${view.customerIntent.width}%`, height: view.customerIntent.height ? `${view.customerIntent.height}%` : undefined, transform: `translate(-50%, -50%) rotate(${view.customerIntent.rotation}deg)` } as CSSProperties}>
                         <strong>DESIGN IDEA</strong><span>{view.customerIntent.idea || view.customerIntent.placementLabel || "Moore Made to create"}</span>
                       </div>
                     ) : null}

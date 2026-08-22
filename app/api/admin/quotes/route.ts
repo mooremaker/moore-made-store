@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { validateDiscountCode } from "@/lib/discount-server";
 import { normalizeDiscountCode } from "@/lib/discount-types";
 import { expirePendingCheckoutSessionsForQuote } from "@/lib/payment-server";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 function text(value: unknown, max = 5000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -489,6 +490,14 @@ export async function POST(request: Request) {
     }
 
     await supabase.from("custom_requests").update({ status: "quote_sent" }).eq("id", requestId);
+    await recordCustomerEmailNotification({
+      requestId,
+      recipientEmails: customerRequest.email,
+      subject: `${needsNewRevision ? "Updated Moore Made proof + quote" : "Your Moore Made proof + quote is ready"} — ${reference}`,
+      body: `Your proof + quote is ready to review. Total: ${money(finalTotalCents)}. Proof version ${targetVersion}.`,
+      topic: "order",
+      label: "Proof + quote email sent",
+    });
 
     return NextResponse.json({
       ok: true,

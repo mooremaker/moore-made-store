@@ -271,7 +271,7 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
             <div className="field requestArtworkField">
               <label htmlFor="artwork">Logo, artwork, or reference files <span className="optionalLabel">Optional</span></label>
               <input id="artwork" name="artwork" type="file" multiple accept="image/*,.pdf,.svg,.ai,.eps" />
-              <span className="fieldHelp">Up to 8 files, 20 MB each. Original/vector files are best, but send what you have.</span>
+              <span className="fieldHelp">Up to 8 files, 20 MB each. Send the best original or vector file you have. Low-resolution files cannot always be safely enhanced. Logos may require vector redraw/vectorization; detailed artwork may require a recreated proof and your approval. Any artwork-preparation cost will be included in your quote.</span>
               <div className="artworkIdeaCompact"><strong>No logo yet?</strong> That&apos;s okay — describe your idea below and we can help with the design.</div>
             </div>
 
@@ -284,7 +284,7 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
                 </div>
                 <fieldset className="field fieldsetReset"><legend>Preferred positioning</legend><div className="checkboxGrid"><label><input type="checkbox" name="placement" value="left-chest" /> Left chest</label><label><input type="checkbox" name="placement" value="front-center" /> Front center</label><label><input type="checkbox" name="placement" value="full-front" /> Full front</label><label><input type="checkbox" name="placement" value="back-center" /> Back center</label><label><input type="checkbox" name="placement" value="full-back" /> Full back</label><label><input type="checkbox" name="placement" value="sleeve" /> Sleeve</label><label><input type="checkbox" name="placement" value="other" /> Other / not sure</label></div></fieldset>
                 <div className="field"><label htmlFor="artworkInstructions">Artwork / placement instructions</label><textarea id="artworkInstructions" name="artworkInstructions" maxLength={5000} placeholder="Example: Small logo on left chest and large logo centered on back." /></div>
-                <details className="artworkQualityDetails"><summary>Artwork quality tips</summary><p>Vector SVG, AI, EPS, or vector PDF is preferred for logos. High-resolution PNG is also great. Screenshots and blurry images may need to be recreated, which can affect timing and price.</p></details>
+                <details className="artworkQualityDetails"><summary>Artwork quality tips</summary><p>Vector SVG, AI, EPS, or vector PDF is preferred for logos. High-resolution transparent PNG is also great. Small or blurry logos may need professional vector redraw/vectorization—not simple enhancement. Detailed artwork may require a recreated proof and your approval because automated cleanup can subtly change lettering, shapes, faces, or colors. Any artwork-preparation work will be included in your quote before production.</p></details>
               </div>
             </details>
 

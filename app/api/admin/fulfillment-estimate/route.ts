@@ -3,6 +3,7 @@ import { requireAdminApi } from "@/lib/auth";
 import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 function text(value: unknown, max = 1500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
       estimated_fulfillment_notified_for_date: estimatedDate,
     }).eq("id", id);
     if (notifiedError) console.error("Estimate email sent but notification timestamp save failed", notifiedError);
+    await recordCustomerEmailNotification({ requestId: id, recipientEmails: row.email, subject: `${changed ? `${label} updated` : label} — ${reference}`, body: `${label}: ${displayDate(estimatedDate)}.${estimatedNote ? ` Note: ${estimatedNote}` : ""}`, topic: "shipping", label: "Production estimate email sent" });
 
     return NextResponse.json({ ok: true, notifiedAt: now, notifiedForDate: estimatedDate });
   } catch (error) {

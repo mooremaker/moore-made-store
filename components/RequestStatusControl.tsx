@@ -30,10 +30,11 @@ export function RequestStatusControl({ id, initialStatus, delivery }: { id: stri
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setStatus(previous);
+      if (!body.saved) setStatus(previous);
       setMessage(body.error || "Could not save");
     } else {
-      setMessage("Saved");
+      const body = await response.json().catch(() => ({}));
+      setMessage(body.reviewRequestSent ? "Saved · review email sent" : "Saved");
       router.refresh();
     }
     setSaving(false);

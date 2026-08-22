@@ -5,6 +5,7 @@ import { money } from "@/lib/quote-types";
 import { quoteRequiredDeposit, type PaymentTerms } from "@/lib/payment-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 export async function recalculateOrderPayment(requestId: string, quoteId: string) {
   const supabase = getSupabaseAdmin();
@@ -173,7 +174,7 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
   if (!wasAlreadyPaid) {
     try {
       const reference = formatRequestNumber(summary.request.request_number);
-      await sendMooreMadeEmail({
+      const customerReceiptEmail = await sendMooreMadeEmail({
         to: summary.request.email,
         subject: `Payment received — ${reference}`,
         html: emailShell(
@@ -192,6 +193,7 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
            </div>`
         ),
       });
+      if (customerReceiptEmail.ok) await recordCustomerEmailNotification({ requestId, recipientEmails: summary.request.email, subject: `Payment received — ${reference}`, body: `Payment received: ${money(amountReceived)}. Paid to date: ${money(summary.amountPaidCents)}. Remaining balance: ${money(summary.remainingCents)}.`, topic: "payment", label: "Payment receipt email sent" });
     } catch (customerEmailError) {
       console.error("Stripe customer receipt email failed", customerEmailError);
     }

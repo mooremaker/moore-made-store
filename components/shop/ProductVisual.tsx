@@ -6,6 +6,7 @@ import type { CatalogMockupSettings } from "@/lib/mockup-template-types";
 type Props = {
   kind: ProductPreviewKind;
   color: string;
+  view?: "front" | "back";
   label?: string;
   example?: boolean;
   examplePlacement?: {
@@ -25,7 +26,8 @@ type Props = {
   onLogoResizePointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 };
 
-function ApparelShape({ kind }: { kind: "tee" | "polo" | "hoodie" }) {
+function ApparelShape({ kind, view }: { kind: "tee" | "polo" | "hoodie"; view: "front" | "back" }) {
+  const isBack = view === "back";
   if (kind === "tee") {
     return (
       <svg className="productVisualGarment" viewBox="0 0 320 300" aria-hidden="true">
@@ -33,7 +35,7 @@ function ApparelShape({ kind }: { kind: "tee" | "polo" | "hoodie" }) {
           className="productVisualGarmentFill"
           d="M111 55c12-4 22-8 31-13 5 8 11 12 18 12s13-4 18-12c9 5 19 9 31 13l49 29-24 39-27-16 4 139H109l4-139-27 16-24-39 49-29Z"
         />
-        <path className="productVisualGarmentSeam" d="M142 42c3 13 9 19 18 19s15-6 18-19" />
+        <path className="productVisualGarmentSeam" d={isBack ? "M142 42c4 7 10 10 18 10s14-3 18-10" : "M142 42c3 13 9 19 18 19s15-6 18-19"} />
         <path className="productVisualGarmentSeam soft" d="M113 107 109 246M207 107l4 139" />
       </svg>
     );
@@ -46,11 +48,13 @@ function ApparelShape({ kind }: { kind: "tee" | "polo" | "hoodie" }) {
           className="productVisualGarmentFill"
           d="M111 57c13-5 23-9 31-15 6 7 12 11 18 11s12-4 18-11c8 6 18 10 31 15l48 29-24 38-27-16 4 138H110l4-138-27 16-24-38 48-29Z"
         />
-        <path className="productVisualGarmentDetail" d="m139 45 21 18-15 17-22-25 16-10Zm42 0-21 18 15 17 22-25-16-10Z" />
-        <path className="productVisualGarmentSeam" d="M160 63v47" />
-        <circle className="productVisualGarmentButton" cx="160" cy="77" r="2.4" />
-        <circle className="productVisualGarmentButton" cx="160" cy="89" r="2.4" />
-        <circle className="productVisualGarmentButton" cx="160" cy="101" r="2.4" />
+        {isBack ? <path className="productVisualGarmentSeam" d="M142 42c4 7 10 10 18 10s14-3 18-10" /> : <>
+          <path className="productVisualGarmentDetail" d="m139 45 21 18-15 17-22-25 16-10Zm42 0-21 18 15 17 22-25-16-10Z" />
+          <path className="productVisualGarmentSeam" d="M160 63v47" />
+          <circle className="productVisualGarmentButton" cx="160" cy="77" r="2.4" />
+          <circle className="productVisualGarmentButton" cx="160" cy="89" r="2.4" />
+          <circle className="productVisualGarmentButton" cx="160" cy="101" r="2.4" />
+        </>}
         <path className="productVisualGarmentSeam soft" d="M114 108 110 246M206 108l4 138" />
       </svg>
     );
@@ -62,7 +66,7 @@ function ApparelShape({ kind }: { kind: "tee" | "polo" | "hoodie" }) {
         className="productVisualGarmentFill"
         d="M112 55c12-4 22-8 30-13 5 8 11 12 18 12s13-4 18-12c8 5 18 9 30 13l37 18 37 101-31 12-37-73 5 128H101l5-128-37 73-31-12L75 73l37-18Z"
       />
-      <path className="productVisualGarmentSeam" d="M142 42c3 13 9 19 18 19s15-6 18-19" />
+      <path className="productVisualGarmentSeam" d={isBack ? "M142 42c4 7 10 10 18 10s14-3 18-10" : "M142 42c3 13 9 19 18 19s15-6 18-19"} />
       <path className="productVisualGarmentRib" d="M101 226h118v18H101zM42 164l31 12-6 16-31-12 6-16Zm236 0-31 12 6 16 31-12-6-16Z" />
       <path className="productVisualGarmentSeam soft" d="M106 113 101 241M214 113l5 128" />
     </svg>
@@ -72,6 +76,7 @@ function ApparelShape({ kind }: { kind: "tee" | "polo" | "hoodie" }) {
 export function ProductVisual({
   kind,
   color,
+  view = "front",
   label,
   example = false,
   examplePlacement,
@@ -108,14 +113,14 @@ export function ProductVisual({
   } : undefined;
 
   return (
-    <div ref={rootRef} className={`productVisual productVisual-${kind} ${editable ? "productVisualEditable" : ""} ${className}`.trim()} style={style}>
+    <div ref={rootRef} className={`productVisual productVisual-${kind} productVisualView-${view} ${editable ? "productVisualEditable" : ""} ${className}`.trim()} style={style}>
       <div
         className={`productVisualBaseLayer ${editable && selectedLayer === "product" ? "isSelected" : ""}`}
         style={productStyle}
         onPointerDown={onProductPointerDown}
       >
         {isApparel ? (
-          <ApparelShape kind={kind} />
+          <ApparelShape kind={kind} view={view} />
         ) : (
           <div className="productVisualShape" aria-hidden="true">
             {kind === "mug" ? <span className="productVisualHandle" /> : null}

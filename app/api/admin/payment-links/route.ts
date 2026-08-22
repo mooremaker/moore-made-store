@@ -6,6 +6,7 @@ import { hashPaymentShareToken, newPaymentShareToken } from "@/lib/payment-share
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 import { nextPaymentAmount, type PaymentTerms } from "@/lib/payment-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 function text(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -219,6 +220,7 @@ export async function POST(request: Request) {
       if (!sent.length) {
         return NextResponse.json({ error: failed[0]?.error || "Could not send the payment email.", sent, failed }, { status: 502 });
       }
+      await recordCustomerEmailNotification({ requestId, recipientEmails: sent, subject: `Secure payment link · ${reference} · Moore Made`, body: `A secure payment link was sent for ${dollars(payable.next.amountCents)} due now.`, topic: "payment", label: "Secure payment email sent" });
       return NextResponse.json({ ok: true, sent, failed });
     }
 

@@ -100,7 +100,7 @@ export const products: Product[] = [
     category: "Apparel",
     startingPrice: 18,
     customizable: true,
-    description: "Build a shirt your way with your own artwork, a Moore Made example layout, or an idea you want us to create.",
+    description: "Build a shirt your way with your own artwork, photo, or an idea you want Moore Made to create.",
     previewKind: "tee",
     colors: apparelColors,
     sizes: ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],

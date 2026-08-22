@@ -4,8 +4,9 @@ import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { orderItemsQuantity, type ShippingAddress, type StructuredOrderItem } from "@/lib/order-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
-const MAX_FILES = 8;
+const MAX_FILES = 20;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_QUANTITY = 1_000_000;
 
@@ -129,6 +130,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const artworkRightsAccepted = files.length > 0 && body.artworkRightsAccepted === true;
+    const artworkRightsPolicyVersion = artworkRightsAccepted ? text(body.artworkRightsPolicyVersion, 120) : "";
     const placements = Array.isArray(body.placements)
       ? body.placements.map((v: unknown) => text(v, 60)).filter(Boolean).slice(0, 12)
       : [];
@@ -162,6 +165,11 @@ export async function POST(request: Request) {
         requested_discount_code: text(body.discountCode, 80).toUpperCase() || null,
         order_items: orderItems,
         shipping_address: shippingAddress,
+        artwork_rights_accepted: artworkRightsAccepted,
+        artwork_rights_accepted_at: artworkRightsAccepted ? new Date().toISOString() : null,
+        artwork_rights_policy_version: artworkRightsPolicyVersion || null,
+        artwork_rights_snapshot: artworkRightsAccepted ? { accepted: true, policyVersion: artworkRightsPolicyVersion, email } : null,
+        artwork_rights_review_status: artworkRightsAccepted ? "customer_attested" : "not_reviewed",
       })
       .select("id, request_number, submission_token")
       .single();
@@ -229,6 +237,7 @@ export async function POST(request: Request) {
       ),
     });
     if (!customerEmail.ok) emailWarning = true;
+    else await recordCustomerEmailNotification({ requestId: created.id, recipientEmails: email, subject: `We received your Moore Made request ${reference}`, body: "Your custom request is saved. Please allow 1–2 business days for review. The next normal step is your mockup + personalized quote.", topic: "order", label: "Request confirmation email sent" });
 
     if (adminEmail) {
       const adminResult = await sendMooreMadeEmail({

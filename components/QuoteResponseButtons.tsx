@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CUSTOMER_PRODUCTION_NOTICE } from "@/lib/customer-production-notice";
 
 type ProofChoice = { id: string; title: string };
 type ItemChange = { key: string; proofItemId: string; message: string };
@@ -87,6 +88,7 @@ export function QuoteResponseButtons({ token, proofItems, delivery }: { token: s
         <input type="checkbox" checked={approvedCheck} onChange={(e) => setApprovedCheck(e.target.checked)} />
         <span>I reviewed <strong>all product mockups</strong>, spelling, placement, item details, sizes/quantities, pricing, and payment terms shown above and approve this entire proof + quote for production.</span>
       </label>
+      <div className="customerProductionNotice"><strong>Before you approve</strong><span>{CUSTOMER_PRODUCTION_NOTICE}</span></div>
 
       <button className="btn proofApproveButton" type="button" disabled={Boolean(working)} onClick={() => respond("approve")}>{working === "approve" ? "Approving…" : "Approve entire proof + quote"}</button>
       <button className="btn secondary" type="button" disabled={Boolean(working)} onClick={() => setShowChanges((value) => !value)}>{showChanges ? "Hide change request" : "Request changes instead"}</button>

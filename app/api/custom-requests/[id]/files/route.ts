@@ -21,7 +21,7 @@ function finite(value: unknown, fallback: number, min: number, max: number) {
 function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allowedPaths: string[]): MockupDocument | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
-  const rawViews = Array.isArray(raw.views) ? raw.views.slice(0, 6) : [];
+  const rawViews = Array.isArray(raw.views) ? raw.views.slice(0, 24) : [];
   if (!rawViews.length) return null;
   const pathSet = new Set(allowedPaths);
 
@@ -45,6 +45,7 @@ function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allow
         x: finite(layer.x, 50, -30, 130),
         y: finite(layer.y, 50, -30, 130),
         width: finite(layer.width, 30, 2, 120),
+        height: finite(layer.height, 14, 2, 120),
         rotation: finite(layer.rotation, 0, -360, 360),
         opacity: finite(layer.opacity, 1, 0.05, 1),
         zIndex: Math.max(0, Math.floor(finite(layer.zIndex, layerIndex + 1, 0, 100))),
@@ -67,10 +68,13 @@ function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allow
         placement: text(rawIntent.placement, 100) || "custom",
         placementLabel: text(rawIntent.placementLabel, 160) || undefined,
         idea: source === "idea" ? text(rawIntent.idea, 3000) || undefined : undefined,
+        details: text(rawIntent.details, 2000) || undefined,
         artworkFileName: source === "upload" ? text(rawIntent.artworkFileName, 300) || undefined : undefined,
+        backgroundRemovalRequested: source === "upload" ? Boolean(rawIntent.backgroundRemovalRequested) : false,
         x: finite(rawIntent.x, 50, -30, 130),
         y: finite(rawIntent.y, 50, -30, 130),
         width: finite(rawIntent.width, 30, 2, 120),
+        height: finite(rawIntent.height, 14, 2, 120),
         rotation: finite(rawIntent.rotation, 0, -360, 360),
       },
       template: {
@@ -110,7 +114,7 @@ export async function PATCH(
     const body = await request.json();
     const submissionToken = typeof body.submissionToken === "string" ? body.submissionToken : "";
     const paths = Array.isArray(body.paths)
-      ? body.paths.filter((path: unknown): path is string => typeof path === "string" && path.startsWith(`${id}/`)).slice(0, 8)
+      ? body.paths.filter((path: unknown): path is string => typeof path === "string" && path.startsWith(`${id}/`)).slice(0, 20)
       : [];
 
     if (!id || !submissionToken) {

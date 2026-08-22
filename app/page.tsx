@@ -18,7 +18,7 @@ export default async function Home() {
             <span className="ideaItem">Apparel</span><span className="ideaItem">Mugs</span><span className="ideaItem">Business cards</span><span className="ideaItem">Gifts</span><span className="ideaItem">One-off ideas</span>
           </div>
           <div className="heroActionsRow">
-            <div className="actions heroActions"><Link className="btn" href="/custom-orders">Place a custom request</Link><Link className="btn secondary" href="/shop">Visit the shop</Link></div>
+            <div className="actions heroActions"><Link className="btn" href="/shop">Visit the shop</Link><Link className="btn secondary" href="/custom-orders">Place a custom request</Link></div>
             <div className="heroStatus heroStatusPill"><span className="statusDot" aria-hidden="true" />Shop is open — customize a product or start with an idea.</div>
           </div>
         </div>
