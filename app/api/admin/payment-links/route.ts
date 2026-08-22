@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
 import { formatRequestNumber } from "@/lib/custom-request-types";
-import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email";
+import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail } from "@/lib/email";
 import { hashPaymentShareToken, newPaymentShareToken } from "@/lib/payment-share";
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 import { nextPaymentAmount, type PaymentTerms } from "@/lib/payment-types";
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
       for (const recipient of recipients) {
         const token = newPaymentShareToken();
         const tokenHash = hashPaymentShareToken(token);
-        const payUrl = `${siteUrl()}/pay/${token}`;
+        const payUrl = `${publicSiteUrl()}/pay/${token}`;
         const label = `${reference} payment email · ${recipient}`;
         const { data: created, error: insertError } = await supabase
           .from("payment_share_links")
@@ -181,7 +181,8 @@ export async function POST(request: Request) {
             <div><strong>Amount due now:</strong> ${escapeHtml(dollars(payable.next.amountCents))}</div>
           </div>
           <p style="font-size:14px;line-height:1.65;margin:0 0 18px;">You can pay this order on the customer's behalf. Your payer name and email will be recorded separately, so the order itself remains under ${escapeHtml(payable.order.customer_name)}.</p>
-          <p style="margin:22px 0;"><a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:800;padding:13px 20px;border-radius:999px;">Pay securely with card</a></p>
+          <p style="margin:22px 0 12px;"><a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:800;padding:13px 20px;border-radius:999px;">Pay securely with card</a></p>
+          <div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:12px 14px;margin:0 0 18px;font-size:12px;line-height:1.55;color:#6f675f;word-break:break-all;"><strong style="color:#171717;">If the button does not open:</strong><br>Tap or copy this link into Safari/Chrome:<br><a href="${escapeHtml(payUrl)}" style="color:#171717;">${escapeHtml(payUrl)}</a></div>
           <p style="font-size:12px;line-height:1.6;color:#6f675f;margin:0;">This link is unique to this order. Card checkout is handled securely by Stripe. If you were not expecting this payment request, you can ignore this email.</p>`
         );
 
@@ -238,7 +239,7 @@ export async function POST(request: Request) {
       .single();
     if (error || !created) throw error || new Error("Could not create link");
 
-    return NextResponse.json({ ok: true, id: created.id, url: `${siteUrl()}/pay/${token}`, createdAt: created.created_at });
+    return NextResponse.json({ ok: true, id: created.id, url: `${publicSiteUrl()}/pay/${token}`, createdAt: created.created_at });
   } catch (error) {
     console.error("Payment share link action failed", error);
     return NextResponse.json({ error: "Could not update the payment link." }, { status: 500 });

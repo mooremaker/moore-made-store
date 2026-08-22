@@ -18,6 +18,7 @@ import { AdminProductPricingPanel } from "@/components/admin/AdminProductPricing
 import { PaymentShareLinkControl } from "@/components/PaymentShareLinkControl";
 import { AdminCustomerMockupSummary } from "@/components/admin/AdminCustomerMockupSummary";
 import { ProductionChecklist } from "@/components/admin/ProductionChecklist";
+import { OrderNotificationControl } from "@/components/admin/OrderNotificationControl";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
 import type { BusinessExpenseRow, BusinessFinanceAuditRow, BusinessFundingRow, BusinessGoalRow, FinancialPaymentRow } from "@/lib/finance-types";
 import type { DiscountCodeRecord } from "@/lib/discount-types";
@@ -462,7 +463,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                       <section className="adminQuoteSection">
                         <div className="adminDetailGroupTitle"><span>$</span><h4>Proof + quote approval</h4></div>
                         {quoteReady ? (
-                          <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} />
+                          <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} customerEmail={request.email} />
                         ) : <div className="requestWarning">Proof + quote approval is not set up yet. Run the Phase 2D scalable proofs SQL migration.</div>}
                       </section>
 
@@ -522,6 +523,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             paymentStatus={request.payment_status}
                           />
                         ) : <p className="muted adminFulfillmentLocked">Final customer notification becomes available after the proof + quote is approved.</p>}
+                      </section>
+
+                      <section className="adminQuoteSection adminNotificationSection">
+                        <div className="adminDetailGroupTitle"><span>✉</span><h4>Email notifications</h4></div>
+                        <OrderNotificationControl requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} customerEmail={request.email} orderStatus={request.status} paymentStatus={request.payment_status} />
                       </section>
 
                       <div className="requestCreated">Submitted {submittedDate(request.created_at)}</div>

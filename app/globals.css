@@ -7565,3 +7565,173 @@ p { line-height: 1.65; }
   .paymentEmailRow { grid-template-columns: 1fr; }
   .paymentEmailQuickFill { align-self: flex-start; }
 }
+
+/* Phase 6.29 — grandma-friendly approval delivery + notification resend center */
+.approvalDeliveryControl,
+.orderNotificationControl {
+  margin-top: 16px;
+  border: 1px solid #ded9d1;
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.approvalDeliveryControl { padding: 18px; }
+
+.approvalDeliveryHead,
+.paymentEmailPanelHead,
+.notificationHistoryHead,
+.orderNotificationToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.approvalDeliveryHead > div,
+.orderNotificationToggle > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.approvalDeliveryHead strong,
+.orderNotificationToggle strong { font-size: 15px; }
+.approvalDeliveryHead span,
+.orderNotificationToggle small { color: #6b645d; line-height: 1.45; }
+
+.approvalDeliveryBadge {
+  flex: 0 0 auto;
+  border: 1px solid #cfc7bd;
+  background: #f7f5f0;
+  color: #3f3a35 !important;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.approvalDeliveryReminder,
+.orderNotificationNotice {
+  display: grid;
+  gap: 3px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f7f5f0;
+  border: 1px solid #e2ddd5;
+  color: #4e4842;
+  line-height: 1.5;
+}
+
+.approvalDeliveryReminder strong,
+.orderNotificationNotice strong { color: #171717; }
+
+.approvalDeliveryEmailRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.approvalDeliveryEmailRow input,
+.orderNotificationBody input,
+.orderNotificationBody select,
+.orderNotificationBody textarea {
+  width: 100%;
+}
+
+.approvalDeliveryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.orderNotificationToggle {
+  width: 100%;
+  padding: 15px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.orderNotificationToggle > span:last-child {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.orderNotificationBody {
+  border-top: 1px solid #e4dfd8;
+  padding: 16px;
+}
+
+.orderNotificationCustom {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.orderNotificationCustom textarea { min-height: 110px; }
+
+.notificationHistory {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e4dfd8;
+}
+
+.notificationHistoryHead { margin-bottom: 8px; }
+.notificationHistoryHead span { color: #77706a; font-size: 12px; }
+
+.notificationHistoryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #eeeae5;
+}
+
+.notificationHistoryRow > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.notificationHistoryRow strong { font-size: 13px; }
+.notificationHistoryRow span,
+.notificationHistoryRow small { font-size: 11px; color: #77706a; overflow-wrap: anywhere; }
+.notificationSent,
+.notificationFailed {
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 10px !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.notificationSent { background: #f0eee9; color: #34302c !important; }
+.notificationFailed { background: #fff0ef; color: #8a2f2a !important; }
+
+@media (max-width: 760px) {
+  .approvalDeliveryHead { align-items: flex-start; }
+  .approvalDeliveryEmailRow { grid-template-columns: 1fr; }
+  .approvalDeliveryEmailRow .btn { width: 100%; }
+  .approvalDeliveryActions .btn { flex: 1 1 180px; text-align: center; }
+  .notificationHistoryRow { grid-template-columns: 1fr; }
+  .notificationHistoryRow > .notificationSent,
+  .notificationHistoryRow > .notificationFailed { justify-self: start; }
+}
+.quoteWaitingNotice {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #ded9d1;
+  border-radius: 12px;
+  background: #f7f5f0;
+  color: #4e4842;
+}
+.quoteWaitingNotice strong { color: #171717; }
+.quoteWaitingNotice span { line-height: 1.5; }

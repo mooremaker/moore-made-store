@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { ApprovalDeliveryControl } from "@/components/ApprovalDeliveryControl";
 import { discountAmountCents, normalizeDiscountCode, type DiscountCodeRecord } from "@/lib/discount-types";
 import { compactSizeSummary, orderItemQuantity, type ShippingAddress, type StructuredOrderItem } from "@/lib/order-types";
 import { recommendedRevenueForMargin, type BusinessSettingsRecord, type ProductPricingRecord } from "@/lib/pricing-types";
@@ -32,6 +33,7 @@ type Props = {
   shippingAddress?: ShippingAddress | null;
   pricingProfiles?: ProductPricingRecord[];
   businessSettings?: BusinessSettingsRecord | null;
+  customerEmail?: string | null;
 };
 
 type EditableLine = { description: string; quantity: string; unitPrice: string };
@@ -63,7 +65,7 @@ function fileLabel(asset: QuoteProofAsset, index: number) {
   return asset.originalName || asset.path.split("/").pop() || `Proof ${index + 1}`;
 }
 
-export function QuoteBuilder({ requestId, requestNumber, product, quantity, existingQuote, discountCodes = [], requestedDiscountCode = null, amountPaidCents = 0, orderItems = [], delivery = null, shippingAddress = null, pricingProfiles = [], businessSettings = null }: Props) {
+export function QuoteBuilder({ requestId, requestNumber, product, quantity, existingQuote, discountCodes = [], requestedDiscountCode = null, amountPaidCents = 0, orderItems = [], delivery = null, shippingAddress = null, pricingProfiles = [], businessSettings = null, customerEmail = null }: Props) {
   const router = useRouter();
   const minimumLaborHours = Math.max(1, Number(businessSettings?.minimum_labor_hours || 1));
   const pricingBySlug = new Map(pricingProfiles.filter((row) => row.active).map((row) => [row.product_slug, row]));
@@ -484,7 +486,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
         <div className="quoteBuilderBody">
           {existingQuote?.status === "approved" && !revisionMode ? <div className="quoteLocked quoteRevisionLocked"><span>This proof and quote have been approved. The approved version stays protected.</span><button className="btn secondary" type="button" onClick={() => { setRevisionMode(true); setRevisionReason(""); }}>Revise quote</button></div> : null}
           {existingQuote?.status === "approved" && revisionMode ? <div className="quoteRevisionMode"><div><strong>Creating quote revision {Number(existingQuote.revision_number || 1) + 1}</strong><span>The current approved quote will not change until you send this revision. Sending it will require the customer to approve the new total/details again.</span></div><button className="textButton" type="button" onClick={() => window.location.reload()}>Cancel revision</button></div> : null}
-          {waitingOnCustomer ? <div className="quoteLocked">This version is currently waiting on the customer. Editing is locked until they approve it or request changes.</div> : null}
+          {waitingOnCustomer ? <div className="quoteWaitingNotice"><strong>Sent to the customer for review</strong><span>The quote is protected while they review it. You can resend the approval email or copy the approval link below without changing anything.</span></div> : null}
           {existingQuote?.public_token ? <div className="quoteDocumentActions"><a className="btn secondary" href={`/proforma/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Pro Forma + Proof ↗</a>{existingQuote.status === "approved" ? <a className="btn secondary" href={`/invoice/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Invoice ↗</a> : null}</div> : null}
           {latestChangeRequest ? (
             <div className="proofChangeRequest">
@@ -678,7 +680,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           {error ? <div className="formError">{error}</div> : null}
           {message ? <div className="quoteSuccess">{message}</div> : null}
           {!locked ? <div className="quoteActions">{!(approvedQuote && revisionMode) ? <button className="btn secondary" type="button" disabled={saving} onClick={() => submit("save")}>{saving ? "Saving…" : "Save draft"}</button> : null}<button className="btn" type="button" disabled={saving} onClick={() => submit("send")}>{saving ? "Working…" : approvedQuote && revisionMode ? "Send revised quote for approval" : existingQuote?.status === "changes_requested" ? "Send updated proof + quote" : "Send proof + quote for approval"}</button></div> : null}
-          {waitingOnCustomer ? <p className="fieldHelp">The customer is reviewing every proof item and the full price together. If they request changes, you&apos;ll be able to create the next proof version here.</p> : null}
+          {waitingOnCustomer ? <ApprovalDeliveryControl requestId={requestId} customerEmail={customerEmail} /> : null}
         </div>
       ) : null}
     </div>

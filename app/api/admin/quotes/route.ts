@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
-import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email";
+import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { money, type QuoteLineItem, type QuoteProofAsset } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -369,7 +369,7 @@ export async function POST(request: Request) {
     }
 
     const reference = formatRequestNumber(customerRequest.request_number);
-    const quoteUrl = `${siteUrl()}/quote/${quote.public_token}`;
+    const quoteUrl = `${publicSiteUrl()}/quote/${quote.public_token}`;
     const lineRows = lineItems
       .map((item) => `<tr><td style="padding:8px 12px 8px 0;">${escapeHtml(item.description)}</td><td style="padding:8px 12px;text-align:center;">${item.quantity}</td><td style="padding:8px 0;text-align:right;font-weight:700;">${escapeHtml(money(item.quantity * item.unitPriceCents))}</td></tr>`)
       .join("");
@@ -409,6 +409,7 @@ export async function POST(request: Request) {
          ${paymentSummary}
          <p style="color:#6b6b6b;font-size:13px;margin:0 0 20px;">Proof version ${targetVersion} · ${proofItems.length} product/proof item${proofItems.length === 1 ? "" : "s"}${mockupSnapshot ? " · saved mockup attached" : ""}${flattenedProofPaths.length ? ` · ${flattenedProofPaths.length} uploaded file${flattenedProofPaths.length === 1 ? "" : "s"}` : ""}</p>
          <a href="${quoteUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:13px 19px;border-radius:999px;font-weight:800;">Review proof + quote</a>
+         <div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:12px 14px;margin:16px 0 0;font-size:12px;line-height:1.55;color:#6b6b6b;word-break:break-all;"><strong style="color:#171717;">If the button does not open:</strong><br>Tap or copy this link into Safari/Chrome:<br><a href="${quoteUrl}" style="color:#171717;">${quoteUrl}</a></div>
          <p style="line-height:1.6;color:#6b6b6b;font-size:13px;margin:18px 0 0;">Approving confirms every displayed mockup, the quoted order details, and the payment terms. Secure payment is presented after approval.</p>`
       ),
     });

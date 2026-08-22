@@ -17,6 +17,11 @@ export function siteUrl() {
   return (process.env.SITE_URL || "http://localhost:3000").replace(/\/$/, "");
 }
 
+// Customer-facing emails and share links must never point at localhost.
+export function publicSiteUrl() {
+  return (process.env.MOORE_MADE_PUBLIC_URL || "https://mooremade.store").replace(/\/$/, "");
+}
+
 export function escapeHtml(value: unknown) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")

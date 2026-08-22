@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email";
+import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail, siteUrl } from "@/lib/email";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const MESSAGE_BUCKET = "message-files";
@@ -133,7 +133,7 @@ export async function notifyCustomerOfAdminReply(input: {
       `<p style="line-height:1.65;margin:0 0 12px;">Hi ${escapeHtml(input.customerName)}, <strong>${escapeHtml(customerVisibleStaffName)}</strong> from Moore Made sent you a new message${input.orderReference ? ` about <strong>${escapeHtml(input.orderReference)}</strong>` : ""}.</p>
        <p style="line-height:1.65;margin:0 0 8px;"><strong>${escapeHtml(input.subject)}</strong></p>
        <div style="background:#f7f5f0;border-radius:12px;padding:14px;line-height:1.6;margin-bottom:18px;">${escapeHtml(input.body).replaceAll("\n", "<br>")}</div>
-       <a href="${siteUrl()}/account/messages?thread=${encodeURIComponent(input.threadId)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View and reply</a>`
+       <a href="${publicSiteUrl()}/account/messages?thread=${encodeURIComponent(input.threadId)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:800;">View and reply</a>`
     ),
   });
 }

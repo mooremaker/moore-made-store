@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
-import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email";
+import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       ? "This date is an estimate and is not guaranteed. It represents when Moore Made expects to hand your order to the shipping carrier. It is not a guaranteed delivery date, and carrier transit or delivery timing cannot be guaranteed."
       : "This date is an estimate and is not guaranteed. Moore Made will notify you again when your order is officially ready for pickup.";
     const noteHtml = estimatedNote ? `<p style="line-height:1.65;margin:0 0 18px;"><strong>Note from Moore Made:</strong><br>${escapeHtml(estimatedNote).replaceAll("\n", "<br>")}</p>` : "";
-    const accountUrl = `${siteUrl()}/account`;
+    const accountUrl = `${publicSiteUrl()}/account`;
 
     const emailResult = await sendMooreMadeEmail({
       to: row.email,
