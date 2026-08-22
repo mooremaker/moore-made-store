@@ -1,35 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { PublicShowcasePost } from "@/lib/showcase-data";
 import { ShowcasePhotoCarousel } from "@/components/ShowcasePhotoCarousel";
 import { ShowcaseReviewModal } from "@/components/ShowcaseReviewModal";
 
 type Props = {
   post: PublicShowcasePost;
-  onExpandedChange?: (expanded: boolean) => void;
 };
 
-export function ShowcaseCard({ post, onExpandedChange }: Props) {
-  const [expanded, setExpanded] = useState(false);
+export function ShowcaseCard({ post }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const displayName = post.business_name || post.customer_name;
 
-  useEffect(() => {
-    setExpanded(false);
-    onExpandedChange?.(false);
-  }, [post.id, onExpandedChange]);
-
-  function toggleReview() {
-    const next = !expanded;
-    setExpanded(next);
-    onExpandedChange?.(next);
-  }
-
   return (
     <>
-      <article className={`showcaseCard showcaseOverlayCard card ${expanded ? "isReviewExpanded" : ""} ${post.photoUrls.length ? "hasPhotos" : "hasNoPhotos"}`}>
+      <article className={`showcaseCard showcaseOverlayCard card ${post.photoUrls.length ? "hasPhotos" : "hasNoPhotos"}`}>
         <div className="showcaseMedia">
           <ShowcasePhotoCarousel
             photoUrls={post.photoUrls}
@@ -61,10 +48,8 @@ export function ShowcaseCard({ post, onExpandedChange }: Props) {
             </div>
 
             <div className="showcaseOverlayActions">
-              <button type="button" className="showcaseReviewToggle" onClick={toggleReview} aria-expanded={expanded}>
-                {expanded ? "Collapse review ↓" : "Read full review ↑"}
-              </button>
-              <Link className="textLink showcaseOverlayCta" href="/custom-orders">Want something like this? →</Link>
+              <button type="button" className="showcaseReviewToggle" onClick={() => setModalOpen(true)}>View photos &amp; review →</button>
+              <Link className="textLink showcaseOverlayCta" href="/shop">Create something like this →</Link>
             </div>
           </div>
         </div>

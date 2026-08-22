@@ -24,7 +24,7 @@ export default async function MadeByYouPage() {
         <div className="eyebrow">Made by You</div>
         <h1>Real ideas.<br />Real orders.</h1>
         <p className="lead">A look at what Moore Made customers have created, gifted, worn, shared, and put to work.</p>
-        <div className="actions"><Link className="btn" href="/made-by-you/submit">Share your order</Link><Link className="btn secondary" href="/custom-orders">Start your own</Link></div>
+        <div className="actions"><Link className="btn" href="/made-by-you/submit">Share your order</Link><Link className="btn secondary" href="/shop">Visit the shop</Link></div>
       </section>
       {customerGroups.length ? (
         <section className="showcaseGrid">

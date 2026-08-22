@@ -66,7 +66,7 @@ export function ShowcaseReviewModal({ post, onClose }: { post: PublicShowcasePos
               >
                 {expanded ? "Collapse review ↓" : "Read full review ↑"}
               </button>
-              <Link className="textLink showcaseOverlayCta" href="/custom-orders">Want something like this? →</Link>
+              <Link className="textLink showcaseOverlayCta" href="/shop">Create something like this →</Link>
             </div>
           </div>
         </div>

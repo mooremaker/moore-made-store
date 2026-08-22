@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useMemo, useRef, useState, type TouchEvent } from "react";
 import { ShowcaseReviewModal } from "@/components/ShowcaseReviewModal";
 import type { PublicShowcasePost } from "@/lib/showcase-data";
 import { useRefreshStablePhotoIndex } from "@/lib/showcase-photo-selection";
@@ -20,15 +20,12 @@ function CompactShowcaseCard({
   onMove: (direction: -1 | 1) => void;
 }) {
   const displayName = post.business_name || post.customer_name;
-  const [reviewExpanded, setReviewExpanded] = useState(false);
   const [previewIndex] = useRefreshStablePhotoIndex(post.id, post.photoUrls);
   const previewPhoto = previewIndex == null ? null : post.photoUrls[previewIndex] ?? post.photoUrls[0] ?? null;
   const preview = previewIndex == null ? null : post.photoPreviews[previewIndex] ?? { x: 50, y: 50, zoom: 1 };
 
-  useEffect(() => setReviewExpanded(false), [post.id]);
-
   return (
-    <article className={`homeCompactReview homeSingleFeaturedReview card ${reviewExpanded ? "isReviewExpanded" : ""}`}>
+    <article className="homeCompactReview homeSingleFeaturedReview card">
       <button type="button" className="homeCompactReviewMedia" onClick={onOpen} aria-label={`Open review from ${displayName}`}>
         {previewPhoto ? (
           <img
@@ -63,8 +60,8 @@ function CompactShowcaseCard({
         ) : null}
 
         <div className="homeCompactReviewActions">
-          <button type="button" className="textLink homeCompactOpen" onClick={() => setReviewExpanded((current) => !current)} aria-expanded={reviewExpanded}>{reviewExpanded ? "Collapse review ↑" : "Show full review ↓"}</button>
-          <Link className="textLink" href="/custom-orders">Make something →</Link>
+          <button type="button" className="textLink homeCompactOpen" onClick={onOpen}>View photos &amp; review →</button>
+          <Link className="textLink" href="/shop">Create something like this →</Link>
         </div>
       </div>
     </article>

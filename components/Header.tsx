@@ -8,7 +8,7 @@ import { cachedCustomRequestCartCount, CUSTOM_REQUEST_CART_EVENT, getCustomReque
 const links = [
   { href: "/shop", label: "Shop" },
   { href: "/cart", label: "Cart" },
-  { href: "/custom-orders", label: "Custom Orders" },
+  { href: "/custom-orders", label: "Order Form" },
   { href: "/made-by-you", label: "Made by You" },
   { href: "/account", label: "Account" },
 ];
