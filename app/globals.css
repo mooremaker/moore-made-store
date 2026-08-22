@@ -7735,3 +7735,338 @@ p { line-height: 1.65; }
 }
 .quoteWaitingNotice strong { color: #171717; }
 .quoteWaitingNotice span { line-height: 1.5; }
+
+/* Phase 6.30 — customer artwork authorization + admin IP review */
+.artworkRightsCustomerCheck{display:flex;gap:12px;align-items:flex-start;border:1px solid #d7d0c7;background:#fbfaf7;border-radius:14px;padding:14px 16px;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}.artworkRightsCustomerCheck:hover{border-color:#a99f94}.artworkRightsCustomerCheck.isChecked{border-color:#8f9a82;background:#f5f8f1;box-shadow:0 0 0 2px rgba(103,120,87,.08)}.artworkRightsCustomerCheck>input{margin-top:3px;width:18px;height:18px;flex:0 0 auto}.artworkRightsCustomerCheck>span{display:grid;gap:4px;line-height:1.45}.artworkRightsCustomerCheck strong{font-size:.86rem}.artworkRightsCustomerCheck small{font-size:.75rem;color:var(--ink)}.artworkRightsCustomerCheck em{font-size:.68rem;color:var(--muted);font-style:normal}.artworkRightsCustomerCheck a{text-decoration:underline;text-underline-offset:2px}.artworkRightsCustomerCheck.compact{margin-top:10px;padding:12px 13px}
+.artworkApprovalCheck{margin-top:10px;background:#fbfaf7}
+.artworkRightsAdminCard{margin:12px 0;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff;display:grid;gap:12px}.artworkRightsAdminHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.artworkRightsAdminHead>div{display:grid;gap:3px}.artworkRightsAdminHead>div>strong{font-size:.94rem}.artworkRightsAdminCard>p{margin:0;color:var(--muted);font-size:.78rem;line-height:1.55}.artworkRightsStatus{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;background:#f0ede8;color:#625d57;font-size:.67rem;font-weight:800;white-space:nowrap}.artworkRightsStatus.is-verified{background:#edf5e9;color:#45613b}.artworkRightsStatus.is-customer_attested{background:#eef3f7;color:#38566c}.artworkRightsStatus.is-permission_requested{background:#fff4dc;color:#765817}.artworkRightsStatus.is-declined{background:#fbe9e7;color:#8a3831}.artworkRightsAdminControls{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(0,1.3fr);gap:12px}.artworkRightsAdminFoot{display:flex;justify-content:space-between;align-items:center;gap:12px}.artworkRightsAdminFoot>span{font-size:.68rem;color:var(--muted);max-width:620px;line-height:1.45}
+@media(max-width:760px){.artworkRightsAdminControls{grid-template-columns:1fr}.artworkRightsAdminHead,.artworkRightsAdminFoot{align-items:stretch;flex-direction:column}.artworkRightsStatus{align-self:flex-start}}
+
+
+/* =========================================================
+   Phase 6.31 — mobile wizard action-bar safety
+   Prevents long action buttons from collapsing into narrow
+   vertical pills on iPhone/Safari and keeps every step usable.
+   ========================================================= */
+@media (max-width: 720px) {
+  .customerWizardNav {
+    position: sticky;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 12;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+
+  .customerWizardNav > span {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    font-size: .72rem;
+    line-height: 1.4;
+  }
+
+  .customerWizardNav .btn {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 14px;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .customerWizardNav .btn + .btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .customerWizardNav {
+    left: auto;
+    right: auto;
+  }
+
+  .customerWizardNav .btn {
+    font-size: .86rem;
+  }
+}
+/* =========================================================
+   Phase 6.33 — balanced mobile quote note
+   Keeps the no-price message compact and intentionally wrapped.
+   ========================================================= */
+@media (max-width: 720px) {
+  .customerWizardNav > span {
+    text-wrap: balance;
+    text-align: center;
+    font-size: .7rem;
+    line-height: 1.35;
+    padding-inline: 6px;
+  }
+}
+
+/* =========================================================
+   Phase 6.35 — job-cost-driven quote price suggestions
+   ========================================================= */
+.quotePricingSuggestion {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #d8d0c5;
+  border-radius: 13px;
+  background: #f8f5ef;
+}
+.quotePricingSuggestion > div {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(255,255,255,.72);
+}
+.quotePricingSuggestion span {
+  color: var(--muted);
+  font-size: .6rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .045em;
+}
+.quotePricingSuggestion strong {
+  font-size: .92rem;
+  line-height: 1.2;
+}
+.quotePricingSuggestion small {
+  color: var(--muted);
+  font-size: .58rem;
+  line-height: 1.35;
+}
+.quotePricingSuggestion .suggestionGapNeedsIncrease strong { color: #9b3f2f; }
+.quotePricingSuggestion .suggestionGapHealthy strong { color: #2f6a3a; }
+.quoteApplySuggestedPrice {
+  align-self: center;
+  min-width: 142px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .quotePricingSuggestion {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .quoteApplySuggestedPrice {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .quotePricingSuggestion {
+    grid-template-columns: 1fr;
+  }
+  .quotePricingSuggestion > div {
+    padding: 9px 10px;
+  }
+}
+
+/* =========================================================
+   Phase 6.37 — finished product photos
+   ========================================================= */
+.finishedProductPhotosManager { display: grid; gap: 12px; }
+.finishedPhotoHeading,
+.finishedPhotoSendHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.finishedPhotoHeading > div,
+.finishedPhotoSendHead > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.finishedPhotoHeading strong,
+.finishedPhotoSendHead strong { font-size: .82rem; }
+.finishedPhotoHeading span,
+.finishedPhotoSendHead span { color: var(--muted); font-size: .66rem; line-height: 1.4; }
+.finishedPhotoUpload { position: relative; overflow: hidden; white-space: nowrap; }
+.finishedPhotoUpload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.finishedPhotoUpload.isDisabled { opacity: .55; pointer-events: none; }
+
+.finishedPhotoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.finishedPhotoCard {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+.finishedPhotoCard > a { display: block; border-radius: 9px; overflow: hidden; background: #f2eee8; aspect-ratio: 1 / 1; }
+.finishedPhotoCard img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.finishedPhotoCard > div { display: grid; min-width: 0; }
+.finishedPhotoCard > div span { font-size: .65rem; font-weight: 850; }
+.finishedPhotoCard > div small { color: var(--muted); font-size: .55rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finishedPhotoCard > button {
+  border: 0;
+  background: transparent;
+  color: #9b3f2f;
+  padding: 2px 0;
+  text-align: left;
+  font: inherit;
+  font-size: .58rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.finishedPhotoEmpty {
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: .68rem;
+  text-align: center;
+}
+.finishedPhotoSendBox {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #faf8f4;
+}
+.finishedPhotoLinkActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.finishedPhotoSendBox textarea { min-height: 88px; }
+.finishedPhotoHistory {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+.finishedPhotoHistory > strong { font-size: .68rem; }
+.finishedPhotoHistory > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  font-size: .6rem;
+}
+.finishedPhotoFootnote { color: var(--muted); font-size: .58rem; }
+
+.accountFinishedPhotos {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #faf8f4;
+}
+.accountFinishedPhotos > div:first-child { display: grid; gap: 2px; }
+.accountFinishedPhotos > div:first-child strong { font-size: .78rem; }
+.accountFinishedPhotos > div:first-child span,
+.accountFinishedPhotos > small { color: var(--muted); font-size: .62rem; }
+.accountFinishedPhotoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.accountFinishedPhotoGrid a {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.accountFinishedPhotoGrid img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #eee8df;
+}
+.accountFinishedPhotoGrid span { font-size: .56rem; font-weight: 800; }
+
+.finishedGalleryPage {
+  min-height: 100vh;
+  padding: 48px 18px;
+  background: #f7f5f0;
+}
+.finishedGalleryCard {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(40,32,25,.08);
+}
+.finishedGalleryCard h1 { margin: 7px 0 8px; font-size: clamp(2rem, 6vw, 4rem); line-height: .98; }
+.finishedGalleryCard > p { margin: 0 0 20px; color: var(--muted); }
+.finishedGalleryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.finishedGalleryGrid a {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #eee9e1;
+  aspect-ratio: 1 / 1;
+}
+.finishedGalleryGrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.finishedGalleryGrid span {
+  position: absolute;
+  left: 9px;
+  bottom: 9px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+  color: #171717;
+  font-size: .68rem;
+  font-weight: 850;
+}
+.finishedGalleryFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.finishedGalleryFooter p { margin: 0; color: var(--muted); font-size: .72rem; }
+
+@media (max-width: 760px) {
+  .finishedPhotoHeading,
+  .finishedPhotoSendHead,
+  .finishedGalleryFooter { align-items: stretch; flex-direction: column; }
+  .finishedPhotoUpload,
+  .finishedPhotoSendBox > .btn { width: 100%; text-align: center; justify-content: center; }
+  .finishedPhotoLinkActions { justify-content: stretch; }
+  .finishedPhotoLinkActions .btn { flex: 1; min-width: 0; text-align: center; }
+  .finishedPhotoGrid,
+  .accountFinishedPhotoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finishedGalleryPage { padding: 18px 10px; }
+  .finishedGalleryCard { padding: 18px 14px; border-radius: 17px; }
+  .finishedGalleryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

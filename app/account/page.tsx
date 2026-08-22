@@ -23,6 +23,7 @@ type QuoteRow = { id: string; request_id: string; public_token: string; status: 
 type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; published_snapshot:unknown|null; updated_at:string; };
 type ReceiptRow = { id:string; request_id:string; amount_cents:number; payment_method:string; paid_at:string|null; created_at:string; receipt_number:number|null; receipt_token:string|null; status:string; };
 type MockupProjectRow = { request_id:string; document:unknown; status:string; updated_at:string; };
+type FinishedPhotoRow = { id:string; request_id:string; storage_path:string; original_filename:string; sort_order:number; created_at:string; };
 
 function dateLabel(value: string | null) {
   if (!value) return "—";
@@ -72,6 +73,23 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     }
   }
 
+  const finishedPhotosByRequest = new Map<string, { id: string; name: string; url: string }[]>();
+  if (requestIds.length) {
+    const { data: finishedPhotoData } = await admin
+      .from("order_finished_photos")
+      .select("id,request_id,storage_path,original_filename,sort_order,created_at")
+      .in("request_id", requestIds)
+      .order("sort_order", { ascending: true });
+    for (const photo of (finishedPhotoData ?? []) as FinishedPhotoRow[]) {
+      const { data: signed } = await admin.storage.from("finished-product-files").createSignedUrl(photo.storage_path, 900);
+      if (!signed?.signedUrl) continue;
+      finishedPhotosByRequest.set(photo.request_id, [
+        ...(finishedPhotosByRequest.get(photo.request_id) ?? []),
+        { id: photo.id, name: photo.original_filename, url: signed.signedUrl },
+      ]);
+    }
+  }
+
   const artworkLinks = new Map<string, { name: string; url: string }[]>();
   for (const request of requests) {
     const links: { name: string; url: string }[] = [];
@@ -109,6 +127,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               const files = artworkLinks.get(request.id) ?? [];
               const receipts = receiptsByRequest.get(request.id) ?? [];
               const savedMockup = mockupsByRequest.get(request.id) ?? null;
+              const finishedPhotos = finishedPhotosByRequest.get(request.id) ?? [];
               return (
                 <details className="accountOrderCard" key={request.id}>
                   <summary>
@@ -137,6 +156,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       <small>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated only and not guaranteed. This is the date Moore Made expects to hand the package to the carrier, not a guaranteed delivery date. Carrier transit and delivery timing are outside Moore Made’s control." : "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for pickup."}</small>
                     </div> : null}
                     {savedMockup ? <SavedMockupPreview document={savedMockup} compact title="Your saved mockup" className="accountSavedMockup" /> : null}
+                    {finishedPhotos.length ? <div className="accountFinishedPhotos">
+                      <div><strong>Finished product photos</strong><span>Your completed Moore Made order.</span></div>
+                      <div className="accountFinishedPhotoGrid">{finishedPhotos.map((photo, index) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt={`Finished product photo ${index + 1}`} /><span>Photo {index + 1}</span></a>)}</div>
+                      <small>Tap a photo to open it larger. Private image links refresh whenever you open your account.</small>
+                    </div> : null}
                     {files.length ? <div className="accountFiles"><strong>Your uploaded artwork</strong><div>{files.map((file) => <a key={file.url} href={file.url} target="_blank" rel="noreferrer">{file.name}</a>)}</div><small>Private links expire after 15 minutes.</small></div> : null}
                     {request.status === "shipped" && (request.tracking_url || request.tracking_number) ? <div className="accountFulfillment"><strong>Shipping</strong>{request.tracking_number ? <span>Tracking: {request.tracking_number}</span> : null}{request.tracking_url ? <a href={request.tracking_url} target="_blank" rel="noreferrer">Track shipment →</a> : null}</div> : null}
                     {request.status === "ready" && request.fulfillment_note ? <div className="accountFulfillment"><strong>Pickup note</strong><span>{request.fulfillment_note}</span></div> : null}

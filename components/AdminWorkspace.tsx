@@ -19,6 +19,8 @@ import { PaymentShareLinkControl } from "@/components/PaymentShareLinkControl";
 import { AdminCustomerMockupSummary } from "@/components/admin/AdminCustomerMockupSummary";
 import { ProductionChecklist } from "@/components/admin/ProductionChecklist";
 import { OrderNotificationControl } from "@/components/admin/OrderNotificationControl";
+import { ArtworkRightsControl } from "@/components/admin/ArtworkRightsControl";
+import { FinishedProductPhotosManager } from "@/components/admin/FinishedProductPhotosManager";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
 import type { BusinessExpenseRow, BusinessFinanceAuditRow, BusinessFundingRow, BusinessGoalRow, FinancialPaymentRow } from "@/lib/finance-types";
 import type { DiscountCodeRecord } from "@/lib/discount-types";
@@ -61,6 +63,12 @@ export type AdminRequestRow = {
   payment_status: "unpaid" | "deposit_paid" | "paid";
   amount_paid_cents: number;
   artwork_paths: string[] | null;
+  artwork_rights_accepted: boolean;
+  artwork_rights_accepted_at: string | null;
+  artwork_rights_policy_version: string | null;
+  artwork_rights_review_status: string;
+  artwork_rights_review_note: string | null;
+  artwork_rights_reviewed_at: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
   fulfillment_note: string | null;
@@ -455,6 +463,16 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         ) : <p className="muted">No artwork uploaded.</p>}
                       </div>
 
+                      <ArtworkRightsControl
+                        requestId={request.id}
+                        hasArtwork={request.fileLinks.length > 0}
+                        accepted={request.artwork_rights_accepted}
+                        acceptedAt={request.artwork_rights_accepted_at}
+                        policyVersion={request.artwork_rights_policy_version}
+                        initialStatus={request.artwork_rights_review_status}
+                        initialNote={request.artwork_rights_review_note}
+                      />
+
                       <section className="adminQuoteSection adminMockupSection">
                         <div className="adminDetailGroupTitle"><span>✦</span><h4>Mockup Studio</h4></div>
                         <MockupStudio requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} />
@@ -523,6 +541,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             paymentStatus={request.payment_status}
                           />
                         ) : <p className="muted adminFulfillmentLocked">Final customer notification becomes available after the proof + quote is approved.</p>}
+                      </section>
+
+                      <section className="adminQuoteSection adminFinishedPhotosSection">
+                        <div className="adminDetailGroupTitle"><span>📸</span><h4>Finished product photos</h4></div>
+                        <FinishedProductPhotosManager requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} customerEmail={request.email} />
                       </section>
 
                       <section className="adminQuoteSection adminNotificationSection">

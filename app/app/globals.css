@@ -137,3 +137,80 @@ p { line-height: 1.65; }
   .logoCard { min-height: 220px; }
   .checkboxGrid { grid-template-columns: 1fr; }
 }
+
+
+/* =========================================================
+   Phase 6.31 — mobile wizard action-bar safety
+   Prevents long action buttons from collapsing into narrow
+   vertical pills on iPhone/Safari and keeps every step usable.
+   ========================================================= */
+@media (max-width: 720px) {
+  .customerWizardNav {
+    position: sticky;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 12;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+
+  .customerWizardNav > span {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    font-size: .72rem;
+    line-height: 1.4;
+  }
+
+  .customerWizardNav .btn {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 14px;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .customerWizardNav .btn + .btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .customerWizardNav {
+    left: auto;
+    right: auto;
+  }
+
+  .customerWizardNav .btn {
+    font-size: .86rem;
+  }
+}
+/* =========================================================
+   Phase 6.33 — balanced mobile quote note
+   Keeps the no-price message compact and intentionally wrapped.
+   ========================================================= */
+@media (max-width: 720px) {
+  .customerWizardNav > span {
+    text-wrap: balance;
+    text-align: center;
+    font-size: .7rem;
+    line-height: 1.35;
+    padding-inline: 6px;
+  }
+}
+

@@ -9,6 +9,7 @@ import { formatRequestNumber } from "@/lib/custom-request-types";
 import { compactSizeSummary, orderItemQuantity, orderItemsQuantity, type ShippingAddress, type StructuredOrderItem } from "@/lib/order-types";
 import { ProductVisual } from "@/components/shop/ProductVisual";
 import { makeStructuredOrderItem, OrderItemsBuilder } from "@/components/shop/OrderItemsBuilder";
+import { ARTWORK_RIGHTS_POLICY_VERSION, ARTWORK_RIGHTS_UPLOAD_LABEL } from "@/lib/artwork-rights";
 
 const BUCKET = "custom-request-files";
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -133,6 +134,7 @@ export function CustomerProductCustomizer({
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({ ...blankAddress, name: initialName });
   const [discountCode, setDiscountCode] = useState("");
   const [notes, setNotes] = useState("");
+  const [artworkRightsAccepted, setArtworkRightsAccepted] = useState(false);
   const [error, setError] = useState("");
   const [reminder, setReminder] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -148,6 +150,10 @@ export function CustomerProductCustomizer({
   const enabledViews = useMemo(() => activeViews(product, coverage), [product, coverage]);
   const currentPlacement = placementFor(product, activeView, current.placement);
   const totalQuantity = orderItemsQuantity(orderItems);
+  const hasCustomerArtwork = enabledViews.some((view) => {
+    const state = view === "front" ? front : back;
+    return state.mode === "upload" && Boolean(state.file);
+  });
 
   function setPrimaryColor(nextColor: string) {
     setOrderItems((items) => items.map((item, index) => index === 0 ? { ...item, colorName: nextColor } : item));
@@ -335,6 +341,10 @@ export function CustomerProductCustomizer({
       setError(validationError);
       return;
     }
+    if (hasCustomerArtwork && !artworkRightsAccepted) {
+      setError("Please confirm that you own the artwork you uploaded or have permission to use it for this order.");
+      return;
+    }
     setSubmitting(true);
     setError("");
 
@@ -380,6 +390,8 @@ export function CustomerProductCustomizer({
         shippingAddress: delivery === "Shipping" ? { ...shippingAddress, name: shippingAddress.name.trim() || name.trim() } : null,
         notes: notes.trim(),
         discountCode: discountCode.trim(),
+        artworkRightsAccepted: hasCustomerArtwork ? artworkRightsAccepted : false,
+        artworkRightsPolicyVersion: hasCustomerArtwork ? ARTWORK_RIGHTS_POLICY_VERSION : null,
         website: "",
         files: fileEntries.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
       };
@@ -527,7 +539,6 @@ export function CustomerProductCustomizer({
         <>
           <section className="customerCustomizerIntro">
             <div><div className="eyebrow">Step 1 · Product & design</div><h2>Show us what the main design should look like.</h2><p>Choose the side, placement, size, and artwork. Drag the preview wherever you want it. Additional colors/products come next.</p></div>
-            <div className="customerPreviewOnly"><strong>Preview, not final proof</strong><span>We&apos;ll check sizing, printability, and production details before you pay.</span></div>
           </section>
 
           {product.examples.length && !isCustomProduct ? (
@@ -556,7 +567,7 @@ export function CustomerProductCustomizer({
                   </div>
                 </ProductVisual>
               </div>
-              <div className="customerPreviewHint">{current.mode === "example" ? <span>This Moore Made logo is only an example. Choose <strong>Upload my artwork</strong> or <strong>I need this created</strong> to make this side yours.</span> : <span><strong>Drag the design to move it.</strong> Drag any corner handle to resize, or use the controls for exact size and rotation.</span>}</div>
+              <div className="customerPreviewHint">{current.mode === "example" ? <span>This Moore Made logo is only an example. Choose <strong>Upload my artwork</strong> or <strong>I need this created</strong> to make this side yours. We&apos;ll confirm sizing and printability before you pay.</span> : <span><strong>Drag the design to move it.</strong> Drag any corner handle to resize, or use the controls for exact size and rotation. We&apos;ll confirm sizing and printability before you pay.</span>}</div>
             </div>
 
             <aside className="customerCustomizerControls">
@@ -592,7 +603,7 @@ export function CustomerProductCustomizer({
           </div>
           {reminder ? <div className="customerDesignReminder" role="status"><span className="customerReminderIcon">i</span><div><strong>Quick design reminder</strong><p>{reminder}</p></div></div> : null}
           {error ? <div className="formError" role="alert">{error}</div> : null}
-          <div className="customerWizardNav"><span>No prices are shown here. Moore Made will send a personalized quote after review.</span><button className="btn" type="button" onClick={() => goToStep(2)}>Continue to quantities →</button></div>
+          <div className="customerWizardNav"><span>No prices yet — Moore Made will send your personalized quote after review.</span><button className="btn" type="button" onClick={() => goToStep(2)}>Continue to quantities →</button></div>
         </>
       ) : null}
 
@@ -654,6 +665,10 @@ export function CustomerProductCustomizer({
           </div>
           {delivery === "Shipping" ? <div className="customerReviewAddress"><span>Ship to</span><strong>{shippingAddress.line1}{shippingAddress.line2 ? `, ${shippingAddress.line2}` : ""}, {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postalCode}</strong></div> : null}
           <div className="customerReviewNotice"><strong>No payment is due now.</strong><span>Moore Made will review your product mix, artwork, supplies, labor, shipping, discount, and applicable tax. You&apos;ll receive a final proof + quote to approve before payment.</span></div>
+          {hasCustomerArtwork ? <label className={`artworkRightsCustomerCheck ${artworkRightsAccepted ? "isChecked" : ""}`}>
+            <input type="checkbox" checked={artworkRightsAccepted} onChange={(event) => setArtworkRightsAccepted(event.target.checked)} />
+            <span><strong>Artwork authorization *</strong><small>{ARTWORK_RIGHTS_UPLOAD_LABEL}</small><em>Moore Made may still pause or refuse artwork that appears unauthorized. <Link href="/terms/custom-orders" target="_blank">Read the custom-order terms ↗</Link></em></span>
+          </label> : null}
           {error ? <div className="formError" role="alert">{error}</div> : null}
           <div className="customerWizardNav"><button className="btn secondary" type="button" onClick={() => goToStep(3)}>← Edit contact / delivery</button><button className="btn" type="button" disabled={submitting} onClick={submitCustomization}>{submitting ? "Sending your request…" : "Send request to Moore Made"}</button></div>
         </section>

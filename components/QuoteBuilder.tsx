@@ -197,8 +197,64 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const estimatedProfit = revenueBeforeTax - internalTotalCost;
   const marginPercent = revenueBeforeTax > 0 ? (estimatedProfit / revenueBeforeTax) * 100 : 0;
   const recommendedRevenue = recommendedRevenueForMargin(internalTotalCost, targetMarginBasisPoints);
+  const setupFeeCents = centsFromInput(setupFee);
+  const shippingChargedCents = centsFromInput(shipping);
+  const manualDiscountCents = centsFromInput(manualDiscount);
+  const selectedPercentRate = selectedDiscountCode?.kind === "percent"
+    ? Math.min(0.99, Math.max(0, Number(selectedDiscountCode.percent_off || 0) / 100))
+    : 0;
+  const selectedFixedDiscountCents = selectedDiscountCode?.kind === "fixed"
+    ? Math.max(0, Number(selectedDiscountCode.amount_off_cents || 0))
+    : 0;
+  const recommendedEligibleSubtotal = selectedPercentRate > 0
+    ? Math.ceil(Math.max(0, recommendedRevenue - shippingChargedCents + manualDiscountCents) / (1 - selectedPercentRate))
+    : Math.max(0, recommendedRevenue - shippingChargedCents + manualDiscountCents + selectedFixedDiscountCents);
+  const recommendedLineSubtotal = Math.max(0, recommendedEligibleSubtotal - setupFeeCents);
+  const quotedPieceCount = lineItems.reduce((sum, item) => sum + Math.max(1, item.quantity), 0);
+  const recommendedAverageUnitPrice = quotedPieceCount > 0
+    ? Math.ceil(recommendedLineSubtotal / quotedPieceCount)
+    : recommendedLineSubtotal;
+  const recommendationGap = recommendedRevenue - revenueBeforeTax;
   const remainingAfterPayments = Math.max(0, total - amountPaidCents);
   const overpaidCents = Math.max(0, amountPaidCents - total);
+
+  function applyRecommendedPricing() {
+    if (locked || lines.length === 0) return;
+
+    const targetSubtotal = Math.max(0, recommendedLineSubtotal);
+    const quantities = lines.map((line) => Math.max(1, Math.floor(Number(line.quantity) || 1)));
+    const totalQuantity = quantities.reduce((sum, qty) => sum + qty, 0);
+    if (totalQuantity <= 0) return;
+
+    setLines((current) => {
+      if (current.length === 1) {
+        const quantity = Math.max(1, Math.floor(Number(current[0].quantity) || 1));
+        const unitPriceCents = Math.ceil(targetSubtotal / quantity);
+        return [{ ...current[0], unitPrice: (unitPriceCents / 100).toFixed(2) }];
+      }
+
+      const currentSubtotal = current.reduce((sum, line, index) => {
+        return sum + quantities[index] * centsFromInput(line.unitPrice);
+      }, 0);
+
+      if (currentSubtotal > 0) {
+        const factor = targetSubtotal / currentSubtotal;
+        return current.map((line) => ({
+          ...line,
+          unitPrice: (Math.max(0, Math.round(centsFromInput(line.unitPrice) * factor)) / 100).toFixed(2),
+        }));
+      }
+
+      const averageUnitPriceCents = Math.ceil(targetSubtotal / totalQuantity);
+      return current.map((line) => ({
+        ...line,
+        unitPrice: (averageUnitPriceCents / 100).toFixed(2),
+      }));
+    });
+
+    setError("");
+    setMessage("Recommended pricing applied. You can still adjust any line item before sending the quote.");
+  }
 
   function updateLine(index: number, field: keyof EditableLine, value: string) {
     setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
@@ -327,32 +383,54 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, locked]);
 
+  async function requestAutomaticTax() {
+    const response = await fetch("/api/admin/tax/calculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId,
+        merchandiseCents: merchandiseAfterDiscountCents,
+        shippingCents: centsFromInput(shipping),
+        inputFingerprint: currentTaxInputFingerprint,
+        taxCode: quoteTaxCode,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not calculate sales tax.");
+
+    const taxCents = Math.max(0, Number(result.taxCents || 0));
+    const calculationId = String(result.calculationId || "");
+    const calculatedAt = String(result.calculatedAt || new Date().toISOString());
+    const inputFingerprint = String(result.inputFingerprint || currentTaxInputFingerprint);
+    const breakdown = result.breakdown && typeof result.breakdown === "object" ? result.breakdown : null;
+    const location = result.location;
+    const locationLabel = location ? `${location.city}, ${location.state} ${location.postalCode}` : "";
+
+    setTax((taxCents / 100).toFixed(2));
+    setTaxCalculationId(calculationId);
+    setTaxCalculatedAt(calculatedAt);
+    setTaxInputFingerprint(inputFingerprint);
+    setTaxBreakdown(breakdown);
+    setTaxLocation(locationLabel);
+
+    return {
+      taxCents,
+      calculationId,
+      calculatedAt,
+      inputFingerprint,
+      breakdown,
+      location,
+      locationLabel,
+    };
+  }
+
   async function calculateAutomaticTax() {
     setError("");
     setMessage("");
     setCalculatingTax(true);
     try {
-      const response = await fetch("/api/admin/tax/calculate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requestId,
-          merchandiseCents: merchandiseAfterDiscountCents,
-          shippingCents: centsFromInput(shipping),
-          inputFingerprint: currentTaxInputFingerprint,
-          taxCode: quoteTaxCode,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Could not calculate sales tax.");
-      setTax((Math.max(0, Number(result.taxCents || 0)) / 100).toFixed(2));
-      setTaxCalculationId(String(result.calculationId || ""));
-      setTaxCalculatedAt(String(result.calculatedAt || new Date().toISOString()));
-      setTaxInputFingerprint(String(result.inputFingerprint || currentTaxInputFingerprint));
-      setTaxBreakdown(result.breakdown && typeof result.breakdown === "object" ? result.breakdown : null);
-      const location = result.location;
-      setTaxLocation(location ? `${location.city}, ${location.state} ${location.postalCode}` : "");
-      setMessage(`Automatic sales tax calculated${location ? ` for ${location.city}, ${location.state}` : ""}.`);
+      const result = await requestAutomaticTax();
+      setMessage(`Automatic sales tax calculated${result.location ? ` for ${result.location.city}, ${result.location.state}` : ""}.`);
     } catch (taxError) {
       setError(taxError instanceof Error ? taxError.message : "Could not calculate sales tax.");
     } finally {
@@ -380,10 +458,6 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       setError(`Labor has a ${minimumLaborHours}-hour minimum. Increase the estimate if this job will take longer.`);
       return;
     }
-    if (action === "send" && taxMode === "automatic" && !automaticTaxFresh) {
-      setError("The automatic tax calculation is missing or out of date. Recalculate tax after the latest price/shipping changes.");
-      return;
-    }
     if (taxMode === "exempt" && taxExemptReason.trim().length < 3) {
       setError("Add a reason or exemption-document note for a tax-exempt quote.");
       return;
@@ -401,14 +475,44 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       return;
     }
 
-    const depositCents = centsFromInput(depositAmount);
-    if (paymentTerms === "deposit" && (depositCents <= 0 || depositCents >= total)) {
-      setError("Custom deposit must be greater than $0 and less than the full quote total.");
-      return;
-    }
-
     setSaving(true);
+    let submitTaxCents = effectiveTaxCents;
+    let submitTaxCalculationId = automaticTaxFresh ? taxCalculationId : "";
+    let submitTaxCalculatedAt = automaticTaxFresh ? taxCalculatedAt : "";
+    let submitTaxInputFingerprint = automaticTaxFresh ? taxInputFingerprint : "";
+    let submitTaxBreakdown = automaticTaxFresh ? taxBreakdown : null;
+
     try {
+      if (action === "send" && taxMode === "automatic") {
+        setCalculatingTax(true);
+        setMessage("Checking the latest sales tax before sending…");
+        try {
+          const latestTax = await requestAutomaticTax();
+          submitTaxCents = latestTax.taxCents;
+          submitTaxCalculationId = latestTax.calculationId;
+          submitTaxCalculatedAt = latestTax.calculatedAt;
+          submitTaxInputFingerprint = latestTax.inputFingerprint;
+          submitTaxBreakdown = latestTax.breakdown;
+        } finally {
+          setCalculatingTax(false);
+        }
+      } else if (taxMode === "exempt") {
+        submitTaxCents = 0;
+      }
+
+      const submitTotal = Math.max(
+        0,
+        subtotal
+          + centsFromInput(setupFee)
+          + centsFromInput(shipping)
+          + submitTaxCents
+          - totalDiscount
+      );
+      const depositCents = centsFromInput(depositAmount);
+      if (paymentTerms === "deposit" && (depositCents <= 0 || depositCents >= submitTotal)) {
+        throw new Error("Custom deposit must be greater than $0 and less than the full quote total.");
+      }
+
       const proofPayload = await buildProofPayload();
       const savedMockupWillBeAttached = hasSavedMockup && useSavedMockup;
       if (action === "send" && !savedMockupWillBeAttached && !proofPayload.some((item) => item.assets.length > 0)) {
@@ -430,12 +534,12 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           lineItems,
           setupFeeCents: centsFromInput(setupFee),
           shippingCents: centsFromInput(shipping),
-          taxCents: taxMode === "automatic" && !automaticTaxFresh ? 0 : effectiveTaxCents,
+          taxCents: submitTaxCents,
           taxMode,
-          stripeTaxCalculationId: taxMode === "automatic" && automaticTaxFresh ? taxCalculationId : null,
-          taxCalculatedAt: taxMode === "automatic" && automaticTaxFresh ? taxCalculatedAt : null,
-          taxInputFingerprint: taxMode === "automatic" && automaticTaxFresh ? taxInputFingerprint : null,
-          taxBreakdown: taxMode === "automatic" && automaticTaxFresh ? taxBreakdown : null,
+          stripeTaxCalculationId: taxMode === "automatic" ? submitTaxCalculationId || null : null,
+          taxCalculatedAt: taxMode === "automatic" ? submitTaxCalculatedAt || null : null,
+          taxInputFingerprint: taxMode === "automatic" ? submitTaxInputFingerprint || null : null,
+          taxBreakdown: taxMode === "automatic" ? submitTaxBreakdown : null,
           taxExemptReason: taxMode === "exempt" ? taxExemptReason.trim() : null,
           manualDiscountCents: centsFromInput(manualDiscount),
           discountCode: normalizedDiscountCode,
@@ -560,7 +664,27 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           </section>
 
           <section className="proofBuilderSection">
-            <div className="proofBuilderHeading"><div><span className="eyebrow">Pricing</span><h5>Order quote</h5></div></div>
+            <div className="proofBuilderHeading"><div><span className="eyebrow">Pricing</span><h5>Order quote</h5><p>Your internal job costs automatically create a suggested customer price. Use it as a starting point, then adjust anything you want.</p></div></div>
+
+            <div className="quotePricingSuggestion">
+              <div>
+                <span>Suggested from true job cost</span>
+                <strong>{money(recommendedRevenue)}</strong>
+                <small>{money(internalTotalCost)} estimated cost · {(targetMarginBasisPoints / 100).toFixed(0)}% target margin</small>
+              </div>
+              <div>
+                <span>Suggested merchandise subtotal</span>
+                <strong>{money(recommendedLineSubtotal)}</strong>
+                <small>{quotedPieceCount > 0 ? `${money(recommendedAverageUnitPrice)} average per piece across ${quotedPieceCount} piece${quotedPieceCount === 1 ? "" : "s"}` : "Add quantities to see a per-piece suggestion."}</small>
+              </div>
+              <div className={recommendationGap > 0 ? "suggestionGapNeedsIncrease" : "suggestionGapHealthy"}>
+                <span>Current pricing vs. target</span>
+                <strong>{recommendationGap === 0 ? "On target" : recommendationGap > 0 ? `${money(recommendationGap)} below` : `${money(Math.abs(recommendationGap))} above`}</strong>
+                <small>Pre-tax revenue compared with your current cost/margin target.</small>
+              </div>
+              {!locked ? <button className="btn quoteApplySuggestedPrice" type="button" onClick={applyRecommendedPricing}>Use suggested price</button> : null}
+            </div>
+
             <div className="quoteLineHeader"><span>Description</span><span>Qty</span><span>Unit price</span><span></span></div>
             {lines.map((line, index) => (
               <div className="quoteLine" key={index}>
