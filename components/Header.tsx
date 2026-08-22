@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,24 +14,34 @@ const links = [
 export function Header() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const leavingAdmin = pathname?.startsWith("/admin") ?? false;
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
+  const brand = (
+    <img
+      className="brandLogo"
+      src="/moore-made-header-logo.png"
+      alt="Moore Made"
+      width={190}
+      height={63}
+    />
+  );
+
   return (
     <header className="siteHeader">
       <div className="shell headerInner">
-        <Link className="brand" href="/" aria-label="Moore Made home">
-          <Image
-            className="brandLogo"
-            src="/moore-made-header-logo.png"
-            alt="Moore Made"
-            width={190}
-            height={63}
-            priority
-          />
-        </Link>
+        {leavingAdmin ? (
+          <a className="brand" href="/" aria-label="Moore Made home">
+            {brand}
+          </a>
+        ) : (
+          <Link className="brand" href="/" aria-label="Moore Made home">
+            {brand}
+          </Link>
+        )}
 
         <button
           className="menuButton"
@@ -52,15 +61,25 @@ export function Header() {
           className={`nav ${open ? "navOpen" : ""}`}
           aria-label="Main navigation"
         >
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={pathname === link.href ? "navActive" : undefined}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) =>
+            leavingAdmin ? (
+              <a
+                key={link.href}
+                href={link.href}
+                className={pathname === link.href ? "navActive" : undefined}
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={pathname === link.href ? "navActive" : undefined}
+              >
+                {link.label}
+              </Link>
+            )
+          )}
         </nav>
       </div>
     </header>

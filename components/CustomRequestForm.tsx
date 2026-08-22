@@ -13,6 +13,7 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [openSection, setOpenSection] = useState<number | null>(1);
+  const [delivery, setDelivery] = useState("");
   const [success, setSuccess] = useState<{ number: number | string; uploadWarning?: boolean; emailWarning?: boolean } | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -48,6 +49,13 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
         setOpenSection(2);
         throw new Error("Quantity must be a whole number between 1 and 1,000,000.");
       }
+      if (String(formData.get("delivery") || "") === "Shipping") {
+        const requiredAddress = ["shippingLine1", "shippingCity", "shippingState", "shippingPostalCode"];
+        if (requiredAddress.some((key) => !String(formData.get(key) || "").trim())) {
+          setOpenSection(3);
+          throw new Error("Please complete the shipping address so we can calculate shipping and sales tax accurately.");
+        }
+      }
 
       if (files.length > MAX_ARTWORK_FILES) {
         setOpenSection(3);
@@ -76,7 +84,17 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
         artworkInstructions: formData.get("artworkInstructions"),
         deadline: formData.get("deadline"),
         delivery: formData.get("delivery"),
+        shippingAddress: String(formData.get("delivery") || "") === "Shipping" ? {
+          name: name,
+          line1: String(formData.get("shippingLine1") || "").trim(),
+          line2: String(formData.get("shippingLine2") || "").trim(),
+          city: String(formData.get("shippingCity") || "").trim(),
+          state: String(formData.get("shippingState") || "").trim().toUpperCase(),
+          postalCode: String(formData.get("shippingPostalCode") || "").trim(),
+          country: "US",
+        } : null,
         notes: formData.get("notes"),
+        discountCode: formData.get("discountCode"),
         website: formData.get("website"),
         files: files.map((file) => ({
           name: file.name,
@@ -142,6 +160,7 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
       }
 
       form.reset();
+      setDelivery("");
       setSuccess({ number: result.requestNumber, uploadWarning, emailWarning: Boolean(result.emailWarning) });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (submissionError) {
@@ -268,10 +287,16 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
 
             <div className="twoCol orderTimingGrid">
               <div className="field orderTimingField"><label htmlFor="deadline">Needed by <span className="optionalLabel">Optional</span></label><input id="deadline" name="deadline" type="date" /></div>
-              <div className="field orderTimingField"><label htmlFor="delivery">Pickup or shipping?</label><select id="delivery" name="delivery" defaultValue=""><option value="">Select one</option><option>Local pickup</option><option>Shipping</option><option>Not sure yet</option></select></div>
+              <div className="field orderTimingField"><label htmlFor="delivery">Pickup or shipping?</label><select id="delivery" name="delivery" value={delivery} onChange={(e) => setDelivery(e.target.value)}><option value="">Select one</option><option>Local pickup</option><option>Shipping</option><option>Not sure yet</option></select></div>
             </div>
+            {delivery === "Shipping" ? <div className="shippingAddressPanel">
+              <strong>Shipping address</strong>
+              <div className="twoCol"><div className="field"><label htmlFor="shippingLine1">Street *</label><input id="shippingLine1" name="shippingLine1" autoComplete="shipping address-line1" /></div><div className="field"><label htmlFor="shippingLine2">Apt / Suite</label><input id="shippingLine2" name="shippingLine2" autoComplete="shipping address-line2" /></div></div>
+              <div className="three"><div className="field"><label htmlFor="shippingCity">City *</label><input id="shippingCity" name="shippingCity" autoComplete="shipping address-level2" /></div><div className="field"><label htmlFor="shippingState">State *</label><input id="shippingState" name="shippingState" maxLength={2} autoComplete="shipping address-level1" /></div><div className="field"><label htmlFor="shippingPostalCode">ZIP *</label><input id="shippingPostalCode" name="shippingPostalCode" autoComplete="shipping postal-code" /></div></div>
+              <span className="fieldHelp">Used only for fulfillment and accurate sales-tax/shipping calculations.</span>
+            </div> : null}
             <span className="fieldHelp orderTimingHelp">Needed-by dates help us plan but are not guaranteed. Production is typically about a week or longer; shipping adds transit time.</span>
-            <div className="field"><label htmlFor="notes">Anything else? <span className="optionalLabel">Optional</span></label><textarea id="notes" name="notes" maxLength={5000} placeholder="Budget, inspiration, special packaging, names/numbers, event details, or anything else we should know." /></div>
+            <div className="twoCol requestFinalDetails"><div className="field"><label htmlFor="notes">Anything else? <span className="optionalLabel">Optional</span></label><textarea id="notes" name="notes" maxLength={5000} placeholder="Budget, inspiration, special packaging, names/numbers, event details, or anything else we should know." /></div><div className="field"><label htmlFor="discountCode">Discount code <span className="optionalLabel">Optional</span></label><input id="discountCode" name="discountCode" maxLength={80} placeholder="Example: FAMILY10" autoCapitalize="characters" /><span className="fieldHelp">We&apos;ll verify the code when preparing your quote and show any approved discount in the final total.</span></div></div>
           </div>
         </section>
       </div>

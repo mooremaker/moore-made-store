@@ -19,7 +19,7 @@ export default async function Home() {
           </div>
           <div className="heroActionsRow">
             <div className="actions heroActions"><Link className="btn" href="/custom-orders">Place a custom request</Link><Link className="btn secondary" href="/shop">Visit the shop</Link></div>
-            <div className="heroStatus heroStatusPill"><span className="statusDot" aria-hidden="true" />Online shop coming soon — custom requests are open now.</div>
+            <div className="heroStatus heroStatusPill"><span className="statusDot" aria-hidden="true" />Shop is open — customize a product or start with an idea.</div>
           </div>
         </div>
       </section>

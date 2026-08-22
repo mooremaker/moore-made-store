@@ -43,9 +43,9 @@ export default async function ReceiptPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data: payment } = await supabase
     .from("payments")
-    .select("id,request_id,quote_id,amount_cents,status,payment_method,manual_reference,paid_at,receipt_number,receipt_token")
+    .select("id,request_id,quote_id,amount_cents,status,payment_method,manual_reference,payer_name,payer_email,paid_at,receipt_number,receipt_token,voided_at,void_reason")
     .eq("receipt_token", token)
-    .eq("status", "paid")
+    .in("status", ["paid", "voided"])
     .maybeSingle();
   if (!payment) notFound();
 
@@ -74,10 +74,11 @@ export default async function ReceiptPage({ params }: Props) {
       <article className="receiptPaper">
         <header className="receiptHeader">
           <Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="receiptLogo" priority />
-          <div className="receiptTitle"><div className="eyebrow">Payment receipt</div><h1>{receiptLabel(payment.receipt_number)}</h1><p>{dateTime(payment.paid_at)}</p></div>
+          <div className="receiptTitle"><div className="eyebrow">{payment.status === "voided" ? "Corrected payment record" : "Payment receipt"}</div><h1>{receiptLabel(payment.receipt_number)}</h1><p>{dateTime(payment.paid_at)}</p></div>
         </header>
 
         <div className="receiptRule" />
+        {payment.status === "voided" ? <div className="receiptVoidNotice"><strong>VOIDED / CORRECTED</strong><p>This payment record is no longer counted toward the order balance.{payment.void_reason ? ` Reason: ${payment.void_reason}` : ""}</p></div> : null}
 
         <section className="receiptCustomerGrid">
           <div><span>Customer</span><strong>{order.customer_name}</strong></div>
@@ -117,6 +118,7 @@ export default async function ReceiptPage({ params }: Props) {
         <section className="receiptPaymentBox">
           <div><span>This payment</span><strong>{money(payment.amount_cents)}</strong></div>
           <div><span>Payment method</span><strong>{paymentMethodLabel(payment.payment_method)}</strong></div>
+          {payment.payer_name ? <div><span>Paid by</span><strong>{payment.payer_name}</strong></div> : null}
           {payment.manual_reference ? <div><span>Reference</span><strong>{payment.manual_reference}</strong></div> : null}
           <div><span>Payment date</span><strong>{dateTime(payment.paid_at)}</strong></div>
         </section>

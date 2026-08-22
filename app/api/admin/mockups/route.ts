@@ -1,22 +1,78 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
-import { emptyMockupDocument, type MockupAssetRef, type MockupDocument, type MockupLayer, type MockupView } from "@/lib/mockup-types";
+import {
+  emptyMockupDocument,
+  type MockupAssetBucket,
+  type MockupAssetRef,
+  type MockupCustomerIntent,
+  type MockupDocument,
+  type MockupLayer,
+  type MockupTemplateRef,
+  type MockupView,
+} from "@/lib/mockup-types";
 import { getSupabaseAdmin, MOCKUP_STUDIO_BUCKET, QUOTE_PROOF_BUCKET } from "@/lib/supabase-admin";
+
+const ALLOWED_ASSET_BUCKETS = new Set<MockupAssetBucket>([
+  "mockup-studio-files",
+  "custom-request-files",
+  "quote-proof-files",
+]);
 
 function text(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
+
 function finite(value: unknown, fallback: number, min: number, max: number) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 }
+
 function asset(value: unknown): MockupAssetRef | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
   const path = text(row.path, 1000);
   if (!path) return null;
-  return { path, originalName: text(row.originalName, 300) || path.split("/").pop() || "Image" };
+  const bucketText = text(row.bucket, 80) as MockupAssetBucket;
+  return {
+    path,
+    originalName: text(row.originalName, 300) || path.split("/").pop() || "Image",
+    ...(ALLOWED_ASSET_BUCKETS.has(bucketText) ? { bucket: bucketText } : {}),
+  };
 }
+
+function customerIntent(value: unknown): MockupCustomerIntent | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const rawSource = text(row.source, 30);
+  const source: MockupCustomerIntent["source"] = rawSource === "upload" || rawSource === "idea" ? rawSource : "example";
+  return {
+    enabled: Boolean(row.enabled),
+    source,
+    placement: text(row.placement, 100) || "custom",
+    placementLabel: text(row.placementLabel, 160) || undefined,
+    idea: text(row.idea, 3000) || undefined,
+    artworkFileName: text(row.artworkFileName, 300) || undefined,
+    x: finite(row.x, 50, -100, 200),
+    y: finite(row.y, 50, -100, 200),
+    width: finite(row.width, 30, 1, 300),
+    rotation: finite(row.rotation, 0, -360, 360),
+  };
+}
+
+function templateRef(value: unknown): MockupTemplateRef | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const result: MockupTemplateRef = {
+    productSlug: text(row.productSlug, 160) || undefined,
+    productName: text(row.productName, 300) || undefined,
+    previewKind: text(row.previewKind, 80) || undefined,
+    colorName: text(row.colorName, 120) || undefined,
+    colorValue: text(row.colorValue, 40) || undefined,
+    viewKey: text(row.viewKey, 80) || undefined,
+  };
+  return Object.values(result).some(Boolean) ? result : null;
+}
+
 function normalizeDocument(value: unknown): MockupDocument {
   if (!value || typeof value !== "object") return emptyMockupDocument();
   const doc = value as Record<string, unknown>;
@@ -24,38 +80,53 @@ function normalizeDocument(value: unknown): MockupDocument {
   const views: MockupView[] = rawViews.map((raw, viewIndex) => {
     const view = (raw || {}) as Record<string, unknown>;
     const id = text(view.id, 100) || `view-${viewIndex + 1}`;
-    const layers = Array.isArray(view.layers) ? view.layers.slice(0, 100).map((rawLayer, layerIndex) => {
-      const layer = (rawLayer || {}) as Record<string, unknown>;
-      const layerAsset = asset(layer.asset);
-      if (!layerAsset) return null;
-      return {
-        id: text(layer.id, 100) || `${id}-layer-${layerIndex + 1}`,
-        asset: layerAsset,
-        x: finite(layer.x, 50, -100, 200),
-        y: finite(layer.y, 50, -100, 200),
-        width: finite(layer.width, 30, 1, 300),
-        rotation: finite(layer.rotation, 0, -360, 360),
-        opacity: finite(layer.opacity, 1, 0.05, 1),
-        zIndex: Math.max(0, Math.floor(finite(layer.zIndex, layerIndex + 1, 0, 1000))),
-        locked: Boolean(layer.locked),
-      } satisfies MockupLayer;
-    }).filter(Boolean) as MockupLayer[] : [];
+    const layers = Array.isArray(view.layers)
+      ? view.layers.slice(0, 100).map((rawLayer, layerIndex) => {
+          const layer = (rawLayer || {}) as Record<string, unknown>;
+          const layerAsset = asset(layer.asset);
+          if (!layerAsset) return null;
+          return {
+            id: text(layer.id, 100) || `${id}-layer-${layerIndex + 1}`,
+            asset: layerAsset,
+            x: finite(layer.x, 50, -100, 200),
+            y: finite(layer.y, 50, -100, 200),
+            width: finite(layer.width, 30, 1, 300),
+            rotation: finite(layer.rotation, 0, -360, 360),
+            opacity: finite(layer.opacity, 1, 0.05, 1),
+            zIndex: Math.max(0, Math.floor(finite(layer.zIndex, layerIndex + 1, 0, 1000))),
+            locked: Boolean(layer.locked),
+          } satisfies MockupLayer;
+        }).filter(Boolean) as MockupLayer[]
+      : [];
     return {
       id,
       name: text(view.name, 100) || `View ${viewIndex + 1}`,
       base: asset(view.base),
       layers,
       exportAsset: asset(view.exportAsset),
+      customerIntent: customerIntent(view.customerIntent),
+      template: templateRef(view.template),
     };
   });
   const safeViews = views.length ? views : emptyMockupDocument().views;
-  return { version: 1, views: safeViews, activeViewId: text(doc.activeViewId, 100) || safeViews[0]?.id || null };
+  const source = text(doc.source, 30) === "customer" ? "customer" : "admin";
+  return {
+    version: 1,
+    source,
+    productSlug: text(doc.productSlug, 160) || null,
+    productName: text(doc.productName, 300) || null,
+    colorName: text(doc.colorName, 120) || null,
+    previewKind: text(doc.previewKind, 80) || null,
+    views: safeViews,
+    activeViewId: text(doc.activeViewId, 100) || safeViews[0]?.id || null,
+  };
 }
 
 async function signedDocument(document: MockupDocument) {
   const supabase = getSupabaseAdmin();
-  const sign = async (ref: MockupAssetRef | null | undefined, bucket: string) => {
+  const sign = async (ref: MockupAssetRef | null | undefined, fallbackBucket: string) => {
     if (!ref?.path) return ref || null;
+    const bucket = ref.bucket || fallbackBucket;
     const { data } = await supabase.storage.from(bucket).createSignedUrl(ref.path, 3600);
     return { ...ref, url: data?.signedUrl || null };
   };

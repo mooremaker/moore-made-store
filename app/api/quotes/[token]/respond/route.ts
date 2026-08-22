@@ -3,6 +3,7 @@ import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { money } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recalculateOrderPayment } from "@/lib/payment-server";
 
 type RouteProps = { params: Promise<{ token: string }> };
 
@@ -38,7 +39,7 @@ export async function POST(request: Request, { params }: RouteProps) {
     const supabase = getSupabaseAdmin();
     const { data: quote, error } = await supabase
       .from("quotes")
-      .select("id,request_id,status,total_cents,valid_until,proof_paths,proof_version,custom_requests(request_number,customer_name,email,product)")
+      .select("id,request_id,status,total_cents,valid_until,proof_paths,proof_version,revision_number,discount_code_id,promo_discount_cents,custom_requests(request_number,customer_name,email,product)")
       .eq("public_token", token)
       .single();
 
@@ -131,10 +132,28 @@ export async function POST(request: Request, { params }: RouteProps) {
 
     if (updateError) return NextResponse.json({ error: "Could not record your response." }, { status: 500 });
 
+    await supabase.from("quote_revisions").update({ status: response, responded_at: respondedAt }).eq("quote_id", quote.id).eq("revision_number", Math.max(1, Number(quote.revision_number || 1)));
+
     await supabase
       .from("custom_requests")
       .update({ status: response === "approved" ? "approved" : "reviewing" })
       .eq("id", quote.request_id);
+
+    if (response === "approved" && quote.discount_code_id && Number(quote.promo_discount_cents || 0) > 0) {
+      const { error: redemptionError } = await supabase.from("discount_redemptions").upsert({
+        discount_code_id: quote.discount_code_id,
+        quote_id: quote.id,
+        request_id: quote.request_id,
+        customer_email: requestRow.email.toLowerCase(),
+        discount_cents: Number(quote.promo_discount_cents || 0),
+        redeemed_at: respondedAt,
+      }, { onConflict: "discount_code_id,quote_id" });
+      if (redemptionError) console.error("Discount redemption save failed", redemptionError);
+    }
+
+    if (response === "approved") {
+      try { await recalculateOrderPayment(quote.request_id, quote.id); } catch (paymentError) { console.error("Revised quote payment recalculation failed", paymentError); }
+    }
 
     const adminEmail = process.env.MOORE_MADE_ADMIN_EMAIL;
     if (adminEmail) {

@@ -11,7 +11,7 @@ export type PaymentRow = {
   payment_kind: "full" | "deposit" | "balance";
   amount_cents: number;
   currency: string;
-  status: "pending" | "paid" | "failed" | "refunded";
+  status: "pending" | "paid" | "failed" | "refunded" | "voided";
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   paid_at: string | null;

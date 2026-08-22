@@ -1,10 +1,52 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { products } from "@/lib/catalog";
+import { CustomerProductCustomizer } from "@/components/shop/CustomerProductCustomizer";
+import { ProductVisual } from "@/components/shop/ProductVisual";
+import { getCurrentUser } from "@/lib/auth";
+import { getProduct } from "@/lib/catalog";
+import { getShopMockupTemplates } from "@/lib/mockup-template-server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = products.find((item) => item.slug === slug);
+  const product = getProduct(slug);
   if (!product) notFound();
 
-  return <div className="shell"><section className="pageHero"><span className="badge">{product.category}</span><h1>{product.name}</h1><p className="lead">{product.description}</p></section><div className="twoCol"><div className="heroCard"><div className="productImage" style={{aspectRatio:"4/3"}}>Product photography / preview</div><p className="muted">We’ll replace this placeholder with your real product photos or mockups.</p></div><div className="card"><h2>Customize</h2><form className="form"><div className="field"><label>Quantity</label><input type="number" min="1" defaultValue="1" /></div><div className="field"><label>Color / material / style</label><select defaultValue=""><option value="" disabled>Choose an option</option><option>Option A</option><option>Option B</option></select></div><div className="field"><label>Upload artwork</label><input type="file" accept="image/*,.pdf,.svg" /></div><div className="field"><label>Customization instructions</label><textarea placeholder="Example: Small logo on the front left chest and large logo centered on the back." /></div><button type="button" className="btn">Add to cart — coming next</button><p className="muted">{product.startingPrice ? `Base pricing starts around $${product.startingPrice}. Final pricing logic will come from the database.` : "This item will use the quote workflow."}</p></form></div></div></div>;
+  const mockupTemplates = await getShopMockupTemplates();
+  const mockupSettings = mockupTemplates[product.slug];
+
+  const user = await getCurrentUser();
+  let profile: { full_name: string | null; phone: string | null } | null = null;
+  if (user) {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.from("profiles").select("full_name,phone").eq("id", user.id).maybeSingle();
+    profile = data;
+  }
+
+  return (
+    <div className="shell productCustomizePage">
+      <section className="pageHero productCustomizeHero">
+        <div className="productCustomizeBreadcrumb"><Link href="/shop">Shop</Link><span>→</span><span>{product.category}</span></div>
+        <div className="productCustomizeHeroGrid">
+          <div>
+            <span className="badge">{product.category}</span>
+            <h1>{product.name}</h1>
+            <p className="lead">{product.description}</p>
+            <div className="productCustomizeHeroNotes"><span>Upload your artwork</span><b>or</b><span>Bring us an idea</span><b>·</b><span>Front/back placement control</span></div>
+          </div>
+          <ProductVisual kind={product.previewKind} color={product.colors[0]?.value || "#e6e0d8"} label="Example — replace this with yours" example examplePlacement={product.catalogPreview} mockupSettings={mockupSettings} />
+        </div>
+      </section>
+
+      {!user ? <div className="productAccountPrompt"><div><strong>Want this connected to your Moore Made account?</strong><span>You can customize as a guest, or sign in first so the request is attached automatically.</span></div><Link className="btn secondary" href={`/account/login?next=/products/${product.slug}`}>Sign in</Link></div> : <div className="productAccountPrompt isSignedIn"><div><strong>Signed in as {user.email}</strong><span>This customization will be attached to your account automatically.</span></div></div>}
+
+      <CustomerProductCustomizer
+        product={product}
+        initialName={profile?.full_name ?? ""}
+        initialEmail={user?.email ?? ""}
+        initialPhone={profile?.phone ?? ""}
+        mockupSettings={mockupSettings}
+      />
+    </div>
+  );
 }

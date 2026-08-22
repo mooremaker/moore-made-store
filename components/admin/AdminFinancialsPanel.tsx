@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { AdminDiscountCodesPanel } from "@/components/admin/AdminDiscountCodesPanel";
+import type { DiscountCodeRecord } from "@/lib/discount-types";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import type { AdminUserOption } from "@/lib/message-types";
 import {
@@ -37,10 +39,12 @@ type Props = {
   fundingReady: boolean;
   goalsReady: boolean;
   auditReady: boolean;
+  discountCodes: DiscountCodeRecord[];
+  discountsReady: boolean;
 };
 
 type QuickForm = "expense" | "funding" | "goal" | null;
-type FinanceView = "overview" | "goals" | "transactions" | "funding" | "tax";
+type FinanceView = "overview" | "goals" | "transactions" | "funding" | "discounts" | "tax";
 type GoalFundingAction = { goalId: string; direction: "allocate" | "withdraw" } | null;
 
 function localDate(value: string | null) {
@@ -165,7 +169,7 @@ function FinanceTrendChart({ rows }: { rows: Array<{ label: string; revenue: num
   );
 }
 
-export function AdminFinancialsPanel({ orders, quotes, payments, expenses, funding, goals, financeAudit, adminUsers, fundingReady, goalsReady, auditReady }: Props) {
+export function AdminFinancialsPanel({ orders, quotes, payments, expenses, funding, goals, financeAudit, adminUsers, fundingReady, goalsReady, auditReady, discountCodes, discountsReady }: Props) {
   const router = useRouter();
   const [view, setView] = useState<FinanceView>("overview");
   const [quickForm, setQuickForm] = useState<QuickForm>(null);
@@ -225,7 +229,10 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
     }, 0);
     const fundingIn = activeFunding.filter((entry) => fundingDirection(entry.entry_type) === "in").reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0);
     const operatingNet = receivedAll - expensesAll;
-    return { receivedAll, receivedMonth, expensesAll, expensesMonth, approvedValue, outstanding, netMonth: receivedMonth - expensesMonth, fundingIn, operatingNet };
+    const approvedQuotes = quotes.filter((quote) => quote.status === "approved" && activeOrderIds.has(quote.request_id));
+    const approvedEstimatedCost = approvedQuotes.reduce((sum, quote) => sum + Number(quote.internal_total_cost_cents || 0), 0);
+    const approvedEstimatedProfit = approvedQuotes.reduce((sum, quote) => sum + Number(quote.estimated_profit_cents || 0), 0);
+    return { receivedAll, receivedMonth, expensesAll, expensesMonth, approvedValue, outstanding, netMonth: receivedMonth - expensesMonth, fundingIn, operatingNet, approvedEstimatedCost, approvedEstimatedProfit };
   }, [paidPayments, activeExpenses, quotes, orders, quoteByRequest, monthKey, activeFunding]);
 
   const monthlyTrend = useMemo(() => sixMonthKeys().map(({ key, label }) => {
@@ -471,6 +478,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
         <button type="button" className={view === "goals" ? "active" : ""} onClick={() => { setView("goals"); setQuickForm(null); }}>Goals {goalTotals.open ? <span>{goalTotals.open}</span> : null}</button>
         <button type="button" className={view === "transactions" ? "active" : ""} onClick={() => { setView("transactions"); setQuickForm(null); }}>Transactions</button>
         <button type="button" className={view === "funding" ? "active" : ""} onClick={() => { setView("funding"); setQuickForm(null); }}>Funding</button>
+        <button type="button" className={view === "discounts" ? "active" : ""} onClick={() => { setView("discounts"); setQuickForm(null); }}>Discounts</button>
         <button type="button" className={view === "tax" ? "active" : ""} onClick={() => { setView("tax"); setQuickForm(null); }}>Tax & audit</button>
       </div>
 
@@ -521,6 +529,8 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
         </form>
       </section> : null}
 
+      {view === "discounts" ? <AdminDiscountCodesPanel codes={discountCodes} ready={discountsReady} /> : null}
+
       {view === "overview" ? <>
         <section className="financeMetricSummary" aria-label="Financial summary">
           <div className="financeMetricGroup">
@@ -566,6 +576,16 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
                 <span className="financeMetricLabel">All-time operating net</span>
                 <strong>{money(totals.operatingNet)}</strong>
                 <small>All recorded customer cash minus expenses</small>
+              </article>
+              <article className="financeMetric">
+                <span className="financeMetricLabel">Approved order profit</span>
+                <strong>{money(totals.approvedEstimatedProfit)}</strong>
+                <small>Estimated profit from approved quotes using their internal job costs</small>
+              </article>
+              <article className="financeMetric">
+                <span className="financeMetricLabel">Approved job costs</span>
+                <strong>{money(totals.approvedEstimatedCost)}</strong>
+                <small>Supplies, labor, shipping, fees, and other costs entered on approved quotes</small>
               </article>
               {goalsReady ? <article className="financeMetric">
                 <span className="financeMetricLabel">Goal funding remaining</span>

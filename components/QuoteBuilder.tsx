@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { discountAmountCents, normalizeDiscountCode, type DiscountCodeRecord } from "@/lib/discount-types";
+import { compactSizeSummary, orderItemQuantity, type ShippingAddress, type StructuredOrderItem } from "@/lib/order-types";
+import { recommendedRevenueForMargin, type BusinessSettingsRecord, type ProductPricingRecord } from "@/lib/pricing-types";
 import {
   money,
   QUOTE_STATUS_LABELS,
@@ -21,6 +24,14 @@ type Props = {
   product: string;
   quantity: number;
   existingQuote?: QuoteRecord | null;
+  discountCodes?: DiscountCodeRecord[];
+  requestedDiscountCode?: string | null;
+  amountPaidCents?: number;
+  orderItems?: StructuredOrderItem[];
+  delivery?: string | null;
+  shippingAddress?: ShippingAddress | null;
+  pricingProfiles?: ProductPricingRecord[];
+  businessSettings?: BusinessSettingsRecord | null;
 };
 
 type EditableLine = { description: string; quantity: string; unitPrice: string };
@@ -52,10 +63,31 @@ function fileLabel(asset: QuoteProofAsset, index: number) {
   return asset.originalName || asset.path.split("/").pop() || `Proof ${index + 1}`;
 }
 
-export function QuoteBuilder({ requestId, requestNumber, product, quantity, existingQuote }: Props) {
+export function QuoteBuilder({ requestId, requestNumber, product, quantity, existingQuote, discountCodes = [], requestedDiscountCode = null, amountPaidCents = 0, orderItems = [], delivery = null, shippingAddress = null, pricingProfiles = [], businessSettings = null }: Props) {
   const router = useRouter();
+  const minimumLaborHours = Math.max(1, Number(businessSettings?.minimum_labor_hours || 1));
+  const pricingBySlug = new Map(pricingProfiles.filter((row) => row.active).map((row) => [row.product_slug, row]));
+  const pricedItems = orderItems.filter((item) => orderItemQuantity(item) > 0);
+  const pricingDefaults = pricedItems.reduce((acc, item) => {
+    const profile = pricingBySlug.get(item.productSlug);
+    const qty = orderItemQuantity(item);
+    if (!profile || qty <= 0) return acc;
+    acc.supply += qty * Number(profile.blank_cost_cents || 0);
+    acc.print += qty * Number(profile.print_cost_cents || 0);
+    acc.packaging += qty * Number(profile.packaging_cost_cents || 0);
+    acc.laborHours += Math.max(minimumLaborHours, Number(profile.default_labor_hours || minimumLaborHours));
+    if (acc.targetMargin === null) acc.targetMargin = Number(profile.target_margin_basis_points || 5000);
+    return acc;
+  }, { supply: 0, print: 0, packaging: 0, laborHours: 0, targetMargin: null as number | null });
+  if (pricingDefaults.laborHours <= 0) pricingDefaults.laborHours = minimumLaborHours;
+  const defaultLaborRateCents = Math.max(0, Number(businessSettings?.default_labor_rate_cents || 1000));
+  const targetMarginBasisPoints = pricingDefaults.targetMargin ?? 5000;
+  const itemTaxCodes = Array.from(new Set(pricedItems.map((item) => pricingBySlug.get(item.productSlug)?.tax_code).filter((value): value is string => Boolean(value))));
+  const quoteTaxCode = itemTaxCodes.length === 1 ? itemTaxCodes[0] : businessSettings?.default_tax_code || "txcd_99999999";
   const waitingOnCustomer = existingQuote?.status === "sent";
-  const locked = existingQuote?.status === "approved" || waitingOnCustomer;
+  const approvedQuote = existingQuote?.status === "approved";
+  const [revisionMode, setRevisionMode] = useState(false);
+  const locked = waitingOnCustomer || (approvedQuote && !revisionMode);
   const [open, setOpen] = useState(Boolean(existingQuote));
   const [lines, setLines] = useState<EditableLine[]>(
     existingQuote?.line_items?.length
@@ -64,12 +96,36 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           quantity: String(item.quantity),
           unitPrice: dollars(item.unitPriceCents),
         }))
-      : [{ description: product, quantity: String(quantity || 1), unitPrice: "" }]
+      : pricedItems.length
+        ? pricedItems.map((item) => ({
+            description: `${item.productName}${item.colorName ? ` — ${item.colorName}` : ""}${compactSizeSummary(item) ? ` (${compactSizeSummary(item)})` : ""}`,
+            quantity: String(orderItemQuantity(item)),
+            unitPrice: "",
+          }))
+        : [{ description: product, quantity: String(quantity || 1), unitPrice: "" }]
   );
   const [setupFee, setSetupFee] = useState(dollars(existingQuote?.setup_fee_cents));
   const [shipping, setShipping] = useState(dollars(existingQuote?.shipping_cents));
   const [tax, setTax] = useState(dollars(existingQuote?.tax_cents));
-  const [discount, setDiscount] = useState(dollars(existingQuote?.discount_cents));
+  const [taxMode, setTaxMode] = useState<"automatic" | "manual" | "exempt">(existingQuote?.tax_mode || "automatic");
+  const [taxCalculationId, setTaxCalculationId] = useState(existingQuote?.stripe_tax_calculation_id || "");
+  const [taxCalculatedAt, setTaxCalculatedAt] = useState(existingQuote?.tax_calculated_at || "");
+  const [taxInputFingerprint, setTaxInputFingerprint] = useState(existingQuote?.tax_input_fingerprint || "");
+  const [taxExemptReason, setTaxExemptReason] = useState(existingQuote?.tax_exempt_reason || "");
+  const [taxBreakdown, setTaxBreakdown] = useState<Record<string, unknown> | null>(existingQuote?.tax_breakdown || null);
+  const [taxLocation, setTaxLocation] = useState<string>("");
+  const [calculatingTax, setCalculatingTax] = useState(false);
+  const [manualDiscount, setManualDiscount] = useState(dollars(existingQuote?.manual_discount_cents ?? existingQuote?.discount_cents));
+  const [discountCode, setDiscountCode] = useState(existingQuote?.applied_discount_code || requestedDiscountCode || "");
+  const [supplyCost, setSupplyCost] = useState(existingQuote ? dollars(existingQuote.internal_supply_cost_cents) : dollars(pricingDefaults.supply));
+  const [printCost, setPrintCost] = useState(existingQuote ? dollars(existingQuote.internal_print_cost_cents) : dollars(pricingDefaults.print));
+  const [packagingCost, setPackagingCost] = useState(existingQuote ? dollars(existingQuote.internal_packaging_cost_cents) : dollars(pricingDefaults.packaging));
+  const [shippingCost, setShippingCost] = useState(dollars(existingQuote?.internal_shipping_cost_cents));
+  const [paymentFee, setPaymentFee] = useState(dollars(existingQuote?.internal_payment_fee_cents));
+  const [otherCost, setOtherCost] = useState(dollars(existingQuote?.internal_other_cost_cents));
+  const [laborHours, setLaborHours] = useState(existingQuote?.labor_hours && existingQuote.labor_hours > 0 ? String(existingQuote.labor_hours) : String(pricingDefaults.laborHours));
+  const [laborRate, setLaborRate] = useState(existingQuote?.labor_rate_cents ? (existingQuote.labor_rate_cents / 100).toFixed(2) : (defaultLaborRateCents / 100).toFixed(2));
+  const [revisionReason, setRevisionReason] = useState("");
   const [notes, setNotes] = useState(existingQuote?.notes ?? "");
   const [validUntil, setValidUntil] = useState(existingQuote?.valid_until ?? "");
   const [paymentTerms, setPaymentTerms] = useState<"full" | "deposit">(existingQuote?.payment_terms === "deposit" ? "deposit" : "full");
@@ -92,6 +148,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const [error, setError] = useState("");
   const [importingMockups, setImportingMockups] = useState(false);
   const [mockupImportChecked, setMockupImportChecked] = useState(Boolean(existingQuote));
+  const [hasSavedMockup, setHasSavedMockup] = useState(Boolean(existingQuote?.mockup_snapshot));
+  const [useSavedMockup, setUseSavedMockup] = useState(Boolean(existingQuote?.mockup_snapshot) || !existingQuote);
 
   useEffect(() => {
     if (!existingQuote?.proofItems?.length) return;
@@ -115,7 +173,30 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   );
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
-  const total = Math.max(0, subtotal + centsFromInput(setupFee) + centsFromInput(shipping) + centsFromInput(tax) - centsFromInput(discount));
+  const eligibleDiscountSubtotal = subtotal + centsFromInput(setupFee);
+  const normalizedDiscountCode = normalizeDiscountCode(discountCode);
+  const selectedDiscountCode = discountCodes.find((code) => normalizeDiscountCode(code.code) === normalizedDiscountCode) || null;
+  const promoDiscount = selectedDiscountCode ? discountAmountCents(selectedDiscountCode, eligibleDiscountSubtotal) : 0;
+  const totalDiscount = Math.min(eligibleDiscountSubtotal, centsFromInput(manualDiscount) + promoDiscount);
+  const merchandiseAfterDiscountCents = Math.max(0, subtotal + centsFromInput(setupFee) - totalDiscount);
+  const currentTaxInputFingerprint = JSON.stringify({
+    merchandiseAfterDiscountCents,
+    shippingCents: centsFromInput(shipping),
+    delivery: delivery || "",
+    shippingAddress: shippingAddress || null,
+  });
+  const automaticTaxFresh = taxMode === "automatic" && Boolean(taxCalculationId) && taxInputFingerprint === currentTaxInputFingerprint;
+  const effectiveTaxCents = taxMode === "exempt" ? 0 : centsFromInput(tax);
+  const total = Math.max(0, subtotal + centsFromInput(setupFee) + centsFromInput(shipping) + effectiveTaxCents - totalDiscount);
+  const safeLaborHours = Math.max(minimumLaborHours, Number(laborHours) || minimumLaborHours);
+  const laborCost = Math.round(safeLaborHours * centsFromInput(laborRate));
+  const internalTotalCost = centsFromInput(supplyCost) + centsFromInput(printCost) + centsFromInput(packagingCost) + centsFromInput(shippingCost) + centsFromInput(paymentFee) + centsFromInput(otherCost) + laborCost;
+  const revenueBeforeTax = Math.max(0, subtotal + centsFromInput(setupFee) + centsFromInput(shipping) - totalDiscount);
+  const estimatedProfit = revenueBeforeTax - internalTotalCost;
+  const marginPercent = revenueBeforeTax > 0 ? (estimatedProfit / revenueBeforeTax) * 100 : 0;
+  const recommendedRevenue = recommendedRevenueForMargin(internalTotalCost, targetMarginBasisPoints);
+  const remainingAfterPayments = Math.max(0, total - amountPaidCents);
+  const overpaidCents = Math.max(0, amountPaidCents - total);
 
   function updateLine(index: number, field: keyof EditableLine, value: string) {
     setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
@@ -200,9 +281,12 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
         if (silent && (response.status === 503 || response.status === 404)) return;
         throw new Error(result.error || "Could not load Mockup Studio exports.");
       }
+      const hasDocument = Boolean(result?.document?.views?.some((view: { customerIntent?: { enabled?: boolean }; layers?: unknown[]; base?: unknown; exportAsset?: unknown }) => view?.customerIntent?.enabled || (Array.isArray(view?.layers) && view.layers.length) || view?.base || view?.exportAsset));
+      setHasSavedMockup(hasDocument);
+      if (hasDocument && !existingQuote) setUseSavedMockup(true);
       const exports = Array.isArray(result.proofExports) ? result.proofExports : [];
       if (!exports.length) {
-        if (!silent) setMessage("No exported Mockup Studio views are ready yet. Open Mockup Studio and choose Export for proof + quote first.");
+        if (!silent) setMessage(hasDocument ? "The saved customer/admin mockup is ready to attach directly to the quote. Exported PNG proof files are optional." : "No saved mockup or exported proof views are ready yet.");
         return;
       }
       const assets: QuoteProofAsset[] = exports.map((item: { path: string; originalName?: string; url?: string }) => ({ path: item.path, originalName: item.originalName || item.path.split("/").pop() || "Mockup", url: item.url }));
@@ -241,12 +325,65 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, locked]);
 
+  async function calculateAutomaticTax() {
+    setError("");
+    setMessage("");
+    setCalculatingTax(true);
+    try {
+      const response = await fetch("/api/admin/tax/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          merchandiseCents: merchandiseAfterDiscountCents,
+          shippingCents: centsFromInput(shipping),
+          inputFingerprint: currentTaxInputFingerprint,
+          taxCode: quoteTaxCode,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not calculate sales tax.");
+      setTax((Math.max(0, Number(result.taxCents || 0)) / 100).toFixed(2));
+      setTaxCalculationId(String(result.calculationId || ""));
+      setTaxCalculatedAt(String(result.calculatedAt || new Date().toISOString()));
+      setTaxInputFingerprint(String(result.inputFingerprint || currentTaxInputFingerprint));
+      setTaxBreakdown(result.breakdown && typeof result.breakdown === "object" ? result.breakdown : null);
+      const location = result.location;
+      setTaxLocation(location ? `${location.city}, ${location.state} ${location.postalCode}` : "");
+      setMessage(`Automatic sales tax calculated${location ? ` for ${location.city}, ${location.state}` : ""}.`);
+    } catch (taxError) {
+      setError(taxError instanceof Error ? taxError.message : "Could not calculate sales tax.");
+    } finally {
+      setCalculatingTax(false);
+    }
+  }
+
   async function submit(action: "save" | "send") {
     setError("");
     setMessage("");
 
     if (waitingOnCustomer) {
       setError("This proof + quote is already with the customer. Wait for approval or a change request before editing it.");
+      return;
+    }
+    if (approvedQuote && revisionMode && action === "save") {
+      setError("Approved quotes stay intact until the revision is sent. Use Send revised quote when the changes are ready.");
+      return;
+    }
+    if (approvedQuote && revisionMode && revisionReason.trim().length < 3) {
+      setError("Add a short reason for this quote revision so the change history is clear.");
+      return;
+    }
+    if (Number(laborHours) < minimumLaborHours) {
+      setError(`Labor has a ${minimumLaborHours}-hour minimum. Increase the estimate if this job will take longer.`);
+      return;
+    }
+    if (action === "send" && taxMode === "automatic" && !automaticTaxFresh) {
+      setError("The automatic tax calculation is missing or out of date. Recalculate tax after the latest price/shipping changes.");
+      return;
+    }
+    if (taxMode === "exempt" && taxExemptReason.trim().length < 3) {
+      setError("Add a reason or exemption-document note for a tax-exempt quote.");
       return;
     }
     if (lineItems.some((item) => !item.description)) {
@@ -271,11 +408,15 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
     setSaving(true);
     try {
       const proofPayload = await buildProofPayload();
-      if (action === "send" && !proofPayload.some((item) => item.assets.length > 0)) {
-        throw new Error("Upload at least one final mockup/proof before sending this approval.");
+      const savedMockupWillBeAttached = hasSavedMockup && useSavedMockup;
+      if (action === "send" && !savedMockupWillBeAttached && !proofPayload.some((item) => item.assets.length > 0)) {
+        throw new Error("Attach the saved customer mockup or upload at least one final proof before sending this approval.");
       }
-      if (action === "send" && proofPayload.some((item) => item.assets.length === 0)) {
-        throw new Error("Every proof item needs at least one mockup/image/PDF before the order can be sent for approval.");
+      if (action === "send") {
+        const missingAdditionalProof = proofPayload.find((item, index) => item.assets.length === 0 && !(index === 0 && savedMockupWillBeAttached));
+        if (missingAdditionalProof) {
+          throw new Error(`Add a proof file for ${missingAdditionalProof.title}. The first proof item may use the saved customer mockup.`);
+        }
       }
 
       const response = await fetch("/api/admin/quotes", {
@@ -287,12 +428,29 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           lineItems,
           setupFeeCents: centsFromInput(setupFee),
           shippingCents: centsFromInput(shipping),
-          taxCents: centsFromInput(tax),
-          discountCents: centsFromInput(discount),
+          taxCents: taxMode === "automatic" && !automaticTaxFresh ? 0 : effectiveTaxCents,
+          taxMode,
+          stripeTaxCalculationId: taxMode === "automatic" && automaticTaxFresh ? taxCalculationId : null,
+          taxCalculatedAt: taxMode === "automatic" && automaticTaxFresh ? taxCalculatedAt : null,
+          taxInputFingerprint: taxMode === "automatic" && automaticTaxFresh ? taxInputFingerprint : null,
+          taxBreakdown: taxMode === "automatic" && automaticTaxFresh ? taxBreakdown : null,
+          taxExemptReason: taxMode === "exempt" ? taxExemptReason.trim() : null,
+          manualDiscountCents: centsFromInput(manualDiscount),
+          discountCode: normalizedDiscountCode,
+          internalSupplyCostCents: centsFromInput(supplyCost),
+          internalPrintCostCents: centsFromInput(printCost),
+          internalPackagingCostCents: centsFromInput(packagingCost),
+          internalShippingCostCents: centsFromInput(shippingCost),
+          internalPaymentFeeCents: centsFromInput(paymentFee),
+          internalOtherCostCents: centsFromInput(otherCost),
+          laborHours: safeLaborHours,
+          laborRateCents: centsFromInput(laborRate),
+          revisionReason: approvedQuote && revisionMode ? revisionReason.trim() : "",
           paymentTerms,
           depositAmountCents: paymentTerms === "deposit" ? centsFromInput(depositAmount) : null,
           notes,
           proofItems: proofPayload,
+          includeSavedMockup: savedMockupWillBeAttached,
           validUntil,
         }),
       });
@@ -300,6 +458,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       if (!response.ok) throw new Error(result.error || "Could not save proof and quote.");
       setProofItems((current) => current.map((item) => ({ ...item, newFiles: [] })));
       setMessage(result.message || (action === "send" ? "Proof and quote sent." : "Draft saved."));
+      if (approvedQuote && revisionMode && action === "send") setRevisionMode(false);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save proof and quote.");
@@ -323,7 +482,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
 
       {open ? (
         <div className="quoteBuilderBody">
-          {existingQuote?.status === "approved" ? <div className="quoteLocked">This proof and quote have been approved. Keep this version as the production reference.</div> : null}
+          {existingQuote?.status === "approved" && !revisionMode ? <div className="quoteLocked quoteRevisionLocked"><span>This proof and quote have been approved. The approved version stays protected.</span><button className="btn secondary" type="button" onClick={() => { setRevisionMode(true); setRevisionReason(""); }}>Revise quote</button></div> : null}
+          {existingQuote?.status === "approved" && revisionMode ? <div className="quoteRevisionMode"><div><strong>Creating quote revision {Number(existingQuote.revision_number || 1) + 1}</strong><span>The current approved quote will not change until you send this revision. Sending it will require the customer to approve the new total/details again.</span></div><button className="textButton" type="button" onClick={() => window.location.reload()}>Cancel revision</button></div> : null}
           {waitingOnCustomer ? <div className="quoteLocked">This version is currently waiting on the customer. Editing is locked until they approve it or request changes.</div> : null}
           {existingQuote?.public_token ? <div className="quoteDocumentActions"><a className="btn secondary" href={`/proforma/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Pro Forma + Proof ↗</a>{existingQuote.status === "approved" ? <a className="btn secondary" href={`/invoice/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Invoice ↗</a> : null}</div> : null}
           {latestChangeRequest ? (
@@ -341,9 +501,14 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
 
           <section className="proofBuilderSection">
             <div className="proofBuilderHeading scalableProofHeading">
-              <div><span className="eyebrow">Product proofs</span><h5>Build the customer&apos;s approval set</h5><p>Use one proof item per product/design. Each item can contain multiple views, pages, images, or PDFs.</p></div>
-              <div className="proofBuilderHeaderActions"><button className="btn secondary" type="button" disabled={locked || importingMockups} onClick={() => importMockupStudio(false)}>{importingMockups ? "Importing…" : "Import Mockup Studio"}</button><span className="proofVersionBadge">Version {displayVersion}</span></div>
+              <div><span className="eyebrow">Product proofs</span><h5>Use the customer mockup, refine it, then quote it</h5><p>The saved Shop mockup can be attached directly to the approval. You can still edit it in Mockup Studio or add separate proof files for additional products/designs.</p></div>
+              <div className="proofBuilderHeaderActions"><button className="btn secondary" type="button" disabled={locked || importingMockups} onClick={() => importMockupStudio(false)}>{importingMockups ? "Checking…" : "Check saved mockup"}</button><span className="proofVersionBadge">Version {displayVersion}</span></div>
             </div>
+
+            {hasSavedMockup ? <label className={`savedMockupQuoteOption ${useSavedMockup ? "selected" : ""}`}>
+              <input type="checkbox" checked={useSavedMockup} onChange={(event) => setUseSavedMockup(event.target.checked)} disabled={locked} />
+              <span><strong>Attach the current saved mockup to this quote</strong><small>Recommended. Moore Made freezes a copy when the quote is sent, so later edits cannot change what the customer approved.</small></span>
+            </label> : <div className="savedMockupQuoteOption unavailable"><span><strong>No saved Shop/Mockup Studio preview found yet</strong><small>Open Mockup Studio above or add a proof image/PDF below.</small></span></div>}
 
             <div className="proofItemEditorList">
               {proofItems.map((item, index) => {
@@ -352,7 +517,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
                   <details className="proofItemEditor" key={item.clientKey}>
                     <summary>
                       <div><span className="proofItemNumber">{String(index + 1).padStart(2, "0")}</span><strong>{item.title.trim() || "Untitled proof item"}</strong></div>
-                      <span>{totalFiles} file{totalFiles === 1 ? "" : "s"}</span>
+                      <span>{totalFiles ? `${totalFiles} file${totalFiles === 1 ? "" : "s"}` : index === 0 && hasSavedMockup && useSavedMockup ? "Saved mockup attached" : "No file yet"}</span>
                     </summary>
                     <div className="proofItemEditorBody">
                       <div className="proofItemTopGrid">
@@ -375,7 +540,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
                       {!locked ? <div className="field">
                         <label htmlFor={`proofFiles-${item.clientKey}`}>Add mockup / proof files</label>
                         <input id={`proofFiles-${item.clientKey}`} type="file" multiple accept="image/*,.pdf" onChange={(e) => { chooseProofs(index, e.target.files); e.currentTarget.value = ""; }} />
-                        <span className="fieldHelp">Images or PDFs, up to 20 MB each. You can add more files in additional selections; large orders are organized by proof item instead of one overall file limit.</span>
+                        <span className="fieldHelp">Optional for the first item when the saved mockup is attached. Add images/PDFs for alternate views or additional products/designs.</span>
                       </div> : null}
 
                       {!locked ? <div className="proofItemActions">
@@ -407,10 +572,71 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
 
             <div className="quoteExtras">
               <label>Setup fee <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={setupFee} onChange={(e) => setSetupFee(e.target.value)} disabled={locked} /></div></label>
-              <label>Shipping <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={shipping} onChange={(e) => setShipping(e.target.value)} disabled={locked} /></div></label>
-              <label>Tax <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={tax} onChange={(e) => setTax(e.target.value)} disabled={locked} /></div></label>
-              <label>Discount <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} disabled={locked} /></div></label>
+              <label>Shipping charged <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={shipping} onChange={(e) => setShipping(e.target.value)} disabled={locked} /></div></label>
+              <label>Manual discount <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} disabled={locked} /></div></label>
             </div>
+
+            <div className="quoteTaxPanel">
+              <div className="proofBuilderHeading"><div><span className="eyebrow">Sales tax</span><h5>How should tax be handled?</h5><p>Automatic uses the order's shipping address or your saved pickup/business address. Manual and tax-exempt modes stay available for unusual orders.</p></div></div>
+              <div className="taxModeOptions">
+                {([
+                  ["automatic", "Automatic", "Calculate with Stripe Tax"],
+                  ["manual", "Manual", "Enter the tax amount yourself"],
+                  ["exempt", "Tax exempt", "No tax; keep an internal reason/document note"],
+                ] as const).map(([value, label, help]) => (
+                  <label className={`taxModeOption ${taxMode === value ? "selected" : ""}`} key={value}>
+                    <input type="radio" name={`tax-mode-${requestId}`} value={value} checked={taxMode === value} disabled={locked} onChange={() => { setTaxMode(value); if (value === "exempt") setTax("0.00"); }} />
+                    <span><strong>{label}</strong><small>{help}</small></span>
+                  </label>
+                ))}
+              </div>
+              {taxMode === "automatic" ? (
+                <div className="automaticTaxBox">
+                  <div><span>Calculated tax</span><strong>{money(effectiveTaxCents)}</strong><small>{automaticTaxFresh ? `Current${taxLocation ? ` · ${taxLocation}` : ""}${taxCalculatedAt ? ` · ${new Date(taxCalculatedAt).toLocaleString("en-US", { timeZone: "America/New_York" })}` : ""}` : taxCalculationId ? "Price/address changed — recalculate before sending." : "Not calculated yet."}</small></div>
+                  <button className="btn secondary" type="button" disabled={locked || calculatingTax} onClick={calculateAutomaticTax}>{calculatingTax ? "Calculating…" : automaticTaxFresh ? "Recalculate tax" : "Calculate tax"}</button>
+                  <p className="fieldHelp">If Stripe Tax returns $0, verify your Stripe Tax registrations before assuming the sale is tax-free.</p>
+                </div>
+              ) : taxMode === "manual" ? (
+                <label className="field taxManualField"><span>Sales tax amount</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={tax} onChange={(e) => setTax(e.target.value)} disabled={locked} /></div></label>
+              ) : (
+                <label className="field taxExemptField"><span>Tax-exempt reason / documentation note *</span><input value={taxExemptReason} onChange={(e) => setTaxExemptReason(e.target.value)} disabled={locked} maxLength={1000} placeholder="Example: Resale certificate on file — customer certificate dated …" /></label>
+              )}
+            </div>
+
+            <div className="quoteDiscountEditor">
+              <div className="proofBuilderHeading"><div><span className="eyebrow">Discounts</span><h5>Promo / family pricing</h5><p>Use a managed discount code or a manual discount. They can be combined; the customer sees only the final discount and total.</p></div></div>
+              <div className="twoCol">
+                <label className="field"><span>Discount code <small>Optional</small></span><input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} list={`discount-codes-${requestId}`} placeholder="FAMILY10" disabled={locked} /><datalist id={`discount-codes-${requestId}`}>{discountCodes.filter((code) => code.active && !code.retired_at).map((code) => <option value={code.code} key={code.id}>{code.description || code.code}</option>)}</datalist>{requestedDiscountCode && !existingQuote?.applied_discount_code ? <small className="fieldHelp">Customer entered: <strong>{requestedDiscountCode}</strong></small> : null}</label>
+                <div className="quoteDiscountPreview"><span>Promo discount</span><strong>{selectedDiscountCode ? `−${money(promoDiscount)}` : normalizedDiscountCode ? "Validated when saved" : money(0)}</strong><small>{selectedDiscountCode?.description || (normalizedDiscountCode ? "The server will verify status, dates, limits, and minimum order." : "No promo code applied")}</small></div>
+              </div>
+            </div>
+
+            <div className="internalCostPanel">
+              <div className="proofBuilderHeading"><div><span className="eyebrow">Admin only</span><h5>True job cost</h5><p>This breakdown never appears on the customer quote. Labor uses your admin minimum and can be increased for larger or multi-part jobs. Saved product defaults prefill this section when available.</p></div></div>
+              <div className="internalCostGrid">
+                <label>Blanks / product supplies <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={supplyCost} onChange={(e) => setSupplyCost(e.target.value)} disabled={locked} /></div></label>
+                <label>Print / decoration <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={printCost} onChange={(e) => setPrintCost(e.target.value)} disabled={locked} /></div></label>
+                <label>Packaging / supplies <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={packagingCost} onChange={(e) => setPackagingCost(e.target.value)} disabled={locked} /></div></label>
+                <label>Actual shipping cost <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} disabled={locked} /></div></label>
+                <label>Payment fee estimate <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={paymentFee} onChange={(e) => setPaymentFee(e.target.value)} disabled={locked} /></div></label>
+                <label>Other cost <div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={otherCost} onChange={(e) => setOtherCost(e.target.value)} disabled={locked} /></div></label>
+              </div>
+              <div className="laborCostEditor">
+                <label className="field"><span>Estimated labor hours</span><input type="number" min={minimumLaborHours} step="0.5" value={laborHours} onChange={(e) => setLaborHours(e.target.value)} disabled={locked} /></label>
+                <label className="field"><span>Internal labor rate / hour</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={laborRate} onChange={(e) => setLaborRate(e.target.value)} disabled={locked} /></div></label>
+                <div className="laborCostResult"><span>Labor cost</span><strong>{money(laborCost)}</strong><small>{safeLaborHours.toLocaleString()} hr × {money(centsFromInput(laborRate))}/hr</small></div>
+              </div>
+              <p className="fieldHelp">If the customer supplies the blanks, set “Blanks / product supplies” to $0. These are internal costing numbers, not customer-facing line items.</p>
+              <div className="profitabilityCard">
+                <div><span>True estimated job cost</span><strong>{money(internalTotalCost)}</strong></div>
+                <div><span>Revenue before sales tax</span><strong>{money(revenueBeforeTax)}</strong></div>
+                <div className={estimatedProfit < 0 ? "profitLoss" : "profitPositive"}><span>Estimated profit</span><strong>{money(estimatedProfit)}</strong></div>
+                <div><span>Estimated margin</span><strong>{marginPercent.toFixed(1)}%</strong></div>
+                <div className="profitRecommendation"><span>Recommended revenue at {(targetMarginBasisPoints / 100).toFixed(0)}% target margin</span><strong>{money(recommendedRevenue)}</strong><small>Suggestion only — you choose the final customer quote.</small></div>
+              </div>
+            </div>
+
+            {approvedQuote && revisionMode ? <div className="quoteRevisionReason"><label className="field"><span>Reason for revision *</span><input value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} maxLength={500} placeholder="Example: Quantity increased from 4 shirts to 7." /></label></div> : null}
 
             <div className="paymentTermsEditor">
               <div className="proofBuilderHeading"><div><span className="eyebrow">Payment</span><h5>Amount due after approval</h5><p>Full payment is required by default. Switch this order to a custom deposit only when you want to collect part of the total first.</p></div></div>
@@ -439,15 +665,19 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
               <div><span>Items subtotal</span><strong>{money(subtotal)}</strong></div>
               {centsFromInput(setupFee) ? <div><span>Setup fee</span><strong>{money(centsFromInput(setupFee))}</strong></div> : null}
               {centsFromInput(shipping) ? <div><span>Shipping</span><strong>{money(centsFromInput(shipping))}</strong></div> : null}
-              {centsFromInput(tax) ? <div><span>Tax</span><strong>{money(centsFromInput(tax))}</strong></div> : null}
-              {centsFromInput(discount) ? <div><span>Discount</span><strong>−{money(centsFromInput(discount))}</strong></div> : null}
-              <div className="quoteGrandTotal"><span>Quote total</span><strong>{money(total)}</strong></div>
+              {effectiveTaxCents ? <div><span>Tax</span><strong>{money(effectiveTaxCents)}</strong></div> : taxMode === "exempt" ? <div><span>Tax</span><strong>Exempt</strong></div> : null}
+              {centsFromInput(manualDiscount) ? <div><span>Manual discount</span><strong>−{money(centsFromInput(manualDiscount))}</strong></div> : null}
+              {promoDiscount ? <div><span>Promo {normalizedDiscountCode ? `(${normalizedDiscountCode})` : ""}</span><strong>−{money(promoDiscount)}</strong></div> : null}
+              <div className="quoteGrandTotal"><span>Customer total</span><strong>{money(total)}</strong></div>
+              {amountPaidCents > 0 ? <><div><span>Already paid</span><strong>{money(amountPaidCents)}</strong></div><div><span>Remaining after approval</span><strong>{money(remainingAfterPayments)}</strong></div>{overpaidCents > 0 ? <div className="quoteCreditWarning"><span>Credit / refund review</span><strong>{money(overpaidCents)}</strong></div> : null}</> : null}
             </div>
           </section>
 
+          {existingQuote?.revisions?.length ? <section className="quoteRevisionHistory"><div className="proofBuilderHeading"><div><span className="eyebrow">History</span><h5>Quote revisions</h5><p>Earlier sent/approved totals stay in the record instead of being overwritten.</p></div></div><div className="quoteRevisionList">{existingQuote.revisions.map((revision) => <div key={revision.id}><span>Revision {revision.revision_number}</span><strong>{money(revision.total_cents)}</strong><small>{QUOTE_STATUS_LABELS[revision.status]}{revision.revision_reason ? ` · ${revision.revision_reason}` : ""}</small></div>)}</div></section> : null}
+
           {error ? <div className="formError">{error}</div> : null}
           {message ? <div className="quoteSuccess">{message}</div> : null}
-          {!locked ? <div className="quoteActions"><button className="btn secondary" type="button" disabled={saving} onClick={() => submit("save")}>{saving ? "Saving…" : "Save draft"}</button><button className="btn" type="button" disabled={saving} onClick={() => submit("send")}>{saving ? "Working…" : existingQuote?.status === "changes_requested" ? "Send updated proof + quote" : "Send proof + quote for approval"}</button></div> : null}
+          {!locked ? <div className="quoteActions">{!(approvedQuote && revisionMode) ? <button className="btn secondary" type="button" disabled={saving} onClick={() => submit("save")}>{saving ? "Saving…" : "Save draft"}</button> : null}<button className="btn" type="button" disabled={saving} onClick={() => submit("send")}>{saving ? "Working…" : approvedQuote && revisionMode ? "Send revised quote for approval" : existingQuote?.status === "changes_requested" ? "Send updated proof + quote" : "Send proof + quote for approval"}</button></div> : null}
           {waitingOnCustomer ? <p className="fieldHelp">The customer is reviewing every proof item and the full price together. If they request changes, you&apos;ll be able to create the next proof version here.</p> : null}
         </div>
       ) : null}

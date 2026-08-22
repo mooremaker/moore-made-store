@@ -4,6 +4,8 @@ import { PrintDocumentButton } from "@/components/document/PrintDocumentButton";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { money, QUOTE_STATUS_LABELS, type QuoteLineItem, type QuoteProofItem, type QuoteStatus } from "@/lib/quote-types";
 import { QUOTE_PROOF_BUCKET, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase-admin";
+import { SavedMockupPreview } from "@/components/mockups/SavedMockupPreview";
+import { signMockupDocumentForDisplay } from "@/lib/mockup-display-server";
 
 export const metadata = { title: "Moore Made Pro Forma Invoice + Proof", robots: { index: false, follow: false } };
 
@@ -34,6 +36,7 @@ type QuoteView = {
   proof_paths: string[];
   proof_notes: string | null;
   proof_version: number;
+  mockup_snapshot: unknown | null;
   sent_at: string | null;
   created_at: string;
   custom_requests: RequestView | RequestView[];
@@ -64,7 +67,7 @@ export default async function ProFormaPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("quotes")
-    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity)")
+    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity)")
     .eq("public_token", token)
     .single();
 
@@ -72,6 +75,8 @@ export default async function ProFormaPage({ params }: Props) {
   const quote = data as unknown as QuoteView;
   const request = Array.isArray(quote.custom_requests) ? quote.custom_requests[0] : quote.custom_requests;
   if (!request) notFound();
+
+  const mockupSnapshot = await signMockupDocumentForDisplay(quote.mockup_snapshot, 3600);
 
   const { data: proofData } = await supabase
     .from("quote_proof_items")
@@ -170,6 +175,7 @@ export default async function ProFormaPage({ params }: Props) {
 
         <section className="proformaSection proformaProofSection">
           <div className="proformaSectionHeading"><div><span className="eyebrow">Mockups / proof</span><h2>Design approval set</h2></div><small>{proofItems.length} product/proof item{proofItems.length === 1 ? "" : "s"}</small></div>
+          {mockupSnapshot ? <SavedMockupPreview document={mockupSnapshot} title="Frozen approval mockup" className="proformaSavedMockup" /> : null}
           {proofItems.length ? <div className="proformaProofList">
             {proofItems.map((item, itemIndex) => (
               <article className="proformaProofItem" key={item.id}>
@@ -180,11 +186,11 @@ export default async function ProFormaPage({ params }: Props) {
                   ) : asset.url ? (
                     <a href={asset.url} target="_blank" rel="noreferrer" key={`${asset.path}-${assetIndex}`}><img src={asset.url} alt={`${item.title} proof ${assetIndex + 1}`} /></a>
                   ) : null)}
-                </div> : <p className="proformaMissingProof">No proof file is attached to this item.</p>}
+                </div> : itemIndex === 0 && mockupSnapshot ? <p className="proformaMissingProof">This item uses the frozen saved mockup shown above.</p> : <p className="proformaMissingProof">No proof file is attached to this item.</p>}
                 {item.notes ? <div className="proformaProofNotes"><span>Design notes</span><p>{item.notes}</p></div> : null}
               </article>
             ))}
-          </div> : <p className="proformaMissingProof">No mockup/proof files are attached to this quote yet.</p>}
+          </div> : mockupSnapshot ? null : <p className="proformaMissingProof">No mockup/proof files are attached to this quote yet.</p>}
         </section>
 
         <footer className="proformaFooter">

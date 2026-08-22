@@ -2,11 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { ProductVisual } from "@/components/shop/ProductVisual";
+import type { ProductPreviewKind } from "@/lib/catalog";
 import { emptyMockupDocument, type MockupAssetRef, type MockupDocument, type MockupLayer, type MockupView } from "@/lib/mockup-types";
 
 const MOCKUP_BUCKET = "mockup-studio-files";
 const PROOF_BUCKET = "quote-proof-files";
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+const PREVIEW_KINDS = new Set<ProductPreviewKind>(["tee", "polo", "hoodie", "mug", "tote", "card", "bookmark", "coaster", "sticker", "custom"]);
+
+function previewKind(value: unknown): ProductPreviewKind | null {
+  return typeof value === "string" && PREVIEW_KINDS.has(value as ProductPreviewKind) ? value as ProductPreviewKind : null;
+}
 
 function uid(prefix = "item") {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? `${prefix}-${crypto.randomUUID()}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -21,9 +29,9 @@ function cleanDocument(document: MockupDocument): MockupDocument {
     ...document,
     views: document.views.map((view) => ({
       ...view,
-      base: view.base ? { path: view.base.path, originalName: view.base.originalName } : null,
-      layers: view.layers.map((layer) => ({ ...layer, asset: { path: layer.asset.path, originalName: layer.asset.originalName } })),
-      exportAsset: view.exportAsset ? { path: view.exportAsset.path, originalName: view.exportAsset.originalName } : null,
+      base: view.base ? { path: view.base.path, originalName: view.base.originalName, bucket: view.base.bucket } : null,
+      layers: view.layers.map((layer) => ({ ...layer, asset: { path: layer.asset.path, originalName: layer.asset.originalName, bucket: layer.asset.bucket } })),
+      exportAsset: view.exportAsset ? { path: view.exportAsset.path, originalName: view.exportAsset.originalName, bucket: view.exportAsset.bucket } : null,
     })),
   };
 }
@@ -61,7 +69,7 @@ function loadImage(src: string) {
 }
 
 async function renderView(view: MockupView) {
-  if (!view.base?.url) throw new Error(`${view.name} needs a base product image before it can be exported.`);
+  if (!view.base?.url) throw new Error(`${view.name} can be attached to the quote as a saved mockup now. Upload a real blank/base image only if you also want a flattened PNG export.`);
   const base = await loadImage(view.base.url);
   const canvas = document.createElement("canvas");
   canvas.width = base.naturalWidth || base.width;
@@ -107,6 +115,7 @@ export function MockupStudio({ requestId, requestNumber, product }: Props) {
 
   const activeView = useMemo(() => documentState.views.find((view) => view.id === documentState.activeViewId) || documentState.views[0], [documentState]);
   const selectedLayer = activeView?.layers.find((layer) => layer.id === selectedLayerId) || null;
+  const customerIntent = activeView?.customerIntent || null;
   const exportCount = documentState.views.filter((view) => view.exportAsset?.path).length;
 
   async function loadProject() {
@@ -232,17 +241,18 @@ export function MockupStudio({ requestId, requestNumber, product }: Props) {
       </button>
       {open ? <div className="mockupStudioBody">
         {loading ? <div className="mockupLoading">Loading Mockup Studio…</div> : ready === false ? <div className="requestWarning"><strong>Mockup Studio needs one database update.</strong><br />Run <code>supabase/moore_made_phase6_22_mockup_studio.sql</code>, then refresh this order.</div> : <>
-          <div className="mockupStudioIntro"><div><span className="eyebrow">Admin design workspace</span><h5>{requestNumber} · {product}</h5><p>Upload a blank product image, place the client&apos;s logos/artwork on top, then export the finished front/back views directly into the Proof + Quote workflow.</p></div><div className="mockupStudioTopActions"><button className="btn secondary" type="button" disabled={saving} onClick={() => save("draft")}>{saving ? "Saving…" : "Save draft"}</button><button className="btn" type="button" disabled={exporting || saving} onClick={exportForProof}>{exporting ? "Rendering…" : "Export for proof + quote"}</button></div></div>
+          <div className="mockupStudioIntro"><div><span className="eyebrow">Admin design workspace</span><h5>{requestNumber} · {product}</h5><p>The customer&apos;s Shop mockup is already saved here. Drag and resize their artwork, replace it if needed, and save your changes. Quote Builder can attach this saved mockup directly; a flattened PNG export is optional.</p></div><div className="mockupStudioTopActions"><button className="btn secondary" type="button" disabled={saving} onClick={() => save("draft")}>{saving ? "Saving…" : "Save mockup changes"}</button><button className="btn" type="button" disabled={exporting || saving} onClick={exportForProof}>{exporting ? "Rendering…" : "Export PNG proof (optional)"}</button></div></div>
 
           <div className="mockupViewTabs">
-            {documentState.views.map((view) => <button type="button" key={view.id} className={view.id === activeView?.id ? "active" : ""} onClick={() => { setDocumentState((current) => ({ ...current, activeViewId: view.id })); setSelectedLayerId(null); }}><span>{view.name}</span>{view.exportAsset?.path ? <small>Proof ready ✓</small> : <small>{view.base ? `${view.layers.length} layer${view.layers.length === 1 ? "" : "s"}` : "No base"}</small>}</button>)}
+            {documentState.views.map((view) => <button type="button" key={view.id} className={view.id === activeView?.id ? "active" : ""} onClick={() => { setDocumentState((current) => ({ ...current, activeViewId: view.id })); setSelectedLayerId(null); }}><span>{view.name}</span>{view.exportAsset?.path ? <small>Proof ready ✓</small> : <small>{view.base ? `${view.layers.length} layer${view.layers.length === 1 ? "" : "s"}` : view.customerIntent?.enabled ? (view.customerIntent.source === "idea" ? "Design needed" : view.layers.length ? "Customer art" : "Customer direction") : "No base"}</small>}</button>)}
             <button className="mockupAddView" type="button" onClick={addView}>+ View</button>
           </div>
 
           {activeView ? <div className="mockupWorkspace">
             <aside className="mockupToolsPanel">
               <label className="field"><span>View name</span><input value={activeView.name} maxLength={100} onChange={(e) => updateView(activeView.id, (view) => ({ ...view, name: e.target.value, exportAsset: null }))} /></label>
-              <div className="mockupToolBlock"><div><strong>1. Product base</strong><small>Front/back photo or blank mockup</small></div><label className="btn secondary mockupUploadButton">{activeView.base ? "Replace base image" : "Upload base image"}<input type="file" accept="image/*" hidden onChange={(e) => { void chooseBase(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>{activeView.base ? <small className="mockupFileName">{activeView.base.originalName}</small> : null}</div>
+              {customerIntent ? <div className={`mockupCustomerDirection ${customerIntent.enabled ? "isEnabled" : "isDisabled"}`}><div><strong>Customer direction</strong><span>{customerIntent.enabled ? `${customerIntent.placementLabel || customerIntent.placement} · ${customerIntent.source === "idea" ? "needs design" : customerIntent.source === "upload" ? "customer artwork" : "example only"}` : "Customer did not request this side"}</span></div>{customerIntent.idea ? <p>{customerIntent.idea}</p> : null}{customerIntent.artworkFileName ? <small>Artwork: {customerIntent.artworkFileName}</small> : null}</div> : null}
+              <div className="mockupToolBlock"><div><strong>1. Product preview</strong><small>{activeView.template?.colorName ? `${activeView.template.productName || product} · ${activeView.template.colorName}` : "Front/back photo or blank mockup"}</small></div>{!activeView.base && previewKind(activeView.template?.previewKind) ? <small className="mockupFileName">Using the customer&apos;s Shop product preview. This is enough for direct quote approval.</small> : null}<label className="btn secondary mockupUploadButton">{activeView.base ? "Replace base image" : "Use a real blank photo (optional)"}<input type="file" accept="image/*" hidden onChange={(e) => { void chooseBase(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>{activeView.base ? <small className="mockupFileName">{activeView.base.originalName}</small> : null}</div>
               <div className="mockupToolBlock"><div><strong>2. Artwork</strong><small>Logo, graphic, or other transparent image</small></div><label className="btn secondary mockupUploadButton">+ Add artwork<input type="file" accept="image/*" multiple hidden onChange={(e) => { void addArtwork(e.target.files); e.currentTarget.value = ""; }} /></label></div>
 
               <div className="mockupLayerList"><strong>Layers</strong>{activeView.layers.length ? activeView.layers.slice().sort((a,b) => b.zIndex-a.zIndex).map((layer) => <button type="button" key={layer.id} className={selectedLayerId === layer.id ? "active" : ""} onClick={() => setSelectedLayerId(layer.id)}><span>{layer.asset.originalName}</span><small>{Math.round(layer.width)}% wide</small></button>) : <p>No artwork layers yet.</p>}</div>
@@ -258,16 +268,17 @@ export function MockupStudio({ requestId, requestNumber, product }: Props) {
             <div className="mockupCanvasColumn">
               <div className="mockupCanvasHead"><div><strong>{activeView.name} preview</strong><small>Drag artwork directly on the product. Sliders give you precise size/rotation control.</small></div>{activeView.exportAsset?.path ? <span>Proof export ready ✓</span> : <span>Draft</span>}</div>
               <div className={`mockupStage ${activeView.base ? "hasBase" : ""}`} ref={stageRef} onPointerDown={() => setSelectedLayerId(null)}>
-                {activeView.base?.url ? <img className="mockupBaseImage" src={activeView.base.url} alt={`${activeView.name} product base`} draggable={false} /> : <div className="mockupEmptyCanvas"><strong>Upload a {activeView.name.toLowerCase()} product image</strong><p>Use the same type of blank/mockup image you currently bring into Canva.</p></div>}
-                {activeView.base?.url ? activeView.layers.map((layer) => layer.asset.url ? <div key={layer.id} className={`mockupLayer ${selectedLayerId === layer.id ? "selected" : ""}`} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, zIndex: layer.zIndex, opacity: layer.opacity, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }} onPointerDown={(event) => onLayerPointerDown(event, layer)}><img src={layer.asset.url} alt={layer.asset.originalName} draggable={false} /></div> : null) : null}
+                {activeView.base?.url ? <img className="mockupBaseImage" src={activeView.base.url} alt={`${activeView.name} product base`} draggable={false} /> : previewKind(activeView.template?.previewKind) ? <ProductVisual kind={previewKind(activeView.template?.previewKind)!} color={activeView.template?.colorValue || "#f4f2ed"} className="mockupCatalogBaseVisual" /> : <div className="mockupEmptyCanvas"><strong>{documentState.source === "customer" ? "Customer placement loaded" : `Upload a ${activeView.name.toLowerCase()} product image`}</strong><p>{documentState.source === "customer" ? "The customer&apos;s placement is saved. Add a real blank photo only if you want a flattened PNG proof." : "Use the same type of blank/mockup image you currently bring into Canva."}</p></div>}
+                {customerIntent?.enabled && customerIntent.source === "idea" ? <div className="mockupCustomerIdeaLayer" style={{ left: `${customerIntent.x}%`, top: `${customerIntent.y}%`, width: `${customerIntent.width}%`, transform: `translate(-50%, -50%) rotate(${customerIntent.rotation}deg)` }}><strong>DESIGN NEEDED</strong><span>{customerIntent.placementLabel || customerIntent.placement}</span></div> : null}
+                {activeView.layers.map((layer) => layer.asset.url ? <div key={layer.id} className={`mockupLayer ${selectedLayerId === layer.id ? "selected" : ""}`} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, zIndex: layer.zIndex, opacity: layer.opacity, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }} onPointerDown={(event) => onLayerPointerDown(event, layer)}><img src={layer.asset.url} alt={layer.asset.originalName} draggable={false} /></div> : null)}
               </div>
-              <div className="mockupCanvasFoot"><span>The editor never changes the original customer artwork. It only saves placement instructions and rendered proof images.</span>{activeView.exportAsset?.url ? <a href={activeView.exportAsset.url} target="_blank" rel="noreferrer">Open latest exported PNG ↗</a> : null}</div>
+              <div className="mockupCanvasFoot"><span>Save your changes to update the working mockup. When you send a quote, Moore Made freezes a copy of the exact mockup the customer is approving.</span>{activeView.exportAsset?.url ? <a href={activeView.exportAsset.url} target="_blank" rel="noreferrer">Open latest exported PNG ↗</a> : null}</div>
             </div>
           </div> : null}
 
           {error ? <div className="formError">{error}</div> : null}
           {message ? <div className="formSuccess">{message}</div> : null}
-          <div className="mockupFutureNote"><strong>Built for the future client portal.</strong><span>The project format already separates product templates, editable placement, client artwork, and frozen proof exports so we can later let clients use approved templates without exposing admin controls.</span></div>
+          <div className="mockupFutureNote"><strong>{documentState.source === "customer" ? "Started by the customer in Shop." : "Shared mockup engine."}</strong><span>{documentState.source === "customer" ? "Their uploaded art, placement, size, rotation, and design-needed notes are preserved here. Refine the layout and save it; Quote Builder can attach the current mockup without making you recreate it." : "Product templates, editable placement, client artwork, and frozen approval snapshots use the same project format on both sides."}</span></div>
         </>}
       </div> : null}
     </div>

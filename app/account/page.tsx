@@ -9,6 +9,9 @@ import { paymentStatusLabel, type PaymentStatus, type PaymentTerms } from "@/lib
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CUSTOM_REQUEST_BUCKET, getSupabaseAdmin } from "@/lib/supabase-admin";
 import { paymentMethodLabel, receiptLabel } from "@/lib/finance-types";
+import { SavedMockupPreview } from "@/components/mockups/SavedMockupPreview";
+import { signMockupDocumentForDisplay } from "@/lib/mockup-display-server";
+import type { MockupDocument } from "@/lib/mockup-types";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -19,6 +22,7 @@ type RequestRow = {
 type QuoteRow = { id: string; request_id: string; public_token: string; status: QuoteStatus; total_cents: number; valid_until: string | null; proof_version: number; payment_terms: PaymentTerms; deposit_amount_cents: number | null; };
 type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; published_snapshot:unknown|null; updated_at:string; };
 type ReceiptRow = { id:string; request_id:string; amount_cents:number; payment_method:string; paid_at:string|null; created_at:string; receipt_number:number|null; receipt_token:string|null; status:string; };
+type MockupProjectRow = { request_id:string; document:unknown; status:string; updated_at:string; };
 
 function dateLabel(value: string | null) {
   if (!value) return "—";
@@ -55,6 +59,19 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   for (const receipt of receiptRows) receiptsByRequest.set(receipt.request_id, [...(receiptsByRequest.get(receipt.request_id) ?? []), receipt]);
 
   const admin = getSupabaseAdmin();
+  const mockupsByRequest = new Map<string, MockupDocument>();
+  if (requestIds.length) {
+    const { data: mockupData } = await admin
+      .from("mockup_projects")
+      .select("request_id,document,status,updated_at")
+      .in("request_id", requestIds)
+      .neq("status", "archived");
+    for (const row of (mockupData ?? []) as MockupProjectRow[]) {
+      const signed = await signMockupDocumentForDisplay(row.document, 900);
+      if (signed) mockupsByRequest.set(row.request_id, signed);
+    }
+  }
+
   const artworkLinks = new Map<string, { name: string; url: string }[]>();
   for (const request of requests) {
     const links: { name: string; url: string }[] = [];
@@ -91,6 +108,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               const quote = quoteByRequest.get(request.id);
               const files = artworkLinks.get(request.id) ?? [];
               const receipts = receiptsByRequest.get(request.id) ?? [];
+              const savedMockup = mockupsByRequest.get(request.id) ?? null;
               return (
                 <details className="accountOrderCard" key={request.id}>
                   <summary>
@@ -118,6 +136,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       {request.estimated_fulfillment_note ? <p>{request.estimated_fulfillment_note}</p> : null}
                       <small>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated only and not guaranteed. This is the date Moore Made expects to hand the package to the carrier, not a guaranteed delivery date. Carrier transit and delivery timing are outside Moore Made’s control." : "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for pickup."}</small>
                     </div> : null}
+                    {savedMockup ? <SavedMockupPreview document={savedMockup} compact title="Your saved mockup" className="accountSavedMockup" /> : null}
                     {files.length ? <div className="accountFiles"><strong>Your uploaded artwork</strong><div>{files.map((file) => <a key={file.url} href={file.url} target="_blank" rel="noreferrer">{file.name}</a>)}</div><small>Private links expire after 15 minutes.</small></div> : null}
                     {request.status === "shipped" && (request.tracking_url || request.tracking_number) ? <div className="accountFulfillment"><strong>Shipping</strong>{request.tracking_number ? <span>Tracking: {request.tracking_number}</span> : null}{request.tracking_url ? <a href={request.tracking_url} target="_blank" rel="noreferrer">Track shipment →</a> : null}</div> : null}
                     {request.status === "ready" && request.fulfillment_note ? <div className="accountFulfillment"><strong>Pickup note</strong><span>{request.fulfillment_note}</span></div> : null}

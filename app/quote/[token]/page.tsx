@@ -10,6 +10,8 @@ import { nextPaymentAmount, paymentStatusLabel, type PaymentStatus, type Payment
 import { syncPaidCheckoutSessionById } from "@/lib/payment-server";
 import { isStripeConfigured } from "@/lib/stripe";
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
+import { SavedMockupPreview } from "@/components/mockups/SavedMockupPreview";
+import { signMockupDocumentForDisplay } from "@/lib/mockup-display-server";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -45,6 +47,7 @@ type QuoteView = {
   shipping_cents: number;
   tax_cents: number;
   discount_cents: number;
+  applied_discount_code: string | null;
   subtotal_cents: number;
   total_cents: number;
   payment_terms: PaymentTerms;
@@ -54,7 +57,10 @@ type QuoteView = {
   proof_paths: string[];
   proof_notes: string | null;
   proof_version: number;
+  revision_number: number;
+  revision_reason: string | null;
   customer_change_request: string | null;
+  mockup_snapshot: unknown | null;
   sent_at: string | null;
   custom_requests: RequestView | RequestView[];
 };
@@ -85,7 +91,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("quotes")
-    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,sent_at,custom_requests(id,request_number,customer_name,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,deadline,delivery,payment_status,amount_paid_cents,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents)")
+    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,revision_number,revision_reason,customer_change_request,mockup_snapshot,sent_at,custom_requests(id,request_number,customer_name,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,deadline,delivery,payment_status,amount_paid_cents,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents)")
     .eq("public_token", token)
     .single();
 
@@ -93,6 +99,8 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
   const quote = data as unknown as QuoteView;
   const request = Array.isArray(quote.custom_requests) ? quote.custom_requests[0] : quote.custom_requests;
   if (!request) notFound();
+
+  const mockupSnapshot = await signMockupDocumentForDisplay(quote.mockup_snapshot, 3600);
 
   const { data: proofData } = await supabase
     .from("quote_proof_items")
@@ -125,7 +133,11 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
   }
 
   const totalProofFiles = proofItems.reduce((sum, item) => sum + item.assets.length, 0);
-  const allProofsAvailable = proofItems.length > 0 && proofItems.every((item) => item.assets.length > 0 && item.assets.every((asset) => Boolean(asset.url)));
+  const savedMockupViews = mockupSnapshot?.views?.filter((view) => view.customerIntent?.enabled || view.layers?.length || view.base || view.exportAsset).length || 0;
+  const allProofsAvailable = proofItems.length > 0 && proofItems.every((item, index) => {
+    if (index === 0 && mockupSnapshot) return true;
+    return item.assets.length > 0 && item.assets.every((asset) => Boolean(asset.url));
+  });
   const isPastDue = quote.valid_until ? Date.now() > new Date(`${quote.valid_until}T23:59:59`).getTime() : false;
   const active = quote.status === "sent" && !isPastDue && allProofsAvailable;
   const shownStatus = isPastDue && quote.status === "sent" ? "Expired" : QUOTE_STATUS_LABELS[quote.status];
@@ -164,12 +176,15 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
         <div className="publicQuoteHead">
           <div><span>Approval status</span><strong>{shownStatus}</strong></div>
           <div><span>Proof version</span><strong>Version {quote.proof_version || 1}</strong></div>
-          <div><span>Proof set</span><strong>{proofItems.length} item{proofItems.length === 1 ? "" : "s"} · {totalProofFiles} file{totalProofFiles === 1 ? "" : "s"}</strong></div>
+          <div><span>Quote revision</span><strong>Revision {quote.revision_number || 1}</strong></div>
+          <div><span>Proof set</span><strong>{proofItems.length} item{proofItems.length === 1 ? "" : "s"}{savedMockupViews ? ` · ${savedMockupViews} saved mockup view${savedMockupViews === 1 ? "" : "s"}` : ""}{totalProofFiles ? ` · ${totalProofFiles} file${totalProofFiles === 1 ? "" : "s"}` : ""}</strong></div>
           {quote.valid_until ? <div><span>Valid through</span><strong>{prettyDate(quote.valid_until)}</strong></div> : null}
         </div>
 
         <section className="publicProofSection scalablePublicProofSection">
           <div className="publicProofSectionHead"><div><span className="eyebrow">01 · Product proofs</span><h2>Review every final design</h2><p>Each product is grouped separately so you can confirm all views before approving the order.</p></div></div>
+
+          {mockupSnapshot ? <SavedMockupPreview document={mockupSnapshot} title="Approved mockup set" className="publicSavedMockupProof" /> : null}
 
           {proofItems.length ? <div className="publicProofItemList">
             {proofItems.map((item, itemIndex) => <article className="publicProofProduct" key={item.id}>
@@ -178,10 +193,10 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
                 {item.assets.map((asset, assetIndex) => <a href={asset.url} target="_blank" rel="noreferrer" className="publicProofItem" key={`${asset.path}-${assetIndex}`}>
                   {assetIsPdf(asset.path) ? <div className="publicProofPdf"><strong>PDF PROOF</strong><span>{asset.originalName || `Open file ${assetIndex + 1}`} ↗</span></div> : <img src={asset.url} alt={`${item.title} proof ${assetIndex + 1}`} />}
                 </a>)}
-              </div> : <div className="quoteInactiveMessage">A proof file is missing for this item. Please contact Moore Made before approving.</div>}
+              </div> : itemIndex === 0 && mockupSnapshot ? <div className="publicSavedMockupNote">This proof item uses the frozen saved mockup displayed above.</div> : <div className="quoteInactiveMessage">A proof file is missing for this item. Please contact Moore Made before approving.</div>}
               {item.notes ? <div className="publicProofNotes"><span>Design notes</span><p>{item.notes}</p></div> : null}
             </article>)}
-          </div> : <div className="quoteInactiveMessage">The proof files are temporarily unavailable. Please contact Moore Made before approving.</div>}
+          </div> : mockupSnapshot ? null : <div className="quoteInactiveMessage">The proof files are temporarily unavailable. Please contact Moore Made before approving.</div>}
         </section>
 
         <section className="publicProofSection">
@@ -203,6 +218,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
 
         <section className="publicProofSection">
           <div className="publicProofSectionHead"><div><span className="eyebrow">03 · Price</span><h2>Review the complete quote</h2></div></div>
+          {Number(quote.revision_number || 1) > 1 && quote.revision_reason ? <div className="quoteInactiveMessage"><strong>Updated quote</strong><br />{quote.revision_reason}</div> : null}
           <div className="publicQuoteLines">
             <div className="publicQuoteLine publicQuoteLineHeader"><span>Item</span><span>Qty</span><span>Total</span></div>
             {quote.line_items.map((item, index) => <div className="publicQuoteLine" key={`${item.description}-${index}`}><span>{item.description}</span><span>{item.quantity}</span><strong>{money(item.quantity * item.unitPriceCents)}</strong></div>)}
@@ -213,7 +229,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>Shipping</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>Tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
-            {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>{quote.applied_discount_code ? `Discount (${quote.applied_discount_code})` : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="publicQuoteGrandTotal"><span>Total</span><strong>{money(quote.total_cents)}</strong></div>
           </div>
           <div className="publicPaymentTermsSummary">

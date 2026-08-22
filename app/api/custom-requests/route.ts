@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { CUSTOM_REQUEST_BUCKET, getSupabaseAdmin } from "@/lib/supabase-admin";
 import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
+import { orderItemsQuantity, type ShippingAddress, type StructuredOrderItem } from "@/lib/order-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_FILES = 8;
@@ -10,6 +11,48 @@ const MAX_QUANTITY = 1_000_000;
 
 function text(value: unknown, max = 4000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+
+function normalizeOrderItems(value: unknown): StructuredOrderItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).map((raw, index) => {
+    const row = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    const quantitiesRaw = row.quantities && typeof row.quantities === "object" ? row.quantities as Record<string, unknown> : {};
+    const quantities: Record<string, number> = {};
+    for (const [size, qty] of Object.entries(quantitiesRaw).slice(0, 40)) {
+      const safeSize = text(size, 80);
+      const n = Math.max(0, Math.min(100000, Math.floor(Number(qty) || 0)));
+      if (safeSize) quantities[safeSize] = n;
+    }
+    return {
+      id: text(row.id, 120) || `item-${index + 1}`,
+      productSlug: text(row.productSlug, 160),
+      productName: text(row.productName, 300),
+      colorName: text(row.colorName, 160),
+      customItemType: text(row.customItemType, 300) || undefined,
+      customColorNotes: text(row.customColorNotes, 500) || undefined,
+      quantities,
+      notes: text(row.notes, 2000) || undefined,
+      designRelationship: row.designRelationship === "primary" || row.designRelationship === "separate" ? row.designRelationship : "same",
+    } satisfies StructuredOrderItem;
+  }).filter((row) => row.productName && Object.values(row.quantities).some((qty) => qty > 0));
+}
+
+function normalizeShippingAddress(value: unknown): ShippingAddress | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const address: ShippingAddress = {
+    name: text(row.name, 160),
+    line1: text(row.line1, 300),
+    line2: text(row.line2, 300),
+    city: text(row.city, 160),
+    state: text(row.state, 80),
+    postalCode: text(row.postalCode, 40),
+    country: text(row.country, 2).toUpperCase() || "US",
+  };
+  if (!address.line1 && !address.city && !address.state && !address.postalCode) return null;
+  return address;
 }
 
 function sanitizeFileName(name: string) {
@@ -34,7 +77,10 @@ export async function POST(request: Request) {
     const name = text(body.name, 160);
     const email = text(body.email, 320).toLowerCase();
     const product = text(body.product, 300);
-    const quantity = Number(body.quantity || 0);
+    const orderItems = normalizeOrderItems(body.orderItems);
+    const structuredQuantity = orderItemsQuantity(orderItems);
+    const quantity = structuredQuantity > 0 ? structuredQuantity : Number(body.quantity || 0);
+    const shippingAddress = normalizeShippingAddress(body.shippingAddress);
 
     const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -102,6 +148,9 @@ export async function POST(request: Request) {
         deadline: text(body.deadline, 20) || null,
         delivery: text(body.delivery, 120) || null,
         notes: text(body.notes, 5000) || null,
+        requested_discount_code: text(body.discountCode, 80).toUpperCase() || null,
+        order_items: orderItems,
+        shipping_address: shippingAddress,
       })
       .select("id, request_number, submission_token")
       .single();
@@ -144,9 +193,11 @@ export async function POST(request: Request) {
     const summaryRows = [
       ["Product", product],
       ["Quantity", String(quantity)],
+      ["Items", orderItems.length > 1 ? `${orderItems.length} product/color groups` : ""],
       ["Style", text(body.itemType, 300)],
       ["Colors", text(body.colors, 500)],
       ["Needed by", text(body.deadline, 20)],
+      ["Discount code", text(body.discountCode, 80).toUpperCase()],
     ].filter(([, value]) => value);
 
     const summaryHtml = summaryRows

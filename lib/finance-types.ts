@@ -5,9 +5,13 @@ export type FinancialPaymentRow = {
   payment_kind: "full" | "deposit" | "balance";
   amount_cents: number;
   currency: string;
-  status: "pending" | "paid" | "failed" | "refunded";
+  status: "pending" | "paid" | "failed" | "refunded" | "voided";
   payment_method: "stripe" | "cashapp" | "cash" | "check" | "other";
   manual_reference: string | null;
+  payer_name: string | null;
+  payer_email: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
   paid_at: string | null;
   created_at: string;
   receipt_number: number | null;

@@ -13,8 +13,16 @@ import { ShowcaseHomepageFeatureControl } from "@/components/ShowcaseHomepageFea
 import { AdminMessagesPanel } from "@/components/messages/AdminMessagesPanel";
 import { AdminFinancialsPanel } from "@/components/admin/AdminFinancialsPanel";
 import { MockupStudio } from "@/components/admin/MockupStudio";
+import { AdminMockupTemplatesPanel } from "@/components/admin/AdminMockupTemplatesPanel";
+import { AdminProductPricingPanel } from "@/components/admin/AdminProductPricingPanel";
+import { PaymentShareLinkControl } from "@/components/PaymentShareLinkControl";
+import { AdminCustomerMockupSummary } from "@/components/admin/AdminCustomerMockupSummary";
+import { ProductionChecklist } from "@/components/admin/ProductionChecklist";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
 import type { BusinessExpenseRow, BusinessFinanceAuditRow, BusinessFundingRow, BusinessGoalRow, FinancialPaymentRow } from "@/lib/finance-types";
+import type { DiscountCodeRecord } from "@/lib/discount-types";
+import { compactSizeSummary, orderItemQuantity, type StructuredOrderItem, type ShippingAddress } from "@/lib/order-types";
+import type { BusinessSettingsRecord, ProductPricingRecord } from "@/lib/pricing-types";
 import {
   formatRequestNumber,
   REQUEST_STATUS_LABELS,
@@ -45,6 +53,9 @@ export type AdminRequestRow = {
   deadline: string | null;
   delivery: string | null;
   notes: string | null;
+  requested_discount_code: string | null;
+  order_items: StructuredOrderItem[];
+  shipping_address: ShippingAddress | null;
   status: RequestStatus;
   payment_status: "unpaid" | "deposit_paid" | "paid";
   amount_paid_cents: number;
@@ -101,6 +112,11 @@ type Props = {
   fundingReady: boolean;
   goalsReady: boolean;
   auditReady: boolean;
+  discountCodes: DiscountCodeRecord[];
+  discountsReady: boolean;
+  productPricing: ProductPricingRecord[];
+  businessSettings: BusinessSettingsRecord | null;
+  pricingReady: boolean;
 };
 
 type OrderFilter = "all" | "review" | "production" | RequestStatus;
@@ -154,8 +170,8 @@ function submittedDate(value: string) {
   });
 }
 
-export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, goals, financeAudit, financialsReady, fundingReady, goalsReady, auditReady }: Props) {
-  const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase">("orders");
+export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, goals, financeAudit, financialsReady, fundingReady, goalsReady, auditReady, discountCodes, discountsReady, productPricing, businessSettings, pricingReady }: Props) {
+  const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase" | "mockups" | "pricing">("orders");
   const [query, setQuery] = useState("");
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
@@ -168,10 +184,10 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
     [quotes]
   );
 
-  const paidPaymentsByRequest = useMemo(() => {
+  const paymentHistoryByRequest = useMemo(() => {
     const grouped = new Map<string, FinancialPaymentRow[]>();
     for (const payment of payments) {
-      if (payment.status !== "paid") continue;
+      if (payment.status !== "paid" && payment.status !== "voided") continue;
       const current = grouped.get(payment.request_id) ?? [];
       current.push(payment);
       grouped.set(payment.request_id, current);
@@ -258,10 +274,18 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         </button>
       </section>
 
-      <nav className="adminWorkspaceSwitcher" aria-label="Admin workspace area">
-        <button type="button" className={tab !== "financials" ? "active" : ""} onClick={() => setTab("orders")}>
+      <nav className="adminWorkspaceSwitcher adminWorkspaceSwitcherFour" aria-label="Admin workspace area">
+        <button type="button" className={["orders","messages","showcase"].includes(tab) ? "active" : ""} onClick={() => setTab("orders")}>
           <span className="adminWorkspaceSwitcherIcon">▣</span>
           <span><strong>Orders & customers</strong><small>Requests, messages, production, showcase</small></span>
+        </button>
+        <button type="button" className={tab === "mockups" ? "active" : ""} onClick={() => setTab("mockups")}>
+          <span className="adminWorkspaceSwitcherIcon">✦</span>
+          <span><strong>Mockup templates</strong><small>Move, resize, and save Shop defaults</small></span>
+        </button>
+        <button type="button" className={tab === "pricing" ? "active" : ""} onClick={() => setTab("pricing")}>
+          <span className="adminWorkspaceSwitcherIcon">◇</span>
+          <span><strong>Products & pricing</strong><small>Private costs, labor, margins, pickup tax address</small></span>
         </button>
         <button type="button" className={tab === "financials" ? "active" : ""} onClick={() => setTab("financials")}>
           <span className="adminWorkspaceSwitcherIcon">$</span>
@@ -269,7 +293,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         </button>
       </nav>
 
-      {tab !== "financials" ? <div className="adminWorkspaceTabs adminOperationsTabs" role="tablist" aria-label="Orders and customers">
+      {["orders","messages","showcase"].includes(tab) ? <div className="adminWorkspaceTabs adminOperationsTabs" role="tablist" aria-label="Orders and customers">
         <button type="button" className={tab === "orders" ? "active" : ""} onClick={() => setTab("orders")}>Orders <span>{requests.length}</span></button>
         <button type="button" className={tab === "messages" ? "active" : ""} onClick={() => setTab("messages")}>Messages <span>{counts.messageUnread}</span></button>
         <button type="button" className={tab === "showcase" ? "active" : ""} onClick={() => setTab("showcase")}>Made by You <span>{counts.showcasePending}</span></button>
@@ -312,8 +336,8 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
             ) : visibleRequests.map((request) => {
               const isOpen = openRequestId === request.id;
               const quote = quoteByRequest.get(request.id) ?? null;
-              const requestPayments = paidPaymentsByRequest.get(request.id) ?? [];
-              const latestReceipt = requestPayments.find((payment) => Boolean(payment.receipt_token)) ?? null;
+              const requestPayments = paymentHistoryByRequest.get(request.id) ?? [];
+              const latestReceipt = requestPayments.find((payment) => payment.status === "paid" && Boolean(payment.receipt_token)) ?? null;
               return (
                 <article id={`order-${request.id}`} className={`adminRequestCompact ${isOpen ? "isOpen" : ""}`} key={request.id}>
                   <div className="adminRequestSummary">
@@ -390,16 +414,29 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             <div><dt>Needed by</dt><dd>{prettyDate(request.deadline)}</dd></div>
                             <div><dt>Payment</dt><dd>{request.payment_status === "paid" ? `Paid in full · ${money(request.amount_paid_cents)}` : request.payment_status === "deposit_paid" ? `Deposit paid · ${money(request.amount_paid_cents)} paid` : "Payment due"}</dd></div>
                           </dl>
+                          {request.order_items?.length ? <div className="adminStructuredOrder">
+                            <span className="eyebrow">Structured items</span>
+                            {request.order_items.map((item) => <div className="adminStructuredOrderRow" key={item.id}>
+                              <div><strong>{item.productName}</strong><small>{item.colorName || "Color not specified"}{item.designRelationship === "separate" ? " · Separate design" : item.designRelationship === "same" ? " · Same design direction" : ""}</small></div>
+                              <div><strong>{orderItemQuantity(item)} pcs</strong><small>{compactSizeSummary(item) || "No size breakdown"}</small></div>
+                            </div>)}
+                          </div> : null}
+                          {request.shipping_address ? <div className="adminShippingAddress"><span>Shipping address</span><p>{request.shipping_address.name ? `${request.shipping_address.name} · ` : ""}{request.shipping_address.line1}{request.shipping_address.line2 ? `, ${request.shipping_address.line2}` : ""}<br />{request.shipping_address.city}, {request.shipping_address.state} {request.shipping_address.postalCode} · {request.shipping_address.country}</p></div> : null}
                         </section>
 
                         <section className="adminDetailGroup adminDetailGroupWide">
-                          <div className="adminDetailGroupTitle"><span>03</span><h4>Artwork & sizing</h4></div>
-                          <div className="adminLongFields">
-                            {request.sizes ? <div><span>Sizes / quantities</span><pre className="adminScrollableText">{request.sizes}</pre></div> : null}
-                            {request.placements?.length ? <div><span>Placement</span><p>{request.placements.map(prettyPlacement).join(" · ")}</p></div> : null}
-                            {request.logo_size ? <div><span>Design size</span><p className="adminScrollableText">{request.logo_size}</p></div> : null}
-                            {request.artwork_instructions ? <div><span>Artwork instructions</span><p className="adminScrollableText">{request.artwork_instructions}</p></div> : null}
-                          </div>
+                          <div className="adminDetailGroupTitle"><span>03</span><h4>Customer mockup & production breakdown</h4></div>
+                          <AdminCustomerMockupSummary requestId={request.id} />
+                          {request.order_items?.length ? <ProductionChecklist requestNumber={formatRequestNumber(request.request_number)} customerName={request.customer_name} items={request.order_items} printSides={request.print_sides} /> : null}
+                          <details className="adminTechnicalDetails">
+                            <summary>Technical placement data</summary>
+                            <div className="adminLongFields">
+                              {request.sizes ? <div><span>Original size summary</span><pre className="adminScrollableText">{request.sizes}</pre></div> : null}
+                              {request.placements?.length ? <div><span>Placement codes</span><p>{request.placements.map(prettyPlacement).join(" · ")}</p></div> : null}
+                              {request.logo_size ? <div><span>Preview sizing</span><p className="adminScrollableText">{request.logo_size}</p></div> : null}
+                              {request.artwork_instructions ? <div><span>Saved preview coordinates</span><p className="adminScrollableText">{request.artwork_instructions}</p></div> : null}
+                            </div>
+                          </details>
                         </section>
 
                         {request.notes ? (
@@ -425,7 +462,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                       <section className="adminQuoteSection">
                         <div className="adminDetailGroupTitle"><span>$</span><h4>Proof + quote approval</h4></div>
                         {quoteReady ? (
-                          <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} existingQuote={quote} />
+                          <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} />
                         ) : <div className="requestWarning">Proof + quote approval is not set up yet. Run the Phase 2D scalable proofs SQL migration.</div>}
                       </section>
 
@@ -463,6 +500,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             policyAcceptedAt={quote.paymentPolicyAcceptedAt || null}
                             payments={requestPayments}
                           />
+                          <PaymentShareLinkControl requestId={request.id} quoteId={quote.id} requestNumber={formatRequestNumber(request.request_number)} quoteStatus={quote.status} amountDueCents={Math.max(0, quote.total_cents - request.amount_paid_cents)} policyAccepted={Boolean(quote.paymentPolicyAccepted)} customerEmail={request.email} />
                         </section>
                       ) : null}
 
@@ -497,7 +535,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
       ) : tab === "messages" ? (
         messagesReady ? <AdminMessagesPanel threads={messageThreads} adminUsers={adminUsers} currentAdminUserId={currentAdminUserId} /> : <section className="adminWorkspacePanel"><div className="formError">Messages are not set up in Supabase yet. Run supabase/moore_made_phase5_messages.sql.</div></section>
       ) : tab === "financials" ? (
-        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} goals={goals} financeAudit={financeAudit} adminUsers={adminUsers} fundingReady={fundingReady} goalsReady={goalsReady} auditReady={auditReady} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need the latest database update. Run <code>supabase/moore_made_phase6_16_finance_command_center.sql</code> after your existing financial migrations.</div></section>
+        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} goals={goals} financeAudit={financeAudit} adminUsers={adminUsers} fundingReady={fundingReady} goalsReady={goalsReady} auditReady={auditReady} discountCodes={discountCodes} discountsReady={discountsReady} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need the latest database update. Run <code>supabase/moore_made_phase6_16_finance_command_center.sql</code> after your existing financial migrations.</div></section>
+      ) : tab === "mockups" ? (
+        <AdminMockupTemplatesPanel />
+      ) : tab === "pricing" ? (
+        <AdminProductPricingPanel records={productPricing} settings={businessSettings} ready={pricingReady} />
       ) : (
         <section className="adminWorkspacePanel">
           <div className="adminSectionIntro">

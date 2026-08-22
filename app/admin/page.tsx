@@ -5,15 +5,18 @@ import type { ShowcaseStatus } from "@/lib/showcase-types";
 import { normalizeShowcasePhotoPreviewMap } from "@/lib/showcase-photo-preview";
 import { CUSTOM_REQUEST_BUCKET, QUOTE_PROOF_BUCKET, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase-admin";
 import type { QuoteRecord } from "@/lib/quote-types";
+import type { DiscountCodeRecord } from "@/lib/discount-types";
 import { AdminWorkspace, type AdminRequestRow, type AdminShowcaseRow } from "@/components/AdminWorkspace";
 import { MESSAGE_BUCKET } from "@/lib/message-server";
 import type { AdminMessageThread, AdminUserOption, MessageAttachment, MessageEntry, MessageTopic, MessageThreadStatus } from "@/lib/message-types";
 import { EXPENSE_RECEIPT_BUCKET, FUNDING_DOCUMENT_BUCKET, type BusinessExpenseReceipt, type BusinessExpenseRow, type BusinessFinanceAuditRow, type BusinessFundingDocument, type BusinessFundingRow, type BusinessGoalFundingRow, type BusinessGoalRow, type FinancialPaymentRow } from "@/lib/finance-types";
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
+import type { StructuredOrderItem, ShippingAddress } from "@/lib/order-types";
+import type { BusinessSettingsRecord, ProductPricingRecord } from "@/lib/pricing-types";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-type RequestRow = { id:string; request_number:number; customer_name:string; email:string; phone:string|null; sms_consent:boolean; product:string; quantity:number; item_type:string|null; colors:string|null; sizes:string|null; logo_size:string|null; print_sides:string|null; placements:string[]|null; artwork_instructions:string|null; deadline:string|null; delivery:string|null; notes:string|null; status:RequestStatus; payment_status:"unpaid"|"deposit_paid"|"paid"; amount_paid_cents:number; artwork_paths:string[]|null; tracking_number:string|null; tracking_url:string|null; fulfillment_note:string|null; fulfillment_notified_at:string|null; estimated_fulfillment_date:string|null; estimated_fulfillment_note:string|null; estimated_fulfillment_notified_at:string|null; estimated_fulfillment_notified_for_date:string|null; cash_payment_request_status:"none"|"pending"|"contacted"|"completed"|"cancelled"; cash_payment_requested_at:string|null; cash_payment_requested_amount_cents:number|null; cash_payment_contacted_at:string|null; created_at:string; };
+type RequestRow = { id:string; request_number:number; customer_name:string; email:string; phone:string|null; sms_consent:boolean; product:string; quantity:number; item_type:string|null; colors:string|null; sizes:string|null; logo_size:string|null; print_sides:string|null; placements:string[]|null; artwork_instructions:string|null; deadline:string|null; delivery:string|null; notes:string|null; requested_discount_code:string|null; order_items:StructuredOrderItem[]; shipping_address:ShippingAddress|null; status:RequestStatus; payment_status:"unpaid"|"deposit_paid"|"paid"; amount_paid_cents:number; artwork_paths:string[]|null; tracking_number:string|null; tracking_url:string|null; fulfillment_note:string|null; fulfillment_notified_at:string|null; estimated_fulfillment_date:string|null; estimated_fulfillment_note:string|null; estimated_fulfillment_notified_at:string|null; estimated_fulfillment_notified_for_date:string|null; cash_payment_request_status:"none"|"pending"|"contacted"|"completed"|"cancelled"; cash_payment_requested_at:string|null; cash_payment_requested_amount_cents:number|null; cash_payment_contacted_at:string|null; created_at:string; };
 type ShowcaseRow = { id:string; customer_name:string; business_name:string|null; email:string; product:string; rating:number; review:string; caption:string|null; social_handle:string|null; status:ShowcaseStatus; homepage_featured:boolean; photo_paths:string[]|null; photo_preview_settings:unknown; created_at:string; };
 type MessageThreadRow = { id:string; customer_user_id:string; request_id:string|null; subject:string; topic:MessageTopic; status:MessageThreadStatus; assigned_admin_user_id:string|null; customer_unread_count:number; admin_unread_count:number; last_message_at:string; created_at:string; };
 type MessageEntryRow = { id:string; thread_id:string; sender_user_id:string|null; sender_role:"customer"|"admin"|"system"; sender_display_name:string; body:string; is_internal:boolean; created_at:string; };
@@ -31,7 +34,7 @@ export default async function AdminPage() {
 
   const { data, error } = await supabase
     .from("custom_requests")
-    .select("id,request_number,customer_name,email,phone,sms_consent,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,artwork_instructions,deadline,delivery,notes,status,payment_status,amount_paid_cents,artwork_paths,tracking_number,tracking_url,fulfillment_note,fulfillment_notified_at,estimated_fulfillment_date,estimated_fulfillment_note,estimated_fulfillment_notified_at,estimated_fulfillment_notified_for_date,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents,cash_payment_contacted_at,created_at")
+    .select("id,request_number,customer_name,email,phone,sms_consent,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,artwork_instructions,deadline,delivery,notes,requested_discount_code,order_items,shipping_address,status,payment_status,amount_paid_cents,artwork_paths,tracking_number,tracking_url,fulfillment_note,fulfillment_notified_at,estimated_fulfillment_date,estimated_fulfillment_note,estimated_fulfillment_notified_at,estimated_fulfillment_notified_for_date,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents,cash_payment_contacted_at,created_at")
     .order("created_at", { ascending: false });
   const requests = (data ?? []) as RequestRow[];
   const rowsWithFiles: AdminRequestRow[] = await Promise.all(requests.map(async (row) => ({
@@ -44,8 +47,15 @@ export default async function AdminPage() {
 
   const { data: quoteData, error: quoteError } = await supabase
     .from("quotes")
-    .select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,sent_at,responded_at,created_at,updated_at");
+    .select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_calculation_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at");
   const baseQuotes = (quoteData ?? []) as QuoteRecord[];
+
+  const { data: quoteRevisionData, error: quoteRevisionError } = await supabase
+    .from("quote_revisions")
+    .select("id,quote_id,revision_number,status,revision_reason,total_cents,estimated_profit_cents,estimated_margin_basis_points,proof_version,sent_at,responded_at,created_at")
+    .order("revision_number", { ascending: false });
+  type QuoteRevisionRow = { id:string; quote_id:string; revision_number:number; status:QuoteRecord["status"]; revision_reason:string|null; total_cents:number; estimated_profit_cents:number; estimated_margin_basis_points:number; proof_version:number; sent_at:string|null; responded_at:string|null; created_at:string; };
+  const quoteRevisionRows = (quoteRevisionData ?? []) as QuoteRevisionRow[];
 
   const { data: policyAcceptanceData } = await supabase
     .from("order_policy_acceptances")
@@ -110,6 +120,7 @@ export default async function AdminPage() {
       proofItems,
       proofItemsVersion: adminVersion,
       changeRequests,
+      revisions: quoteRevisionRows.filter((row) => row.quote_id === quote.id).map(({ quote_id: _quoteId, ...row }) => row),
       paymentPolicyAccepted: Boolean(policyAcceptance),
       paymentPolicyAcceptedAt: policyAcceptance?.accepted_at || null,
     };
@@ -178,7 +189,7 @@ export default async function AdminPage() {
 
   const { data: paymentData, error: paymentError } = await supabase
     .from("payments")
-    .select("id,request_id,quote_id,payment_kind,amount_cents,currency,status,payment_method,manual_reference,paid_at,created_at,receipt_number,receipt_token")
+    .select("id,request_id,quote_id,payment_kind,amount_cents,currency,status,payment_method,manual_reference,payer_name,payer_email,voided_at,void_reason,paid_at,created_at,receipt_number,receipt_token")
     .order("created_at", { ascending: false });
   const payments = (paymentData ?? []) as FinancialPaymentRow[];
 
@@ -257,6 +268,25 @@ export default async function AdminPage() {
     .limit(150);
   const financeAudit = (financeAuditData ?? []) as BusinessFinanceAuditRow[];
 
+  const { data: discountCodeData, error: discountCodeError } = await supabase
+    .from("discount_codes")
+    .select("id,code,description,kind,percent_off,amount_off_cents,min_order_cents,max_uses,per_customer_limit,starts_at,expires_at,active,retired_at,created_at,updated_at,discount_redemptions(id,quote_id,request_id,customer_email,discount_cents,redeemed_at)")
+    .order("created_at", { ascending: false });
+  const discountCodes = (discountCodeData ?? []) as unknown as DiscountCodeRecord[];
+
+  const { data: productPricingData, error: productPricingError } = await supabase
+    .from("product_pricing")
+    .select("product_slug,product_name,active,blank_cost_cents,print_cost_cents,packaging_cost_cents,default_labor_hours,labor_rate_cents,target_margin_basis_points,tax_code,notes,created_at,updated_at")
+    .order("product_name", { ascending: true });
+  const productPricing = (productPricingData ?? []) as ProductPricingRecord[];
+
+  const { data: businessSettingsData, error: businessSettingsError } = await supabase
+    .from("business_settings")
+    .select("id,default_labor_rate_cents,minimum_labor_hours,pickup_address,default_tax_code,shipping_tax_code,updated_at")
+    .eq("id", "default")
+    .maybeSingle();
+  const businessSettings = (businessSettingsData ?? null) as BusinessSettingsRecord | null;
+
   const messageThreads: AdminMessageThread[] = messageThreadRows.map((thread) => {
     const order = thread.request_id ? requestById.get(thread.request_id) : null;
     const profile = profileByUser.get(thread.customer_user_id);
@@ -329,6 +359,11 @@ export default async function AdminPage() {
       fundingReady={!fundingError && !fundingDocumentError}
       goalsReady={!goalError && !goalFundingError}
       auditReady={!financeAuditError}
+      discountCodes={discountCodes}
+      discountsReady={!discountCodeError && !quoteRevisionError}
+      productPricing={productPricing}
+      businessSettings={businessSettings}
+      pricingReady={!productPricingError && !businessSettingsError}
     />
   </div>;
 }

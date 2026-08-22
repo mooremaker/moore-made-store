@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { paymentMethodLabel, receiptLabel, type FinancialPaymentRow } from "@/lib/finance-types";
 import { money } from "@/lib/quote-types";
@@ -58,9 +58,9 @@ export function ManualPaymentControl({
     () => nextPaymentAmount({ totalCents, terms: paymentTerms, depositAmountCents, amountPaidCents }),
     [totalCents, paymentTerms, depositAmountCents, amountPaidCents]
   );
-  const paidPayments = useMemo(
+  const paymentHistory = useMemo(
     () => [...payments]
-      .filter((payment) => payment.status === "paid")
+      .filter((payment) => payment.status === "paid" || payment.status === "voided")
       .sort((a, b) => new Date(b.paid_at || b.created_at).getTime() - new Date(a.paid_at || a.created_at).getTime()),
     [payments]
   );
@@ -72,9 +72,40 @@ export function ManualPaymentControl({
   const [message, setMessage] = useState("");
   const [receiptToken, setReceiptToken] = useState("");
   const [error, setError] = useState("");
+  const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidSaving, setVoidSaving] = useState(false);
+
+  useEffect(() => {
+    setAmount(dollars(nextPayment.amountCents));
+  }, [nextPayment.amountCents]);
 
   const remainingCents = Math.max(0, totalCents - amountPaidCents);
   const approved = quoteStatus === "approved";
+
+  async function voidPayment(paymentId: string) {
+    if (voidReason.trim().length < 3) {
+      setError("Add a short correction reason so the audit history stays clear.");
+      return;
+    }
+    setVoidSaving(true); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/admin/payments/void", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentId, reason: voidReason.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not correct payment.");
+      setMessage(result.message || "Payment corrected and balance reopened.");
+      setVoidingId(null); setVoidReason("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not correct payment.");
+    } finally {
+      setVoidSaving(false);
+    }
+  }
 
   async function recordPayment() {
     setSaving(true);
@@ -122,25 +153,30 @@ export function ManualPaymentControl({
         <div><span>Remaining</span><strong>{money(remainingCents)}</strong></div>
       </div>
 
-      {paidPayments.length ? (
+      {paymentHistory.length ? (
         <section className="manualPaymentHistory" aria-label={`Payment receipts for ${requestNumber}`}>
           <div className="manualPaymentHistoryHead">
             <div><span className="eyebrow">Receipts</span><strong>Payment history</strong></div>
-            <small>{paidPayments.length} payment{paidPayments.length === 1 ? "" : "s"} recorded</small>
+            <small>{paymentHistory.length} record{paymentHistory.length === 1 ? "" : "s"}</small>
           </div>
           <div className="manualPaymentHistoryList">
-            {paidPayments.map((payment) => (
-              <div className="manualPaymentHistoryRow" key={payment.id}>
-                <div>
-                  <strong>{receiptLabel(payment.receipt_number)}</strong>
-                  <small>{paymentDate(payment.paid_at || payment.created_at)} · {paymentMethodLabel(payment.payment_method)}</small>
+            {paymentHistory.map((payment) => (
+              <div className={`manualPaymentHistoryRow ${payment.status === "voided" ? "isVoided" : ""}`} key={payment.id}>
+                <div className="paymentHistoryIdentity">
+                  <strong>{receiptLabel(payment.receipt_number)}{payment.status === "voided" ? " · VOIDED" : ""}</strong>
+                  <small>{paymentDate(payment.paid_at || payment.created_at)} · {paymentMethodLabel(payment.payment_method)}{payment.payer_name ? ` · Paid by ${payment.payer_name}` : ""}</small>
+                  {payment.status === "voided" && payment.void_reason ? <small className="voidReasonText">Correction: {payment.void_reason}</small> : null}
                 </div>
                 <strong>{money(payment.amount_cents)}</strong>
-                {payment.receipt_token ? (
-                  <a className="btn secondary" href={`/receipt/${payment.receipt_token}`} target="_blank" rel="noreferrer">View receipt ↗</a>
-                ) : (
-                  <span className="manualPaymentReceiptMissing">Receipt unavailable</span>
-                )}
+                <div className="paymentHistoryActions">
+                  {payment.receipt_token ? <a className="btn secondary" href={`/receipt/${payment.receipt_token}`} target="_blank" rel="noreferrer">View receipt ↗</a> : <span className="manualPaymentReceiptMissing">Receipt unavailable</span>}
+                  {payment.status === "paid" && payment.payment_method !== "stripe" ? <button className="textButton dangerText" type="button" onClick={() => { setVoidingId(payment.id); setVoidReason(""); setError(""); }}>Correct / void</button> : null}
+                  {payment.status === "paid" && payment.payment_method === "stripe" ? <small className="stripeCorrectionNote">Stripe charges must be refunded/corrected in Stripe.</small> : null}
+                </div>
+                {voidingId === payment.id ? <div className="paymentVoidEditor">
+                  <label className="field"><span>Why is this payment being corrected?</span><input value={voidReason} onChange={(e) => setVoidReason(e.target.value)} maxLength={1000} placeholder="Example: Cash was marked received, but customer changed to card before cash was handed over." /></label>
+                  <div><button className="btn secondary" type="button" disabled={voidSaving} onClick={() => setVoidingId(null)}>Cancel</button><button className="btn" type="button" disabled={voidSaving} onClick={() => voidPayment(payment.id)}>{voidSaving ? "Correcting…" : "Void record & reopen balance"}</button></div>
+                </div> : null}
               </div>
             ))}
           </div>

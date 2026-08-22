@@ -1,25 +1,33 @@
 import Link from "next/link";
+import { ShopCatalog } from "@/components/shop/ShopCatalog";
+import { getShopMockupTemplates } from "@/lib/mockup-template-server";
 
-export default function ShopPage() {
+export default async function ShopPage() {
+  const mockupTemplates = await getShopMockupTemplates();
   return (
-    <div className="shell">
-      <section className="pageHero comingSoonHero">
+    <div className="shell shopPage">
+      <section className="pageHero shopHero">
         <div className="eyebrow">Moore Made shop</div>
-        <span className="comingSoonBadge">COMING SOON</span>
-        <h1>Our online shop is being made.</h1>
+        <h1>See something you like? <span>Make it yours.</span></h1>
         <p className="lead">
-          We&apos;re building an easier way to browse products, choose options,
-          upload artwork, and order directly online.
+          Browse what we can make, choose your colors and placement, then upload your own artwork or tell us the idea you want created. You stay in control of the look from the beginning.
         </p>
-        <p className="lead">
-          In the meantime, you can still order just about anything. Send us a
-          custom request with the item, quantity, sizes, colors, logo, and
-          placement details and we&apos;ll take it from there.
-        </p>
-        <div className="actions">
-          <Link className="btn" href="/custom-orders">Place a custom request</Link>
-          <Link className="btn secondary" href="/">Back home</Link>
+        <div className="shopHeroPaths">
+          <div><strong>I have artwork</strong><span>Upload it, place it, resize it, and show us exactly what you have in mind.</span></div>
+          <div><strong>I have an idea</strong><span>Pick the product and layout anyway. Tell us what belongs in each spot and we&apos;ll help create it.</span></div>
         </div>
+        <div className="actions">
+          <a className="btn" href="#catalog">Browse the catalog</a>
+          <Link className="btn secondary" href="/custom-orders">Start a general request</Link>
+        </div>
+      </section>
+
+      <section className="shopCatalogSection" id="catalog">
+        <div className="sectionHead shopSectionHead">
+          <div><div className="eyebrow">Choose a canvas</div><h2>What do you want to make?</h2></div>
+          <p>Example Moore Made artwork shows you how each item can look. Replace it with yours — or use the layout as inspiration.</p>
+        </div>
+        <ShopCatalog mockupTemplates={mockupTemplates} />
       </section>
     </div>
   );
