@@ -15,6 +15,25 @@ function money(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Math.max(0, cents) / 100);
 }
 
+function splitSupportHeadline(headline: string) {
+  const words = headline.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return [headline, ""];
+  if (words.slice(0, 3).join(" ").toLowerCase() === "help moore made") {
+    return [words.slice(0, 3).join(" "), words.slice(3).join(" ")];
+  }
+  const target = headline.length / 2;
+  let splitAt = 1;
+  let closest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < words.length; index += 1) {
+    const distance = Math.abs(words.slice(0, index).join(" ").length - target);
+    if (distance < closest) {
+      closest = distance;
+      splitAt = index;
+    }
+  }
+  return [words.slice(0, splitAt).join(" "), words.slice(splitAt).join(" ")];
+}
+
 const mainRoadmapGroups = [
   {
     label: "Needed now",
@@ -63,6 +82,8 @@ export default async function SupportPage({ params }: { params: Promise<{ token:
   const weeklyReserve = Number(businessSettings?.weekly_reserve_goal_cents ?? 30000);
   const legacyHeadline = "Help Moore Made build the equipment and stability needed to grow.";
   const displayHeadline = settings.headline === legacyHeadline ? "Help Moore Made build what comes next." : settings.headline;
+  const headlineLines = splitSupportHeadline(displayHeadline);
+  const headlineLengthClass = Math.max(...headlineLines.map((line) => line.length)) > 28 ? " isExtraLong" : Math.max(...headlineLines.map((line) => line.length)) > 18 ? " isLong" : "";
   const goalSummary = "DTF printer repair, dependable production supplies, embroidery, and a dedicated workshop or storefront";
   const legacyIntroduction = settings.introduction.startsWith("Moore Made is building a dependable two-owner custom-goods business.");
   const introductionParagraphs = legacyIntroduction ? [
@@ -79,17 +100,18 @@ export default async function SupportPage({ params }: { params: Promise<{ token:
     const sales = Math.round(weeklySales * stage.percent / 100);
     const profit = Math.round(weeklyProfit * stage.percent / 100);
     const pieces = Math.ceil(sales / planningItemRevenue);
-    return { ...stage, sales, profit, pieces, orders: Math.ceil(pieces / planningItemsPerOrder), piecesPerDay: Math.ceil(pieces / 5) };
+    const orders = Math.ceil(pieces / planningItemsPerOrder);
+    return { ...stage, sales, profit, pieces, orders, piecesPerDay: Math.ceil(pieces / 5), ordersPerDay: Math.ceil(orders / 5) };
   });
 
   return <div className="supportPage">
     <section className="supportHero">
       <div className="supportHeroBrand"><strong>MOORE<span>/</span>MADE</strong><small>Your Idea. Moore Made.</small></div>
       <div className="supportPrivateBadge">Private supporter overview</div>
-      <h1>{displayHeadline}</h1>
+      <h1 className={`supportHeroTitle${headlineLengthClass}`} aria-label={displayHeadline}><span>{headlineLines[0]}</span><span>{headlineLines[1]}</span></h1>
       <div className="supportHeroIntro">{introductionParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
       <div className="supportHeroStats"><span><strong>2 owners</strong><small>Building together</small></span><span><strong>Clear safeguards</strong><small>Costs and margins tracked</small></span><span><strong>Scalable production</strong><small>Equipment unlocks capacity</small></span></div>
-      <div className="supportHeroUtility supportHeroSingleAction"><a href="#support-form">Interested in supporting Moore Made? Leave your contact details</a></div>
+      <div className="supportHeroUtility supportHeroSingleAction"><a href="#support-form"><span>Interested in supporting Moore Made?</span><span>Leave your contact details</span></a></div>
       <p className="supportHeroNote">No payment or commitment is made on this page.</p>
     </section>
     <nav className="supportJumpNav" aria-label="Support page sections"><a href="#business">The business</a><a href="#growth-runway">Growth runway</a><a href="#production-plan">Production + ads</a><a href="#support-needs">What support unlocks</a></nav>
@@ -97,7 +119,7 @@ export default async function SupportPage({ params }: { params: Promise<{ token:
     <section className="supportStory supportSection" id="business">
       <div className="supportSectionNumber">01</div>
       <div className="supportSectionCopy"><div className="supportEyebrow">The business</div><h2>A careful custom-order company built to last.</h2><p>Moore Made creates custom apparel, bags, drinkware, paper goods, gifts, and business materials. Customers share their idea, receive a mockup and safeguarded quote, approve the work, pay securely, and receive production and fulfillment updates.</p><p>Sal and Matt are building the company around clear communication, repeatable production, honest pricing, organized financial records, and finished work customers are excited to share.</p></div>
-      <div className="supportFlow" aria-label="Moore Made customer process"><span>Idea</span><b>→</b><span>Proof + quote</span><b>→</b><span>Approval</span><b>→</b><span>Production</span><b>→</b><span>Delivery</span></div>
+      <div className="supportFlow" aria-label="Moore Made customer process"><span>Customer idea</span><b>→</b><span>Proof + quote</span><b>→</b><span>Approval</span><b>→</b><span>Production</span><b>→</b><span>Delivery</span></div>
     </section>
 
     <section className="supportSection">
@@ -124,9 +146,9 @@ export default async function SupportPage({ params }: { params: Promise<{ token:
         <div className="supportAnnualNumbers"><article><span>Annual sales goal</span><strong>{money(weeklySales * 52)}</strong></article><article><span>Annual business-profit goal</span><strong>{money(weeklyProfit * 52)}</strong></article><article><span>Combined annual owner goal</span><strong>{money(weeklyOwners * 52)}</strong><small>Before personal tax reserves</small></article><article><span>Annual business reserve goal</span><strong>{money(weeklyReserve * 52)}</strong><small>For stability and reinvestment</small></article></div>
       </div>
       <div className="supportProjectionIntro"><strong>A realistic runway—not one giant leap.</strong><p>The goal is to grow through measurable stages. Each milestone below is calculated from Moore Made’s editable weekly goals and shows the scale the business is working toward.</p></div>
-      <div className="supportProjectionGrid">
-        <article><div className="supportProjectionHead"><span>Estimated weekly sales</span><strong>{money(weeklySales)} goal</strong></div>{capacityStages.map((stage) => <div className="supportProjectionRow" key={`sales-${stage.name}`}><div><b>{stage.name}</b><span>{money(stage.sales)}</span></div><div className="supportProjectionTrack"><span style={{ width: `${stage.percent}%` }} /></div></div>)}</article>
-        <article><div className="supportProjectionHead"><span>Estimated weekly business profit</span><strong>{money(weeklyProfit)} goal</strong></div>{capacityStages.map((stage) => <div className="supportProjectionRow isProfit" key={`profit-${stage.name}`}><div><b>{stage.name}</b><span>{money(stage.profit)}</span></div><div className="supportProjectionTrack"><span style={{ width: `${stage.percent}%` }} /></div></div>)}</article>
+      <div className="supportProjectionGrid supportProjectionCombined">
+        <div className="supportProjectionCombinedHead"><span>Estimated weekly targets by stage</span><div><b>{money(weeklySales)} sales goal</b><b>{money(weeklyProfit)} profit goal</b></div></div>
+        <div className="supportProjectionStages">{capacityStages.map((stage) => <article className="supportProjectionStage" key={stage.name}><div className="supportProjectionStageHead"><span>{stage.percent}% of weekly goal</span><strong>{stage.name}</strong></div><div className="supportProjectionMetric"><div><b>Sales</b><span>{money(stage.sales)}</span></div><div className="supportProjectionTrack"><span style={{ width: `${stage.percent}%` }} /></div></div><div className="supportProjectionMetric isProfit"><div><b>Business profit</b><span>{money(stage.profit)}</span></div><div className="supportProjectionTrack"><span style={{ width: `${stage.percent}%` }} /></div></div></article>)}</div>
       </div>
       <div className="supportCapacityNote"><strong>How production capacity is evaluated</strong><p>Moore Made tracks orders, pieces, labor hours, material costs, equipment needs, payment fees, overhead, estimated profit, and true margin. Larger orders are priced to reward customers for volume while still covering the additional labor required.</p></div>
     </section>
@@ -134,7 +156,7 @@ export default async function SupportPage({ params }: { params: Promise<{ token:
     <section className="supportSection" id="production-plan">
       <div className="supportSectionNumber">04</div>
       <div className="supportSectionCopy"><div className="supportEyebrow">Production + customer growth</div><h2>What reaching the goal could look like.</h2><p>This example uses an average of {money(planningItemRevenue)} in customer revenue per finished item and about {planningItemsPerOrder} pieces per order. The actual mix will vary across apparel, mugs, bags, business orders, and larger group orders.</p></div>
-      <div className="supportCapacityTable">{capacityStages.map((stage) => <article key={stage.name}><div className="supportCapacityStage"><span>{stage.percent}% of weekly goal</span><h3>{stage.name}</h3><p>{stage.note}</p></div><div><strong>{stage.pieces}</strong><span>pieces / week</span></div><div><strong>{stage.orders}</strong><span>orders / week</span></div><div><strong>{stage.piecesPerDay}</strong><span>pieces / production day</span></div></article>)}</div>
+      <div className="supportCapacityTable">{capacityStages.map((stage) => <article key={stage.name}><div className="supportCapacityStage"><span>{stage.percent}% of weekly goal</span><h3>{stage.name}</h3><p>{stage.note}</p></div><div><strong>{stage.pieces}</strong><span>pieces / week</span></div><div><strong>{stage.orders}</strong><span>orders / week</span></div><div><strong>{stage.piecesPerDay}</strong><span>pieces / production day</span></div><div><strong>{stage.ordersPerDay}</strong><span>orders / production day</span></div></article>)}</div>
       <div className="supportAssumptionNote">Planning example only. A higher average order value or larger group orders can reach the same sales goal with fewer individual orders; smaller one-off products may require more pieces.</div>
       <div className="supportAdPlan">
         <div className="supportAdPlanHead"><span>How Moore Made plans to bring in customers</span><h3>Earn attention, test carefully,<br />then scale what pays for itself.</h3></div>
