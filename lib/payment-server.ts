@@ -10,7 +10,7 @@ import { recordCustomerEmailNotification } from "@/lib/message-server";
 export async function recalculateOrderPayment(requestId: string, quoteId: string) {
   const supabase = getSupabaseAdmin();
   const [{ data: quote }, { data: request }, { data: paymentRows }] = await Promise.all([
-    supabase.from("quotes").select("id,public_token,total_cents,payment_terms,deposit_amount_cents").eq("id", quoteId).single(),
+    supabase.from("quotes").select("id,public_token,total_cents,payment_terms,deposit_amount_cents,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id").eq("id", quoteId).single(),
     supabase.from("custom_requests").select("id,status,request_number,customer_name,email,product").eq("id", requestId).single(),
     supabase.from("payments").select("amount_cents,status").eq("request_id", requestId),
   ]);
@@ -54,6 +54,9 @@ export async function recalculateOrderPayment(requestId: string, quoteId: string
     paymentStatus,
     orderStatus: nextStatus,
     invoiceToken: quote.public_token || null,
+    taxMode: quote.tax_mode || "manual",
+    stripeTaxCalculationId: quote.stripe_tax_calculation_id || null,
+    stripeTaxTransactionId: quote.stripe_tax_transaction_id || null,
   };
 }
 
@@ -165,6 +168,14 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
   if (paymentError) throw new Error("Could not record Stripe payment.");
 
   const summary = await recalculateOrderPayment(requestId, quoteId);
+  if (summary.remainingCents <= 0 && summary.taxMode === "automatic" && summary.stripeTaxCalculationId && !summary.stripeTaxTransactionId) {
+    try {
+      const taxTransaction = await getStripe().tax.transactions.createFromCalculation({ calculation: summary.stripeTaxCalculationId, reference: `order-${requestId}` });
+      await supabase.from("quotes").update({ stripe_tax_transaction_id: taxTransaction.id }).eq("id", quoteId).is("stripe_tax_transaction_id", null);
+    } catch (taxTransactionError) {
+      console.error("Final Stripe Tax transaction recording failed", taxTransactionError);
+    }
+  }
   const { data: receiptPayment } = await supabase
     .from("payments")
     .select("receipt_number,receipt_token")

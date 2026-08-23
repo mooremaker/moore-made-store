@@ -43,7 +43,7 @@ export default async function ReceiptPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data: payment } = await supabase
     .from("payments")
-    .select("id,request_id,quote_id,amount_cents,status,payment_method,manual_reference,payer_name,payer_email,paid_at,receipt_number,receipt_token,voided_at,void_reason")
+    .select("id,request_id,quote_id,amount_cents,order_tax_cents,order_total_cents,status,payment_method,manual_reference,payer_name,payer_email,paid_at,receipt_number,receipt_token,voided_at,void_reason")
     .eq("receipt_token", token)
     .in("status", ["paid", "voided"])
     .maybeSingle();
@@ -63,7 +63,8 @@ export default async function ReceiptPage({ params }: Props) {
     const rowTime = row.paid_at ? new Date(row.paid_at).getTime() : 0;
     return rowTime <= paidAtMs ? sum + Number(row.amount_cents || 0) : sum;
   }, 0);
-  const totalCents = Number(quote.total_cents || 0);
+  const totalCents = Number(payment.order_total_cents ?? quote.total_cents ?? 0);
+  const receiptTaxCents = Number(payment.order_tax_cents ?? quote.tax_cents ?? 0);
   const remainingCents = Math.max(0, totalCents - paidToDate);
   const orderNumber = formatRequestNumber(order.request_number);
   const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
@@ -95,7 +96,7 @@ export default async function ReceiptPage({ params }: Props) {
         <section className="receiptBreakdownSection">
           <div className="receiptSectionHeading"><div><span className="eyebrow">Order breakdown</span><h2>What this order includes</h2></div><small>Prices reflect the approved quote.</small></div>
           <div className="receiptLineItems">
-            <div className="receiptLine receiptLineHeader"><span>Item</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+            <div className="receiptLine receiptLineHeader"><span>Item</span><span>Qty</span><span>Price each</span><span>Line total</span></div>
             {lineItems.map((item, index) => (
               <div className="receiptLine" key={`${item.description}-${index}`}>
                 <span>{item.description}</span>
@@ -110,7 +111,7 @@ export default async function ReceiptPage({ params }: Props) {
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
-            {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            {receiptTaxCents ? <div><span>Sales tax</span><strong>{money(receiptTaxCents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="receiptOrderGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
           </div>
@@ -163,7 +164,7 @@ export default async function ReceiptPage({ params }: Props) {
 
         <section className="receiptPrintItems">
           <div className="receiptPrintSectionLabel">Order details</div>
-          <div className="receiptPrintLine receiptPrintLineHeader"><span>Item</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+          <div className="receiptPrintLine receiptPrintLineHeader"><span>Item</span><span>Qty</span><span>Price each</span><span>Line total</span></div>
           {lineItems.length ? lineItems.map((item, index) => (
             <div className="receiptPrintLine" key={`print-${item.description}-${index}`}>
               <span>{item.description}</span>
@@ -187,7 +188,7 @@ export default async function ReceiptPage({ params }: Props) {
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
-            {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            {receiptTaxCents ? <div><span>Sales tax</span><strong>{money(receiptTaxCents)}</strong></div> : null}
             <div className="receiptPrintGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
           </div>
 

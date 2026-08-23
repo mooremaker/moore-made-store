@@ -19,6 +19,8 @@ type InvoiceQuote = {
   setup_fee_cents: number;
   shipping_cents: number;
   tax_cents: number;
+  tax_mode: "automatic" | "manual" | "exempt";
+  stripe_tax_transaction_id: string | null;
   discount_cents: number;
   subtotal_cents: number;
   total_cents: number;
@@ -49,7 +51,7 @@ export default async function InvoicePage({ params }: Props) {
   const { token } = await params;
   if (!token) notFound();
   const supabase = getSupabaseAdmin();
-  const { data: quoteData } = await supabase.from("quotes").select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,responded_at,sent_at,created_at").eq("public_token", token).maybeSingle();
+  const { data: quoteData } = await supabase.from("quotes").select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_transaction_id,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,responded_at,sent_at,created_at").eq("public_token", token).maybeSingle();
   if (!quoteData || quoteData.status !== "approved") notFound();
   const quote = quoteData as unknown as InvoiceQuote;
   const [{ data: order }, { data: paymentData }] = await Promise.all([
@@ -91,14 +93,14 @@ export default async function InvoicePage({ params }: Props) {
         <section className="invoiceSection">
           <div className="invoiceSectionHeading"><div><span className="eyebrow">Approved order</span><h2>Itemized charges</h2></div><small>This invoice reflects the customer-approved proof + quote.</small></div>
           <div className="invoiceLineItems">
-            <div className="invoiceLine invoiceLineHeader"><span>Item</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+            <div className="invoiceLine invoiceLineHeader"><span>Item</span><span>Qty</span><span>Price each</span><span>Line total</span></div>
             {lineItems.map((item, index) => <div className="invoiceLine" key={`${item.description}-${index}`}><span>{item.description}</span><span>{item.quantity}</span><span>{money(item.unitPriceCents)}</span><strong>{money(item.quantity * item.unitPriceCents)}</strong></div>)}
           </div>
           <div className="invoiceTotals">
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
-            {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            {quote.tax_cents ? <div><span>{quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? "Estimated sales tax" : "Sales tax"}</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="invoiceGrandTotal"><span>Invoice total</span><strong>{money(totalCents)}</strong></div>
           </div>

@@ -45,6 +45,8 @@ type QuoteView = {
   setup_fee_cents: number;
   shipping_cents: number;
   tax_cents: number;
+  tax_mode: "automatic" | "manual" | "exempt";
+  stripe_tax_transaction_id: string | null;
   discount_cents: number;
   applied_discount_code: string | null;
   subtotal_cents: number;
@@ -90,7 +92,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("quotes")
-    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,revision_number,revision_reason,customer_change_request,mockup_snapshot,sent_at,custom_requests(id,request_number,customer_name,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,deadline,delivery,payment_status,amount_paid_cents,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents)")
+    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_transaction_id,discount_cents,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,revision_number,revision_reason,customer_change_request,mockup_snapshot,sent_at,custom_requests(id,request_number,customer_name,product,quantity,item_type,colors,sizes,logo_size,print_sides,placements,deadline,delivery,payment_status,amount_paid_cents,cash_payment_request_status,cash_payment_requested_at,cash_payment_requested_amount_cents)")
     .eq("public_token", token)
     .single();
 
@@ -224,18 +226,19 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
           <div className="publicProofSectionHead"><div><span className="eyebrow">03 · Price</span><h2>Review the complete quote</h2></div></div>
           {Number(quote.revision_number || 1) > 1 && quote.revision_reason ? <div className="quoteInactiveMessage"><strong>Updated quote</strong><br />{quote.revision_reason}</div> : null}
           <div className="publicQuoteLines">
-            <div className="publicQuoteLine publicQuoteLineHeader"><span>Item</span><span>Qty</span><span>Total</span></div>
-            {quote.line_items.map((item, index) => <div className="publicQuoteLine" key={`${item.description}-${index}`}><span>{item.description}</span><span>{item.quantity}</span><strong>{money(item.quantity * item.unitPriceCents)}</strong></div>)}
+            <div className="publicQuoteLine publicQuoteLineHeader"><span>Item</span><span>Qty</span><span>Price each</span><span>Line total</span></div>
+            {quote.line_items.map((item, index) => <div className="publicQuoteLine" key={`${item.description}-${index}`}><span>{item.description}</span><span>{item.quantity}</span><span>{money(item.unitPriceCents)}</span><strong>{money(item.quantity * item.unitPriceCents)}</strong></div>)}
           </div>
 
           <div className="publicQuoteTotals">
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
-            {quote.tax_cents ? <div><span>Tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            {quote.tax_cents ? <div><span>{quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? "Estimated sales tax" : "Sales tax"}</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>{quote.applied_discount_code ? `Discount (${quote.applied_discount_code})` : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
-            <div className="publicQuoteGrandTotal"><span>Total</span><strong>{money(quote.total_cents)}</strong></div>
+            <div className="publicQuoteGrandTotal"><span>{quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? "Estimated approval total" : "Total"}</span><strong>{money(quote.total_cents)}</strong></div>
           </div>
+          {quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? <p className="fieldHelp">Automatic sales tax is estimated from the current pickup, delivery, or shipping details. Moore Made checks it again immediately before payment. If only tax changes, the secure payment page shows the updated final total; product, quantity, artwork, or base-price changes still require a revised quote.</p> : null}
           <div className="publicPaymentTermsSummary">
             <span>Payment terms</span>
             {quote.payment_terms === "deposit" ? <div><strong>Custom deposit: {money(quote.deposit_amount_cents || 0)}</strong><small>Remaining after deposit: {money(Math.max(0, quote.total_cents - (quote.deposit_amount_cents || 0)))}</small></div> : <div><strong>Full payment required</strong><small>{money(quote.total_cents)} is due after approval to begin production.</small></div>}
@@ -261,6 +264,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
           </div>
           {paymentStep.amountCents > 0 ? <>
             <p className="publicApprovalIntro">{paymentStep.kind === "deposit" ? `A ${money(paymentStep.amountCents)} custom deposit is required to begin production. The remaining balance stays attached to this order.` : paymentStep.kind === "balance" ? `Your deposit is recorded. Pay the remaining balance before the order can be ${balanceFulfillmentText}.` : "Full payment is required to begin production."}</p>
+            <div className="quoteInactiveMessage"><strong>Need to change pickup, delivery, shipping, or the destination address?</strong><br />Contact Moore Made before paying. We will recalculate tax and, if shipping or another customer charge changes, provide an updated total for confirmation.</div>
 
             <PaymentPolicyGate
               token={token}
@@ -276,7 +280,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
                     <h3>Pay securely online</h3>
                     <p>Use Stripe Checkout for the fastest payment confirmation.</p>
                   </div>
-                  <PaymentCheckoutButton token={token} amountCents={paymentStep.amountCents} label={paymentLabel} />
+                  <PaymentCheckoutButton token={token} amountCents={paymentStep.amountCents} label={paymentLabel} amountIsEstimate={quote.tax_mode === "automatic"} />
                 </div> : null}
 
                 {!isStripeConfigured() ? <div className="digitalPaymentPanel cashAppPaymentPendingSetup">

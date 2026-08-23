@@ -30,6 +30,18 @@ function normalizeLineItems(value: unknown): QuoteLineItem[] {
     .filter((item) => item.description && item.unitPriceCents >= 0);
 }
 
+function normalizeSupplierCosts(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 500).map((row) => ({
+    key: text(row?.key, 200),
+    productName: text(row?.productName, 300),
+    colorName: text(row?.colorName, 200),
+    size: text(row?.size, 80),
+    quantity: Math.max(0, Math.floor(Number(row?.quantity) || 0)),
+    unitCostCents: cents(row?.unitCostCents),
+  })).filter((row) => row.key && row.productName && row.size && row.quantity > 0);
+}
+
 type NormalizedProofItem = {
   title: string;
   notes: string | null;
@@ -60,7 +72,7 @@ function normalizeProofItems(value: unknown, requestId: string): NormalizedProof
   }).filter((item) => item.title);
 }
 
-const QUOTE_SELECT = "id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_calculation_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at";
+const QUOTE_SELECT = "id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_supplier_costs,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at";
 
 export async function POST(request: Request) {
   const auth = await requireAdminApi();
@@ -72,6 +84,7 @@ export async function POST(request: Request) {
     const action = body.action === "send" ? "send" : "save";
     const lineItems = normalizeLineItems(body.lineItems);
     const proofItems = normalizeProofItems(body.proofItems, requestId);
+    const internalSupplierCosts = normalizeSupplierCosts(body.internalSupplierCosts);
 
     if (!requestId || lineItems.length === 0) {
       return NextResponse.json({ error: "Add at least one quote line item." }, { status: 400 });
@@ -87,6 +100,7 @@ export async function POST(request: Request) {
     const taxCalculatedAt = taxMode === "automatic" ? text(body.taxCalculatedAt, 100) : "";
     const taxInputFingerprint = taxMode === "automatic" ? text(body.taxInputFingerprint, 5000) : "";
     const taxBreakdown = taxMode === "automatic" && body.taxBreakdown && typeof body.taxBreakdown === "object" ? body.taxBreakdown : null;
+    const taxCode = text(body.taxCode, 80) || "txcd_99999999";
     let taxCents = taxMode === "exempt" ? 0 : cents(body.taxCents);
     if (taxMode === "exempt" && taxExemptReason.length < 3) {
       return NextResponse.json({ error: "Add a reason/document note when marking a customer tax exempt." }, { status: 400 });
@@ -142,7 +156,7 @@ export async function POST(request: Request) {
     let discountCodeId: string | null = null;
 
     const laborHours = Math.max(1, Number(body.laborHours) || 1);
-    const laborRateCents = cents(body.laborRateCents || 1000);
+    const laborRateCents = cents(body.laborRateCents || 1500);
     const laborCostCents = Math.round(laborHours * laborRateCents);
     const internalSupplyCostCents = cents(body.internalSupplyCostCents);
     const internalPrintCostCents = cents(body.internalPrintCostCents);
@@ -239,7 +253,7 @@ export async function POST(request: Request) {
           internal_payment_fee_cents: Number(existing.internal_payment_fee_cents || 0),
           internal_other_cost_cents: Number(existing.internal_other_cost_cents || 0),
           labor_hours: Number(existing.labor_hours || 0),
-          labor_rate_cents: Number(existing.labor_rate_cents || 1000),
+          labor_rate_cents: Number(existing.labor_rate_cents || 1500),
           labor_cost_cents: Number(existing.labor_cost_cents || 0),
           internal_total_cost_cents: Number(existing.internal_total_cost_cents || 0),
           estimated_profit_cents: Number(existing.estimated_profit_cents || 0),
@@ -263,6 +277,8 @@ export async function POST(request: Request) {
       setup_fee_cents: setupFeeCents,
       shipping_cents: shippingCents,
       tax_cents: taxCents,
+      estimated_tax_cents: taxCents,
+      tax_code: taxCode,
       tax_mode: taxMode,
       stripe_tax_calculation_id: stripeTaxCalculationId || null,
       tax_calculated_at: taxCalculatedAt || null,
@@ -279,6 +295,7 @@ export async function POST(request: Request) {
       payment_terms: paymentTerms,
       deposit_amount_cents: depositAmountCents,
       internal_supply_cost_cents: internalSupplyCostCents,
+      internal_supplier_costs: internalSupplierCosts,
       internal_print_cost_cents: internalPrintCostCents,
       internal_packaging_cost_cents: internalPackagingCostCents,
       internal_shipping_cost_cents: internalShippingCostCents,
@@ -377,14 +394,14 @@ export async function POST(request: Request) {
         ? "Shipping"
         : "Fulfillment";
     const lineRows = lineItems
-      .map((item) => `<tr><td style="padding:8px 12px 8px 0;">${escapeHtml(item.description)}</td><td style="padding:8px 12px;text-align:center;">${item.quantity}</td><td style="padding:8px 0;text-align:right;font-weight:700;">${escapeHtml(money(item.quantity * item.unitPriceCents))}</td></tr>`)
+      .map((item) => `<tr><td style="padding:8px 12px 8px 0;">${escapeHtml(item.description)}</td><td style="padding:8px 10px;text-align:center;">${item.quantity}</td><td style="padding:8px 10px;text-align:right;white-space:nowrap;">${escapeHtml(money(item.unitPriceCents))}</td><td style="padding:8px 0;text-align:right;font-weight:700;white-space:nowrap;">${escapeHtml(money(item.quantity * item.unitPriceCents))}</td></tr>`)
       .join("");
 
     const extraRows = [
-      setupFeeCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Setup fee</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(setupFeeCents))}</td></tr>` : "",
-      shippingCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">${escapeHtml(fulfillmentChargeLabel)}</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(shippingCents))}</td></tr>` : "",
-      taxCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Tax</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(taxCents))}</td></tr>` : "",
-      finalDiscountCents ? `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#6b6b6b;">Discount</td><td style="padding:6px 0;text-align:right;font-weight:700;">−${escapeHtml(money(finalDiscountCents))}</td></tr>` : "",
+      setupFeeCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">Setup fee</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(setupFeeCents))}</td></tr>` : "",
+      shippingCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">${escapeHtml(fulfillmentChargeLabel)}</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(shippingCents))}</td></tr>` : "",
+      taxCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">${taxMode === "automatic" ? "Estimated sales tax" : "Sales tax"}</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(taxCents))}</td></tr>` : "",
+      finalDiscountCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">Discount</td><td style="padding:6px 0;text-align:right;font-weight:700;">−${escapeHtml(money(finalDiscountCents))}</td></tr>` : "",
     ].join("");
 
     const proofSummary = proofItems.map((item, index) => {
@@ -396,7 +413,7 @@ export async function POST(request: Request) {
 
     const paymentSummary = paymentTerms === "deposit"
       ? `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Payment after approval</strong><p style="line-height:1.6;margin:7px 0 0;">Custom deposit due: <strong>${escapeHtml(money(depositAmountCents || 0))}</strong><br>Remaining balance: <strong>${escapeHtml(money(Math.max(0, finalTotalCents - (depositAmountCents || 0))))}</strong></p></div>`
-      : `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Payment after approval</strong><p style="line-height:1.6;margin:7px 0 0;">Full payment of <strong>${escapeHtml(money(finalTotalCents))}</strong> is required to begin production.</p></div>`;
+      : `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Payment after approval</strong><p style="line-height:1.6;margin:7px 0 0;">Full payment of <strong>${escapeHtml(money(finalTotalCents))}</strong>${taxMode === "automatic" ? " (estimated until the final tax check at payment)" : ""} is required to begin production.</p></div>`;
 
     const emailResult = await sendMooreMadeEmail({
       to: customerRequest.email,
@@ -408,10 +425,10 @@ export async function POST(request: Request) {
          <p style="line-height:1.65;margin:0 0 18px;">Review <strong>every product proof, the order details, and the quote together</strong>. If everything looks right, approve the entire order in one step. If something needs to change, you can identify the specific product from the same page.</p>
          <div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Proof set</strong><ul style="margin:8px 0 0;padding-left:20px;line-height:1.55;">${proofSummary}</ul></div>
          <table style="width:100%;border-collapse:collapse;margin:0 0 16px;">
-           <thead><tr style="border-bottom:1px solid #ded9d1;"><th style="text-align:left;padding:8px 12px 8px 0;">Item</th><th style="padding:8px 12px;">Qty</th><th style="text-align:right;padding:8px 0;">Total</th></tr></thead>
+           <thead><tr style="border-bottom:1px solid #ded9d1;"><th style="text-align:left;padding:8px 12px 8px 0;">Item</th><th style="padding:8px 10px;">Qty</th><th style="text-align:right;padding:8px 10px;">Price each</th><th style="text-align:right;padding:8px 0;">Line total</th></tr></thead>
            <tbody>${lineRows}${extraRows}</tbody>
          </table>
-         <p style="font-size:22px;margin:0 0 12px;"><strong>Total: ${escapeHtml(money(finalTotalCents))}</strong></p>
+         <p style="font-size:22px;margin:0 0 12px;"><strong>${taxMode === "automatic" ? "Estimated total" : "Total"}: ${escapeHtml(money(finalTotalCents))}</strong></p>
          ${paymentSummary}
          <p style="color:#6b6b6b;font-size:13px;margin:0 0 20px;">Proof version ${targetVersion} · ${proofItems.length} product/proof item${proofItems.length === 1 ? "" : "s"}${mockupSnapshot ? " · saved mockup attached" : ""}${flattenedProofPaths.length ? ` · ${flattenedProofPaths.length} uploaded file${flattenedProofPaths.length === 1 ? "" : "s"}` : ""}</p>
          <a href="${quoteUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:13px 19px;border-radius:999px;font-weight:800;">Review proof + quote</a>

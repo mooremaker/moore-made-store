@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import type { ShippingAddress } from "@/lib/order-types";
 
 type FulfillmentMode = "pickup" | "delivery" | "shipping";
 
@@ -21,6 +22,22 @@ function deliveryLabel(mode: FulfillmentMode) {
   return "Local pickup";
 }
 
+function normalizeAddress(value: unknown): ShippingAddress | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const address: ShippingAddress = {
+    name: text(row.name, 200),
+    line1: text(row.line1, 300),
+    line2: text(row.line2, 300),
+    city: text(row.city, 200),
+    state: text(row.state, 100).toUpperCase(),
+    postalCode: text(row.postalCode ?? row.postal_code, 30),
+    country: (text(row.country, 2) || "US").toUpperCase(),
+  };
+  if (!address.line1 || !address.city || !address.state || !address.postalCode || !address.country) return null;
+  return address;
+}
+
 export async function POST(request: Request) {
   const auth = await requireAdminApi();
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -30,6 +47,10 @@ export async function POST(request: Request) {
     const id = text(body.id, 100);
     const mode = modeFrom(body.mode);
     if (!id || !mode) return NextResponse.json({ error: "Choose Local pickup, Local delivery, or Shipping." }, { status: 400 });
+    const shippingAddress = normalizeAddress(body.shippingAddress);
+    if ((mode === "shipping" || mode === "delivery") && !shippingAddress) {
+      return NextResponse.json({ error: `Complete the ${mode === "shipping" ? "shipping" : "local delivery"} address before saving.` }, { status: 400 });
+    }
 
     const supabase = getSupabaseAdmin();
     const { data: order, error } = await supabase
@@ -46,7 +67,7 @@ export async function POST(request: Request) {
     const delivery = deliveryLabel(mode);
     const { error: updateError } = await supabase
       .from("custom_requests")
-      .update({ delivery })
+      .update({ delivery, ...(shippingAddress ? { shipping_address: shippingAddress } : {}) })
       .eq("id", id);
 
     if (updateError) {

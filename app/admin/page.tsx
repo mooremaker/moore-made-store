@@ -48,7 +48,7 @@ export default async function AdminPage() {
 
   const { data: quoteData, error: quoteError } = await supabase
     .from("quotes")
-    .select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_calculation_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,artwork_rights_confirmed_at,artwork_rights_policy_version,artwork_rights_snapshot,sent_at,responded_at,created_at,updated_at");
+    .select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_supplier_costs,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,artwork_rights_confirmed_at,artwork_rights_policy_version,artwork_rights_snapshot,sent_at,responded_at,created_at,updated_at");
   const baseQuotes = (quoteData ?? []) as QuoteRecord[];
 
   const { data: quoteRevisionData, error: quoteRevisionError } = await supabase
@@ -277,7 +277,7 @@ export default async function AdminPage() {
 
   const { data: productPricingData, error: productPricingError } = await supabase
     .from("product_pricing")
-    .select("product_slug,product_name,active,blank_cost_cents,print_cost_cents,packaging_cost_cents,default_labor_hours,labor_rate_cents,target_margin_basis_points,tax_code,notes,created_at,updated_at")
+    .select("product_slug,product_name,active,blank_cost_cents,size_blank_costs,size_customer_surcharges,print_cost_cents,packaging_cost_cents,default_labor_hours,labor_rate_cents,target_margin_basis_points,tax_code,notes,created_at,updated_at")
     .order("product_name", { ascending: true });
   const productPricing = (productPricingData ?? []) as ProductPricingRecord[];
 

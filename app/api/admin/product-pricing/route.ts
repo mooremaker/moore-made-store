@@ -16,6 +16,13 @@ function number(value: unknown, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function centsMap(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .map(([key, amount]) => [text(key, 40), cents(amount)] as const)
+    .filter(([key]) => Boolean(key)));
+}
+
 export async function POST(request: Request) {
   const auth = await requireAdminApi();
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -58,9 +65,13 @@ export async function POST(request: Request) {
       product_name: name,
       active: body.active !== false,
       blank_cost_cents: cents(body.blankCostCents),
+      size_blank_costs: centsMap(body.sizeBlankCosts),
+      size_customer_surcharges: centsMap(body.sizeCustomerSurcharges),
       print_cost_cents: cents(body.printCostCents),
       packaging_cost_cents: cents(body.packagingCostCents),
-      default_labor_hours: Math.max(0, number(body.defaultLaborHours, 1)),
+      // These legacy product fields stay neutral. Labor is a business/order
+      // setting and is added exactly once when the quote is calculated.
+      default_labor_hours: 0,
       labor_rate_cents: cents(body.laborRateCents),
       target_margin_basis_points: marginBasisPoints,
       tax_code: text(body.taxCode, 80) || "txcd_99999999",

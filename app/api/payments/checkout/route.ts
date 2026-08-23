@@ -8,6 +8,8 @@ import { siteUrl } from "@/lib/email";
 import { FINAL_SALE_POLICY_VERSION } from "@/lib/payment-policy";
 import { recordPaidCheckoutSession } from "@/lib/payment-server";
 import { hashPaymentShareToken } from "@/lib/payment-share";
+import { calculateAutomaticOrderTax } from "@/lib/automatic-tax-server";
+import { money } from "@/lib/quote-types";
 
 function text(value: unknown, max = 200) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -26,11 +28,13 @@ async function reuseOpenCheckoutSession({
   amountCents,
   paymentKind,
   payerEmail,
+  orderTotalCents,
 }: {
   quoteId: string;
   amountCents: number;
   paymentKind: "full" | "deposit" | "balance";
   payerEmail?: string | null;
+  orderTotalCents: number;
 }) {
   const supabase = getSupabaseAdmin();
   const stripe = getStripe();
@@ -50,6 +54,11 @@ async function reuseOpenCheckoutSession({
     if (!row.stripe_checkout_session_id) continue;
     try {
       const session = await stripe.checkout.sessions.retrieve(row.stripe_checkout_session_id);
+      if (Number(session.metadata?.order_total_cents || 0) !== orderTotalCents) {
+        if (session.status === "open") await stripe.checkout.sessions.expire(session.id);
+        await supabase.from("payments").update({ status: "failed" }).eq("id", row.id).eq("status", "pending");
+        continue;
+      }
       if (session.status === "open" && session.url) return session.url;
       if (session.payment_status === "paid") {
         await recordPaidCheckoutSession(session);
@@ -100,7 +109,7 @@ export async function POST(request: Request) {
 
     let quoteQuery = supabase
       .from("quotes")
-      .select("id,request_id,public_token,status,total_cents,payment_terms,deposit_amount_cents,proof_version,revision_number,custom_requests(id,request_number,customer_name,email,product,payment_status,amount_paid_cents)");
+      .select("id,request_id,public_token,status,subtotal_cents,setup_fee_cents,shipping_cents,discount_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,total_cents,payment_terms,deposit_amount_cents,proof_version,revision_number,custom_requests(id,request_number,customer_name,email,product,payment_status,amount_paid_cents)");
     quoteQuery = quoteIdFromShare ? quoteQuery.eq("id", quoteIdFromShare) : quoteQuery.eq("public_token", token);
     const { data: quote, error: quoteError } = await quoteQuery.single();
 
@@ -133,9 +142,27 @@ export async function POST(request: Request) {
       .filter((row) => row.status === "paid")
       .reduce((sum, row) => sum + Number(row.amount_cents || 0), 0);
 
+    let checkoutTaxCents = Math.max(0, Number(quote.tax_cents || 0));
+    let checkoutTotalCents = Math.max(0, Number(quote.total_cents || 0));
+    let finalTaxCalculationId = "";
+    if (quote.tax_mode === "automatic") {
+      try {
+        const merchandiseCents = Math.max(0, Number(quote.subtotal_cents || 0) + Number(quote.setup_fee_cents || 0) - Number(quote.discount_cents || 0));
+        const fingerprint = JSON.stringify({ merchandiseCents, shippingCents: Number(quote.shipping_cents || 0), requestId: quote.request_id, stage: "payment" });
+        const finalTax = await calculateAutomaticOrderTax({ requestId: quote.request_id, merchandiseCents, shippingCents: Number(quote.shipping_cents || 0), taxCode: quote.tax_code, inputFingerprint: fingerprint });
+        checkoutTaxCents = finalTax.taxCents;
+        finalTaxCalculationId = finalTax.calculationId;
+        checkoutTotalCents = Math.max(0, Number(quote.subtotal_cents || 0) + Number(quote.setup_fee_cents || 0) + Number(quote.shipping_cents || 0) + checkoutTaxCents - Number(quote.discount_cents || 0));
+        const { error: taxUpdateError } = await supabase.from("quotes").update({ tax_cents: checkoutTaxCents, total_cents: checkoutTotalCents, stripe_tax_calculation_id: finalTax.calculationId, tax_calculated_at: finalTax.calculatedAt, tax_input_fingerprint: finalTax.inputFingerprint, tax_breakdown: finalTax.breakdown }).eq("id", quote.id);
+        if (taxUpdateError) throw new Error("The final tax was calculated, but the order total could not be saved.");
+      } catch (taxError) {
+        return NextResponse.json({ error: taxError instanceof Error ? taxError.message : "Could not verify final sales tax before payment." }, { status: 409 });
+      }
+    }
+
     const terms = (quote.payment_terms === "deposit" ? "deposit" : "full") as PaymentTerms;
     const next = nextPaymentAmount({
-      totalCents: Number(quote.total_cents || 0),
+      totalCents: checkoutTotalCents,
       terms,
       depositAmountCents: quote.deposit_amount_cents,
       amountPaidCents: amountPaid,
@@ -150,6 +177,7 @@ export async function POST(request: Request) {
       amountCents: next.amountCents,
       paymentKind: next.kind,
       payerEmail: shareToken ? payerEmail : null,
+      orderTotalCents: checkoutTotalCents,
     });
     if (existingUrl) return NextResponse.json({ ok: true, url: existingUrl, reused: true });
 
@@ -175,6 +203,8 @@ export async function POST(request: Request) {
       payer_name: shareToken ? payerName : null,
       payer_email: shareToken ? payerEmail : null,
       payment_share_link_id: shareLinkId,
+      order_tax_cents: checkoutTaxCents,
+      order_total_cents: checkoutTotalCents,
     });
 
     if (insertError) {
@@ -194,7 +224,7 @@ export async function POST(request: Request) {
             unit_amount: next.amountCents,
             product_data: {
               name: paymentName,
-              description: requestRow.product,
+              description: `${requestRow.product} · Order total ${money(checkoutTotalCents)}${quote.tax_mode === "automatic" ? ` including ${money(checkoutTaxCents)} final sales tax` : ""}`,
             },
           },
         }],
@@ -210,6 +240,9 @@ export async function POST(request: Request) {
           payer_name: shareToken ? payerName : requestRow.customer_name,
           payer_email: shareToken ? payerEmail : requestRow.email,
           payment_share_link_id: shareLinkId || "",
+          order_total_cents: String(checkoutTotalCents),
+          order_tax_cents: String(checkoutTaxCents),
+          stripe_tax_calculation_id: finalTaxCalculationId,
         },
         payment_intent_data: {
           metadata: {
@@ -222,6 +255,9 @@ export async function POST(request: Request) {
             payer_name: shareToken ? payerName : requestRow.customer_name,
             payer_email: shareToken ? payerEmail : requestRow.email,
             payment_share_link_id: shareLinkId || "",
+            order_total_cents: String(checkoutTotalCents),
+            order_tax_cents: String(checkoutTaxCents),
+            stripe_tax_calculation_id: finalTaxCalculationId,
           },
         },
       }, {

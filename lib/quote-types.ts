@@ -72,8 +72,11 @@ export type QuoteRecord = {
   setup_fee_cents: number;
   shipping_cents: number;
   tax_cents: number;
+  estimated_tax_cents?: number;
+  tax_code?: string | null;
   tax_mode?: "automatic" | "manual" | "exempt";
   stripe_tax_calculation_id?: string | null;
+  stripe_tax_transaction_id?: string | null;
   tax_calculated_at?: string | null;
   tax_exempt_reason?: string | null;
   tax_breakdown?: Record<string, unknown> | null;
@@ -88,6 +91,7 @@ export type QuoteRecord = {
   payment_terms: "full" | "deposit";
   deposit_amount_cents: number | null;
   internal_supply_cost_cents?: number;
+  internal_supplier_costs?: Array<{ key: string; productName: string; colorName: string; size: string; quantity: number; unitCostCents: number }>;
   internal_print_cost_cents?: number;
   internal_packaging_cost_cents?: number;
   internal_shipping_cost_cents?: number;

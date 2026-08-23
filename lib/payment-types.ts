@@ -10,6 +10,8 @@ export type PaymentRow = {
   quote_id: string;
   payment_kind: "full" | "deposit" | "balance";
   amount_cents: number;
+  order_tax_cents?: number | null;
+  order_total_cents?: number | null;
   currency: string;
   status: "pending" | "paid" | "failed" | "refunded" | "voided";
   stripe_checkout_session_id: string | null;

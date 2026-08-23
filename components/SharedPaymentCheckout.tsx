@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { money } from "@/lib/quote-types";
 
-export function SharedPaymentCheckout({ shareToken, amountCents, initialEmail = "" }: { shareToken: string; amountCents: number; initialEmail?: string }) {
+export function SharedPaymentCheckout({ shareToken, amountCents, initialEmail = "", amountIsEstimate = false }: { shareToken: string; amountCents: number; initialEmail?: string; amountIsEstimate?: boolean }) {
   const [payerName, setPayerName] = useState("");
   const [payerEmail, setPayerEmail] = useState(initialEmail);
   const [working, setWorking] = useState(false);
@@ -27,8 +27,8 @@ export function SharedPaymentCheckout({ shareToken, amountCents, initialEmail = 
   return (
     <div className="sharedPaymentCheckout">
       <div className="sharedPayerGrid"><label className="field"><span>Your name</span><input value={payerName} onChange={(e) => setPayerName(e.target.value)} autoComplete="name" /></label><label className="field"><span>Your email</span><input value={payerEmail} onChange={(e) => setPayerEmail(e.target.value)} type="email" autoComplete="email" /></label></div>
-      <button className="btn" type="button" disabled={working} onClick={pay}>{working ? "Opening Stripe…" : `Pay securely · ${money(amountCents)}`}</button>
-      <span className="sharedStripeNote">Card checkout is handled securely by Stripe.</span>
+      <button className="btn" type="button" disabled={working} onClick={pay}>{working ? "Checking final tax…" : `Pay securely · ${amountIsEstimate ? "about " : ""}${money(amountCents)}`}</button>
+      <span className="sharedStripeNote">{amountIsEstimate ? "Final sales tax is checked before Stripe opens. Review the final total there before paying." : "Card checkout is handled securely by Stripe."}</span>
       {error ? <div className="formError">{error}</div> : null}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RequestStatus } from "@/lib/custom-request-types";
+import type { ShippingAddress } from "@/lib/order-types";
 
 type FulfillmentMode = "pickup" | "delivery" | "shipping";
 
@@ -11,6 +12,7 @@ type Props = {
   requestNumber: string;
   initialStatus: RequestStatus;
   delivery: string | null;
+  shippingAddress?: ShippingAddress | null;
   initialTrackingNumber?: string | null;
   initialTrackingUrl?: string | null;
   initialNote?: string | null;
@@ -28,11 +30,12 @@ function localDateTime(value: string | null) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).format(date);
 }
 
-function initialModeFor(delivery: string | null, status: RequestStatus): FulfillmentMode {
+function initialModeFor(delivery: string | null, status: RequestStatus): FulfillmentMode | "" {
   const value = String(delivery || "").toLowerCase();
   if (status === "shipped" || value.includes("ship")) return "shipping";
   if (value.includes("delivery")) return "delivery";
-  return "pickup";
+  if (value.includes("pickup")) return "pickup";
+  return "";
 }
 
 function savedDeliveryLabel(mode: FulfillmentMode) {
@@ -46,6 +49,7 @@ export function FulfillmentActions({
   requestNumber,
   initialStatus,
   delivery,
+  shippingAddress,
   initialTrackingNumber,
   initialTrackingUrl,
   initialNote,
@@ -56,11 +60,22 @@ export function FulfillmentActions({
   paymentStatus,
 }: Props) {
   const router = useRouter();
+  const initialSavedMode = initialModeFor(delivery, initialStatus);
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<FulfillmentMode>(() => initialModeFor(delivery, initialStatus));
+  const [mode, setMode] = useState<FulfillmentMode | "">(initialSavedMode);
+  const [savedMode, setSavedMode] = useState<FulfillmentMode | "">(initialSavedMode);
   const [methodWorking, setMethodWorking] = useState(false);
   const [methodMessage, setMethodMessage] = useState("");
   const [methodError, setMethodError] = useState("");
+  const [address, setAddress] = useState<ShippingAddress>({
+    name: shippingAddress?.name || "",
+    line1: shippingAddress?.line1 || "",
+    line2: shippingAddress?.line2 || "",
+    city: shippingAddress?.city || "",
+    state: shippingAddress?.state || "",
+    postalCode: shippingAddress?.postalCode || "",
+    country: shippingAddress?.country || "US",
+  });
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber ?? "");
   const [trackingUrl, setTrackingUrl] = useState(initialTrackingUrl ?? "");
   const [note, setNote] = useState(initialNote ?? "");
@@ -77,6 +92,7 @@ export function FulfillmentActions({
   const [estimatedNotifiedForDate, setEstimatedNotifiedForDate] = useState(initialEstimatedNotifiedForDate ?? null);
 
   const methodLocked = initialStatus === "shipped" || initialStatus === "completed";
+  const addressComplete = Boolean(address.line1.trim() && address.city.trim() && address.state.trim() && address.postalCode.trim() && address.country.trim());
   const estimateLabel = mode === "shipping" ? "Estimated ship date" : mode === "delivery" ? "Estimated delivery-ready date" : "Estimated pickup-ready date";
   const finalLabel = mode === "shipping" ? "Shipped" : mode === "delivery" ? "Ready for delivery" : "Ready for pickup";
   const noteLabel = mode === "shipping" ? "Shipping note" : mode === "delivery" ? "Delivery instructions / note" : "Pickup instructions / note";
@@ -87,9 +103,15 @@ export function FulfillmentActions({
       : "Example: Your order is ready. Please call or text before pickup.";
 
   async function chooseMode(nextMode: FulfillmentMode) {
-    if (nextMode === mode || methodLocked) return;
+    if (methodLocked) return;
     const previous = mode;
     setMode(nextMode);
+    if ((nextMode === "shipping" || nextMode === "delivery") && !addressComplete) {
+      setMethodMessage("");
+      setMethodError(`Complete the ${nextMode === "shipping" ? "shipping" : "local delivery"} address below, then save the fulfillment method.`);
+      return;
+    }
+    if (nextMode === savedMode && nextMode === "pickup") return;
     setMethodWorking(true);
     setMethodMessage("");
     setMethodError("");
@@ -97,10 +119,11 @@ export function FulfillmentActions({
       const response = await fetch("/api/admin/fulfillment-method", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, mode: nextMode }),
+        body: JSON.stringify({ id, mode: nextMode, shippingAddress: address }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Could not save the fulfillment method.");
+      setSavedMode(nextMode);
       setMethodMessage(`${savedDeliveryLabel(nextMode)} saved.`);
       router.refresh();
     } catch (err) {
@@ -139,6 +162,10 @@ export function FulfillmentActions({
   }
 
   async function notifyCustomer() {
+    if (!mode) {
+      setError("Choose and save a fulfillment method first.");
+      return;
+    }
     setWorking(true);
     setMessage("");
     setError("");
@@ -161,7 +188,9 @@ export function FulfillmentActions({
 
   const currentEstimateWasEmailed = Boolean(estimatedDate && estimatedNotifiedForDate === estimatedDate);
 
-  return <div className="fulfillmentStack">
+  const fulfillmentAvailable = ["approved", "in_production", "ready", "shipped", "completed"].includes(initialStatus);
+
+  return <div className="fulfillmentStack" id={`fulfillment-${id}`}>
     <section className="fulfillmentPanel">
       <div className="fulfillmentBody">
         <div className="estimatedFulfillmentHead">
@@ -169,11 +198,26 @@ export function FulfillmentActions({
           {methodWorking ? <span className="estimateStatus">Saving…</span> : methodMessage ? <span className="estimateStatus isSent">Saved</span> : null}
         </div>
         <p className="fieldHelp">This controls the estimate wording, final button, customer email, account status, and whether tracking is requested.</p>
+        {!savedMode ? <div className="requestWarning">Required before automatic sales tax: choose how this order will reach the customer. Your choice saves immediately.</div> : null}
+        {savedMode && ["approved", "in_production", "ready"].includes(initialStatus) ? <div className="fieldHelp">Changing fulfillment updates the address used for the final tax check. It does not automatically invent a new shipping/delivery charge; revise the customer quote first if Moore Made needs to charge a different amount.</div> : null}
         <div className="fulfillmentMode">
           <button type="button" disabled={methodWorking || methodLocked} className={mode === "pickup" ? "active" : ""} onClick={() => void chooseMode("pickup")}>Local pickup</button>
           <button type="button" disabled={methodWorking || methodLocked} className={mode === "delivery" ? "active" : ""} onClick={() => void chooseMode("delivery")}>Local delivery</button>
           <button type="button" disabled={methodWorking || methodLocked} className={mode === "shipping" ? "active" : ""} onClick={() => void chooseMode("shipping")}>Shipping</button>
         </div>
+        {mode === "shipping" || mode === "delivery" ? <div className="fulfillmentAddressEditor">
+          <strong>{mode === "shipping" ? "Shipping address" : "Local delivery address"}</strong>
+          <div className="twoCol">
+            <label className="field"><span>Street *</span><input disabled={methodLocked} value={address.line1} onChange={(event) => setAddress((current) => ({ ...current, line1: event.target.value }))} /></label>
+            <label className="field"><span>Apt / Suite <small>(optional)</small></span><input disabled={methodLocked} value={address.line2} onChange={(event) => setAddress((current) => ({ ...current, line2: event.target.value }))} /></label>
+          </div>
+          <div className="three">
+            <label className="field"><span>City *</span><input disabled={methodLocked} value={address.city} onChange={(event) => setAddress((current) => ({ ...current, city: event.target.value }))} /></label>
+            <label className="field"><span>State *</span><input disabled={methodLocked} maxLength={2} value={address.state} onChange={(event) => setAddress((current) => ({ ...current, state: event.target.value.toUpperCase() }))} /></label>
+            <label className="field"><span>ZIP *</span><input disabled={methodLocked} value={address.postalCode} onChange={(event) => setAddress((current) => ({ ...current, postalCode: event.target.value }))} /></label>
+          </div>
+          <button className="btn secondary" type="button" disabled={methodWorking || methodLocked || !addressComplete} onClick={() => void chooseMode(mode)}>{methodWorking ? "Saving…" : "Save fulfillment + address"}</button>
+        </div> : null}
         {methodLocked ? <div className="fieldHelp">The fulfillment method is locked after an order is shipped or completed.</div> : null}
         {methodMessage ? <div className="quoteSuccess">{methodMessage}</div> : null}
         {methodError ? <div className="formError">{methodError}</div> : null}
@@ -203,7 +247,7 @@ export function FulfillmentActions({
       </div>
     </section> : null}
 
-    <div className="fulfillmentPanel">
+    {fulfillmentAvailable ? <div className="fulfillmentPanel">
       <button className="fulfillmentToggle" type="button" onClick={() => setOpen((value) => !value)}>
         <span><strong>Final customer notification</strong><small>{initialStatus === "ready" ? (mode === "delivery" ? "Ready for delivery sent" : "Ready for pickup sent") : initialStatus === "shipped" ? "Shipped notification sent" : `Send when the order is finished · ${finalLabel}`}</small></span>
         <span>{open ? "−" : "+"}</span>
@@ -219,8 +263,8 @@ export function FulfillmentActions({
         <label className="field"><span>{noteLabel} <small>(optional)</small></span><textarea value={note} maxLength={3000} onChange={(e) => setNote(e.target.value)} placeholder={notePlaceholder} /></label>
         {error ? <div className="formError">{error}</div> : null}
         {message ? <div className="quoteSuccess">{message}</div> : null}
-        <button className="btn" type="button" disabled={working || methodWorking || paymentStatus !== "paid"} onClick={notifyCustomer}>{working ? "Sending…" : mode === "shipping" ? `Mark shipped + email ${requestNumber}` : mode === "delivery" ? `Mark ready for delivery + email ${requestNumber}` : `Mark ready for pickup + email ${requestNumber}`}</button>
+        <button className="btn" type="button" disabled={working || methodWorking || paymentStatus !== "paid" || !savedMode} onClick={notifyCustomer}>{working ? "Sending…" : mode === "shipping" ? `Mark shipped + email ${requestNumber}` : mode === "delivery" ? `Mark ready for delivery + email ${requestNumber}` : `Mark ready for pickup + email ${requestNumber}`}</button>
       </div> : null}
-    </div>
+    </div> : <p className="muted adminFulfillmentLocked">Choose the fulfillment method now for tax. Final customer notifications become available after the proof + quote is approved.</p>}
   </div>;
 }

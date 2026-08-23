@@ -490,7 +490,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         <div className="adminDetailGroupTitle"><span>$</span><h4>Proof + quote approval</h4></div>
                         {quoteReady ? (
                           <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} customerEmail={request.email} />
-                        ) : <div className="requestWarning">Proof + quote approval is not set up yet. Run the Phase 2D scalable proofs SQL migration.</div>}
+                        ) : <div className="requestWarning">Proof + quote data needs the latest database updates. If proofs were already working, run <code>supabase/moore_made_phase6_46_size_pricing_final_tax.sql</code>.</div>}
                       </section>
 
                       {quote ? (
@@ -516,12 +516,12 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
 
                       <section className="adminQuoteSection adminFulfillmentSection">
                         <div className="adminDetailGroupTitle"><span>✓</span><h4>Fulfillment</h4></div>
-                        {["approved", "in_production", "ready", "shipped", "completed"].includes(request.status) ? (
-                          <FulfillmentActions
+                        <FulfillmentActions
                             id={request.id}
                             requestNumber={formatRequestNumber(request.request_number)}
                             initialStatus={request.status}
                             delivery={request.delivery}
+                            shippingAddress={request.shipping_address}
                             initialTrackingNumber={request.tracking_number}
                             initialTrackingUrl={request.tracking_url}
                             initialNote={request.fulfillment_note}
@@ -531,7 +531,6 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             initialEstimatedNotifiedForDate={request.estimated_fulfillment_notified_for_date}
                             paymentStatus={request.payment_status}
                           />
-                        ) : <p className="muted adminFulfillmentLocked">Final customer notification becomes available after the proof + quote is approved.</p>}
                       </section>
 
                       <section className="adminQuoteSection adminFinishedPhotosSection">

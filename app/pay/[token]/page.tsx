@@ -15,7 +15,7 @@ export default async function SharedPaymentPage({ params }: { params: Promise<{ 
   const hash = hashPaymentShareToken(token);
   const { data: link } = await supabase
     .from("payment_share_links")
-    .select("id,request_id,quote_id,active,expires_at,revoked_at,recipient_email,quotes(id,status,total_cents,payment_terms,deposit_amount_cents,custom_requests(request_number,customer_name,product))")
+    .select("id,request_id,quote_id,active,expires_at,revoked_at,recipient_email,quotes(id,status,total_cents,tax_mode,payment_terms,deposit_amount_cents,custom_requests(request_number,customer_name,product))")
     .eq("token_hash", hash)
     .maybeSingle();
   if (!link || !link.active || link.revoked_at || (link.expires_at && new Date(link.expires_at).getTime() < Date.now())) notFound();
@@ -41,7 +41,7 @@ export default async function SharedPaymentPage({ params }: { params: Promise<{ 
           <div><span>Paid already</span><strong>{money(amountPaid)}</strong></div>
           <div><span>Amount due now</span><strong>{money(next.amountCents)}</strong></div>
         </div>
-        {next.amountCents > 0 ? <SharedPaymentCheckout shareToken={token} amountCents={next.amountCents} initialEmail={link.recipient_email || ""} /> : <div className="quoteResponseSuccess"><strong>Paid in full ✓</strong><p>No balance remains on this order.</p></div>}
+        {next.amountCents > 0 ? <SharedPaymentCheckout shareToken={token} amountCents={next.amountCents} initialEmail={link.recipient_email || ""} amountIsEstimate={quote.tax_mode === "automatic"} /> : <div className="quoteResponseSuccess"><strong>Paid in full ✓</strong><p>No balance remains on this order.</p></div>}
         <p className="sharedPaymentPrivacy">Only the approved customer-facing order total is shown here. Internal Moore Made costs and notes are never shared.</p>
       </section>
     </div>

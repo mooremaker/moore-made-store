@@ -27,6 +27,7 @@ type QuoteView = {
   setup_fee_cents: number;
   shipping_cents: number;
   tax_cents: number;
+  tax_mode: "automatic" | "manual" | "exempt";
   discount_cents: number;
   subtotal_cents: number;
   total_cents: number;
@@ -68,7 +69,7 @@ export default async function ProFormaPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("quotes")
-    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity,delivery)")
+    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity,delivery)")
     .eq("public_token", token)
     .single();
 
@@ -149,7 +150,7 @@ export default async function ProFormaPage({ params }: Props) {
         <section className="proformaSection">
           <div className="proformaSectionHeading"><div><span className="eyebrow">Pricing</span><h2>Complete quote</h2></div><small>Preliminary document for approval; not proof of payment.</small></div>
           <div className="proformaLineItems">
-            <div className="proformaLine proformaLineHeader"><span>Item</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+            <div className="proformaLine proformaLineHeader"><span>Item</span><span>Qty</span><span>Price each</span><span>Line total</span></div>
             {lineItems.map((item, index) => (
               <div className="proformaLine" key={`${item.description}-${index}`}>
                 <span>{item.description}</span>
@@ -164,9 +165,9 @@ export default async function ProFormaPage({ params }: Props) {
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
-            {quote.tax_cents ? <div><span>Sales tax</span><strong>{money(quote.tax_cents)}</strong></div> : null}
+            {quote.tax_cents ? <div><span>{quote.tax_mode === "automatic" ? "Estimated sales tax" : "Sales tax"}</span><strong>{money(quote.tax_cents)}</strong></div> : null}
             {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
-            <div className="proformaGrandTotal"><span>Pro forma total</span><strong>{money(quote.total_cents)}</strong></div>
+            <div className="proformaGrandTotal"><span>{quote.tax_mode === "automatic" ? "Estimated pro forma total" : "Pro forma total"}</span><strong>{money(quote.total_cents)}</strong></div>
           </div>
 
           <div className="proformaPaymentTerms">

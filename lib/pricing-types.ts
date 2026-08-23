@@ -3,6 +3,8 @@ export type ProductPricingRecord = {
   product_name: string;
   active: boolean;
   blank_cost_cents: number;
+  size_blank_costs?: Record<string, number>;
+  size_customer_surcharges?: Record<string, number>;
   print_cost_cents: number;
   packaging_cost_cents: number;
   default_labor_hours: number;
@@ -13,6 +15,11 @@ export type ProductPricingRecord = {
   created_at?: string;
   updated_at?: string;
 };
+
+export function priceForSize(size: string, baseCents: number, bySize?: Record<string, number> | null) {
+  const saved = Number(bySize?.[size]);
+  return Number.isFinite(saved) && saved >= 0 ? Math.round(saved) : Math.max(0, Math.round(baseCents || 0));
+}
 
 export type BusinessSettingsRecord = {
   id: string;

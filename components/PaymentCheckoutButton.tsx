@@ -7,10 +7,12 @@ export function PaymentCheckoutButton({
   token,
   amountCents,
   label,
+  amountIsEstimate = false,
 }: {
   token: string;
   amountCents: number;
   label: string;
+  amountIsEstimate?: boolean;
 }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
@@ -36,9 +38,9 @@ export function PaymentCheckoutButton({
   return (
     <div className="paymentCheckoutAction">
       <button className="btn paymentCheckoutButton" type="button" onClick={checkout} disabled={working || amountCents <= 0}>
-        {working ? "Opening secure checkout…" : `${label} · ${money(amountCents)}`}
+        {working ? "Checking final tax and opening checkout…" : `${label} · ${amountIsEstimate ? "about " : ""}${money(amountCents)}`}
       </button>
-      <span>Secure checkout is handled by Stripe. Moore Made never receives your full card number.</span>
+      <span>{amountIsEstimate ? "Final sales tax is checked before Stripe opens. Review the final total there before paying." : "Secure checkout is handled by Stripe. Moore Made never receives your full card number."}</span>
       {error ? <div className="formError">{error}</div> : null}
     </div>
   );

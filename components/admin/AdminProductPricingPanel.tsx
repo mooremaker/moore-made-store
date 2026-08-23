@@ -11,11 +11,11 @@ type EditablePricing = {
   blank: string;
   print: string;
   packaging: string;
-  laborHours: string;
-  laborRate: string;
   margin: string;
   taxCode: string;
   notes: string;
+  sizeBlankCosts: Record<string, string>;
+  sizeSurcharges: Record<string, string>;
 };
 
 function dollars(cents: number | undefined) {
@@ -44,17 +44,17 @@ export function AdminProductPricingPanel({
       blank: dollars(row?.blank_cost_cents ?? starter.blankCostCents),
       print: dollars(row?.print_cost_cents ?? starter.printCostCents),
       packaging: dollars(row?.packaging_cost_cents ?? starter.packagingCostCents),
-      laborHours: String(row?.default_labor_hours ?? starter.laborHours),
-      laborRate: dollars(row?.labor_rate_cents ?? settings?.default_labor_rate_cents ?? 1000),
       margin: ((row?.target_margin_basis_points ?? starter.targetMarginBasisPoints) / 100).toFixed(0),
       taxCode: row?.tax_code || settings?.default_tax_code || "txcd_99999999",
       notes: row?.notes || "",
+      sizeBlankCosts: Object.fromEntries(product.sizes.map((size) => [size, dollars(row?.size_blank_costs?.[size] ?? starter.sizeBlankCostsCents[size] ?? row?.blank_cost_cents ?? starter.blankCostCents)])),
+      sizeSurcharges: Object.fromEntries(product.sizes.map((size) => [size, dollars(row?.size_customer_surcharges?.[size] ?? starter.sizeCustomerSurchargesCents[size] ?? 0)])),
     } satisfies EditablePricing];
   })));
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [globalLaborRate, setGlobalLaborRate] = useState(dollars(settings?.default_labor_rate_cents ?? 1000));
+  const [globalLaborRate, setGlobalLaborRate] = useState(dollars(settings?.default_labor_rate_cents ?? 1500));
   const [minimumLaborHours, setMinimumLaborHours] = useState(String(settings?.minimum_labor_hours ?? 1));
   const pickup = settings?.pickup_address || {};
   const [pickupAddress, setPickupAddress] = useState({
@@ -78,8 +78,9 @@ export function AdminProductPricingPanel({
       blank: dollars(starter.blankCostCents),
       print: dollars(starter.printCostCents),
       packaging: dollars(starter.packagingCostCents),
-      laborHours: String(starter.laborHours),
       margin: (starter.targetMarginBasisPoints / 100).toFixed(0),
+      sizeBlankCosts: Object.fromEntries((products.find((product) => product.slug === slug)?.sizes || []).map((size) => [size, dollars(starter.sizeBlankCostsCents[size] ?? starter.blankCostCents)])),
+      sizeSurcharges: Object.fromEntries((products.find((product) => product.slug === slug)?.sizes || []).map((size) => [size, dollars(starter.sizeCustomerSurchargesCents[size] ?? 0)])),
     });
     setMessage("Starter estimates filled in. Replace them with your actual supplier and production costs whenever you know them.");
   }
@@ -99,10 +100,14 @@ export function AdminProductPricingPanel({
           productName: product.name,
           active: row.active,
           blankCostCents: cents(row.blank),
+          sizeBlankCosts: Object.fromEntries(Object.entries(row.sizeBlankCosts).map(([size, amount]) => [size, cents(amount)])),
+          sizeCustomerSurcharges: Object.fromEntries(Object.entries(row.sizeSurcharges).map(([size, amount]) => [size, cents(amount)])),
           printCostCents: cents(row.print),
           packagingCostCents: cents(row.packaging),
-          defaultLaborHours: Math.max(0, Number(row.laborHours) || 0),
-          laborRateCents: cents(row.laborRate),
+          // Kept at zero for database compatibility. Labor is configured once
+          // in business settings and added once to the complete quote.
+          defaultLaborHours: 0,
+          laborRateCents: cents(globalLaborRate),
           targetMarginBasisPoints: Math.round(Math.max(0, Math.min(95, Number(row.margin) || 0)) * 100),
           taxCode: row.taxCode,
           notes: row.notes,
@@ -143,20 +148,20 @@ export function AdminProductPricingPanel({
     }
   }
 
-  if (!ready) return <section className="adminWorkspacePanel"><div className="formError">Products & pricing need the Phase 6.26 database update. Run <code>supabase/moore_made_phase6_26_ordering_payments_tax.sql</code>.</div></section>;
+  if (!ready) return <section className="adminWorkspacePanel"><div className="formError">Products & pricing need the latest database updates. Run Phase 6.26 if it has never been installed, then run <code>supabase/moore_made_phase6_46_size_pricing_final_tax.sql</code>.</div></section>;
 
   return (
     <section className="adminWorkspacePanel productPricingAdmin">
-      <div className="adminSectionIntro"><div><div className="eyebrow">Private pricing engine</div><h2>Products & pricing</h2><p>Unsaved products begin with editable starter estimates. Replace them with your actual blank, transfer, and packaging costs as you receive invoices; nothing here appears as a public Shop price.</p></div></div>
+      <div className="adminSectionIntro"><div><div className="eyebrow">Private pricing engine</div><h2>Products & pricing</h2><p>Unsaved products begin with editable starter estimates. Replace them with your actual blank, transfer, and packaging costs as you receive invoices. Labor is added once to the entire quote, never once per product or item; nothing here appears as a public Shop price.</p></div></div>
 
       {message ? <div className="formSuccess">{message}</div> : null}
       {error ? <div className="formError">{error}</div> : null}
 
       <div className="pricingSettingsCard card">
-        <div className="pricingSettingsHead"><div><strong>Business defaults</strong><span>Used when a product does not have a more specific setting.</span></div><span className="badge">Admin only</span></div>
+        <div className="pricingSettingsHead"><div><strong>Whole-order labor defaults</strong><span>Applied once to the complete quote, regardless of its quantity or number of product types.</span></div><span className="badge">Admin only</span></div>
         <div className="pricingSettingsGrid">
-          <label className="field"><span>Default internal labor rate</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={globalLaborRate} onChange={(e) => setGlobalLaborRate(e.target.value)} /></div><small>Current plan: $10/hr while owners are doing the work.</small></label>
-          <label className="field"><span>Minimum labor per production job</span><input type="number" min="1" step="0.25" value={minimumLaborHours} onChange={(e) => setMinimumLaborHours(e.target.value)} /><small>Current plan: 1 hour minimum.</small></label>
+          <label className="field"><span>Internal labor rate per hour</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={globalLaborRate} onChange={(e) => setGlobalLaborRate(e.target.value)} /></div><small>Starts at $15/hour and remains private.</small></label>
+          <label className="field"><span>Minimum labor for the entire order</span><input type="number" min="1" step="0.25" value={minimumLaborHours} onChange={(e) => setMinimumLaborHours(e.target.value)} /><small>One hour means a $15 minimum for the whole order—not for each item.</small></label>
         </div>
         <div className="pricingPickupSettings">
           <div><strong>Pickup / business address for tax</strong><span>Automatic tax uses this customer location for local-pickup orders.</span></div>
@@ -176,9 +181,7 @@ export function AdminProductPricingPanel({
         {products.map((product) => {
           const row = editing[product.slug];
           const directUnitCost = cents(row.blank) + cents(row.print) + cents(row.packaging);
-          const laborCost = Math.round(Math.max(0, Number(row.laborHours) || 0) * cents(row.laborRate));
-          const sampleCost = directUnitCost + laborCost;
-          const recommended = recommendedRevenueForMargin(sampleCost, Math.round((Number(row.margin) || 0) * 100));
+          const recommended = recommendedRevenueForMargin(directUnitCost, Math.round((Number(row.margin) || 0) * 100));
           return (
             <article className="productPricingCard card" key={product.slug}>
               <div className="productPricingCardHead"><div><span className="badge">{product.category}</span><h3>{product.name}</h3></div><label className="pricingActiveToggle"><input type="checkbox" checked={row.active} onChange={(e) => patch(product.slug, { active: e.target.checked })} /><span>Use defaults</span></label></div>
@@ -186,11 +189,10 @@ export function AdminProductPricingPanel({
                 <label><span>Blank / product cost each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.blank} onChange={(e) => patch(product.slug, { blank: e.target.value })} /></div></label>
                 <label><span>Print / decoration each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.print} onChange={(e) => patch(product.slug, { print: e.target.value })} /></div></label>
                 <label><span>Packaging each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.packaging} onChange={(e) => patch(product.slug, { packaging: e.target.value })} /></div></label>
-                <label><span>Default labor hours</span><input type="number" min="0" step="0.25" value={row.laborHours} onChange={(e) => patch(product.slug, { laborHours: e.target.value })} /></label>
-                <label><span>Internal labor rate / hr</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={row.laborRate} onChange={(e) => patch(product.slug, { laborRate: e.target.value })} /></div></label>
                 <label><span>Target margin</span><div className="percentInput"><input type="number" min="0" max="95" step="1" value={row.margin} onChange={(e) => patch(product.slug, { margin: e.target.value })} /><span>%</span></div></label>
               </div>
-              <div className="pricingRecommendation"><span>Example cost incl. default labor</span><strong>{money(sampleCost)}</strong><span>Suggested revenue at {Number(row.margin) || 0}% margin</span><strong>{money(recommended)}</strong></div>
+              <div className="pricingRecommendation"><span>Direct cost per item (before order labor)</span><strong>{money(directUnitCost)}</strong><span>Baseline revenue before order labor at {Number(row.margin) || 0}% margin</span><strong>{money(recommended)}</strong></div>
+              {product.sizes.some((size) => /^(?:XS|S|M|L|XL|[2-9]XL)$/i.test(size)) ? <details className="pricingAdvanced pricingSizeCosts"><summary>Supplier cost and customer surcharge by size</summary><p className="fieldHelp">Copy today&apos;s Jiffy price for each size. These remain private estimates. The surcharge is the additional amount the customer sees above the product&apos;s standard price.</p><div className="pricingSizeCostHead"><span>Size</span><span>Jiffy / supplier cost</span><span>Customer surcharge</span></div>{product.sizes.map((size) => <div className="pricingSizeCostRow" key={size}><strong>{size}</strong><div className="moneyInput"><span>$</span><input aria-label={`${product.name} ${size} supplier cost`} type="number" min="0" step="0.01" value={row.sizeBlankCosts[size] || "0.00"} onChange={(event) => patch(product.slug, { sizeBlankCosts: { ...row.sizeBlankCosts, [size]: event.target.value } })} /></div><div className="moneyInput"><span>+$</span><input aria-label={`${product.name} ${size} customer surcharge`} type="number" min="0" step="0.01" value={row.sizeSurcharges[size] || "0.00"} onChange={(event) => patch(product.slug, { sizeSurcharges: { ...row.sizeSurcharges, [size]: event.target.value } })} /></div></div>)}</details> : null}
               <details className="pricingAdvanced"><summary>Advanced</summary><label className="field"><span>Stripe Tax code</span><input value={row.taxCode} onChange={(e) => patch(product.slug, { taxCode: e.target.value })} /></label><label className="field"><span>Internal notes</span><textarea value={row.notes} onChange={(e) => patch(product.slug, { notes: e.target.value })} /></label></details>
               <div className="goalFundingFormActions"><button type="button" className="btn" onClick={() => saveProduct(product.slug)} disabled={savingSlug === product.slug}>{savingSlug === product.slug ? "Saving…" : "Save pricing defaults"}</button><button type="button" className="btn secondary" onClick={() => applyStarter(product.slug)}>Restore starter estimates</button></div>
             </article>

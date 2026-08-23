@@ -16,8 +16,8 @@ create table if not exists public.product_pricing (
   blank_cost_cents integer not null default 0 check (blank_cost_cents >= 0),
   print_cost_cents integer not null default 0 check (print_cost_cents >= 0),
   packaging_cost_cents integer not null default 0 check (packaging_cost_cents >= 0),
-  default_labor_hours numeric(8,2) not null default 1 check (default_labor_hours >= 0),
-  labor_rate_cents integer not null default 1000 check (labor_rate_cents >= 0),
+  default_labor_hours numeric(8,2) not null default 0 check (default_labor_hours >= 0),
+  labor_rate_cents integer not null default 1500 check (labor_rate_cents >= 0),
   target_margin_basis_points integer not null default 5000 check (target_margin_basis_points >= 0 and target_margin_basis_points < 10000),
   tax_code text not null default 'txcd_99999999',
   notes text,
@@ -42,7 +42,7 @@ for each row execute function public.set_product_pricing_updated_at();
 -- location used for pickup tax calculations.
 create table if not exists public.business_settings (
   id text primary key default 'default',
-  default_labor_rate_cents integer not null default 1000 check (default_labor_rate_cents >= 0),
+  default_labor_rate_cents integer not null default 1500 check (default_labor_rate_cents >= 0),
   minimum_labor_hours numeric(8,2) not null default 1 check (minimum_labor_hours >= 0),
   pickup_address jsonb,
   default_tax_code text not null default 'txcd_99999999',

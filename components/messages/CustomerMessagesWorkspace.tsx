@@ -32,6 +32,13 @@ function dateLabel(value: string) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" }).format(date);
 }
 
+function displayThreadSubject(subject: string) {
+  // The order reference is already displayed directly above the subject. Keep
+  // it in the stored subject/email history, but avoid repeating it in narrow UI.
+  const withoutRepeatedReference = subject.replace(/^MM-\d{6}\s*[·-]\s*/i, "").trim();
+  return withoutRepeatedReference || subject;
+}
+
 export function CustomerMessagesWorkspace({ threads, orders, initialThreadId, initialRequestId }: Props) {
   const router = useRouter();
   const initialOrderThread = initialRequestId ? threads.find((thread) => thread.requestId === initialRequestId)?.id : null;
@@ -117,7 +124,7 @@ export function CustomerMessagesWorkspace({ threads, orders, initialThreadId, in
               <div className="messageOrderGroupThreads">{group.threads.map((thread) => {
                 const latest = thread.entries.at(-1);
                 return <button key={thread.id} type="button" className={`messageThreadRow ${selectedId === thread.id ? "active" : ""}`} onClick={() => chooseThread(thread.id)}>
-                  <div className="messageThreadRowTop"><strong>{thread.subject}</strong>{thread.customerUnreadCount ? <span className="messageUnreadBadge">{thread.customerUnreadCount}</span> : null}</div>
+                  <div className="messageThreadRowTop"><strong>{displayThreadSubject(thread.subject)}</strong>{thread.customerUnreadCount ? <span className="messageUnreadBadge">{thread.customerUnreadCount}</span> : null}</div>
                   <span>{MESSAGE_TOPIC_LABELS[thread.topic]}</span>
                   <p>{latest?.body || "No messages yet."}</p>
                   <small>{timeLabel(thread.lastMessageAt)}</small>
@@ -148,7 +155,7 @@ export function CustomerMessagesWorkspace({ threads, orders, initialThreadId, in
         {selected ? (
           <>
             <div className="messageConversationHead">
-              <div><div className="eyebrow">{selected.requestNumber ? formatRequestNumber(selected.requestNumber) : "General question"}</div><h2>{selected.subject}</h2><p>{MESSAGE_TOPIC_LABELS[selected.topic]} · {MESSAGE_STATUS_LABELS[selected.status]}</p></div>
+              <div><div className="eyebrow">{selected.requestNumber ? formatRequestNumber(selected.requestNumber) : "General question"}</div><h2>{displayThreadSubject(selected.subject)}</h2><p>{MESSAGE_TOPIC_LABELS[selected.topic]} · {MESSAGE_STATUS_LABELS[selected.status]}</p></div>
               {selected.requestId ? <Link className="btn secondary messageOrderLink" href="/account">View order</Link> : null}
             </div>
             <div className="messageHistory">

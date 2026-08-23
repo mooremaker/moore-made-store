@@ -14,6 +14,11 @@ function dateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
+function displayThreadSubject(subject: string) {
+  const withoutRepeatedReference = subject.replace(/^MM-\d{6}\s*[·-]\s*/i, "").trim();
+  return withoutRepeatedReference || subject;
+}
+
 export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<InboxFilter>(threads.some((thread) => thread.adminUnreadCount > 0) ? "unread" : "open");
@@ -108,7 +113,7 @@ export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: 
         <div className="adminMessageConversation">
           {selected ? <>
             <header className="adminMessageConversationHead">
-              <div><div className="adminRequestKicker"><span className={`statusBadge message-status-${selected.status}`}>{MESSAGE_STATUS_LABELS[selected.status]}</span>{selected.requestNumber ? <span className="requestNumber">{formatRequestNumber(selected.requestNumber)}</span> : <span className="requestNumber">General</span>}</div><h3>{selected.subject}</h3><p>{MESSAGE_TOPIC_LABELS[selected.topic]} · {selected.customerEmail}</p></div>
+              <div><div className="adminRequestKicker"><span className={`statusBadge message-status-${selected.status}`}>{MESSAGE_STATUS_LABELS[selected.status]}</span>{selected.requestNumber ? <span className="requestNumber">{formatRequestNumber(selected.requestNumber)}</span> : <span className="requestNumber">General</span>}</div><h3>{displayThreadSubject(selected.subject)}</h3><p>{MESSAGE_TOPIC_LABELS[selected.topic]} · {selected.customerEmail}</p></div>
               <div className="adminMessageContactActions">
                 {selected.smsConsent && selected.customerPhone ? <a className="btn secondary" href={`sms:${selected.customerPhone}?&body=${encodeURIComponent(`Hi ${selected.customerName}, this is Moore Made regarding ${selected.requestNumber ? formatRequestNumber(selected.requestNumber) : "your message"}.`)}`}>Text customer</a> : null}
                 <a className="btn secondary" href={`mailto:${selected.customerEmail}`}>Email</a>
