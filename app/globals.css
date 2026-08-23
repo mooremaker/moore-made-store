@@ -5530,6 +5530,12 @@ p { line-height: 1.65; }
   font-size: .59rem;
   line-height: 1.25;
 }
+.financeReadinessFix {
+  display: inline-flex;
+  margin-top: 5px;
+  font-size: .62rem !important;
+  font-weight: 850 !important;
+}
 
 @media (max-width: 680px) {
   .financeReadinessHeadActions {

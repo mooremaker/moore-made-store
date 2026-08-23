@@ -40,10 +40,10 @@ export function StripeTaxRecordingControl({ quote, amountPaidCents }: Props) {
 
   return (
     <div className={recorded ? "quoteLocked" : "requestWarning"}>
-      <strong>{recorded ? "Stripe Tax recorded" : paidInFull ? "Tax collected - Stripe Tax record needs attention" : "Stripe Tax ready"}</strong>
+      <strong>{recorded ? "Sales tax recorded in Stripe Tax" : paidInFull ? "Sales tax collected—Stripe Tax record needs attention" : "Sales tax ready for Stripe Tax"}</strong>
       <span>
         {recorded
-          ? `${money(quote.tax_cents)} is linked to Stripe Tax transaction ${quote.stripe_tax_transaction_id}.`
+          ? `${money(quote.tax_cents)} in sales tax is linked to Stripe Tax transaction ${quote.stripe_tax_transaction_id}. This is separate from Stripe's processing fee.`
           : paidInFull
             ? `${money(quote.tax_cents)} was included in the customer's paid total, but the Stripe Tax reporting transaction is missing.`
             : `${money(quote.tax_cents)} will be recorded in Stripe Tax automatically after the order is paid in full.`}

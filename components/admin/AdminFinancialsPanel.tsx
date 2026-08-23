@@ -326,11 +326,12 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
   const monthKey = currentMonthKey();
   const easternWeek = currentEasternWeek();
   const currentTaxYear = dateKeyForNewYork(new Date()).slice(0, 4);
-  const unreconciledStripePayments = useMemo(() => paidPayments.filter((payment) =>
+  const allUnreconciledStripePayments = useMemo(() => paidPayments.filter((payment) =>
+    payment.payment_method === "stripe" && payment.stripe_fee_cents == null
+  ), [paidPayments]);
+  const unreconciledStripePayments = useMemo(() => allUnreconciledStripePayments.filter((payment) =>
     dateKeyForNewYork(payment.paid_at || payment.created_at).startsWith(currentTaxYear)
-    && payment.payment_method === "stripe"
-    && payment.stripe_fee_cents == null
-  ), [paidPayments, currentTaxYear]);
+  ), [allUnreconciledStripePayments, currentTaxYear]);
 
   function openFeeReconciliation() {
     setQuickForm(null);
@@ -452,7 +453,8 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
     const mattGross = Math.max(0, estimatedProfit - salGross);
     const salAfterReserve = Math.ceil(afterTaxReserve / 2);
     const mattAfterReserve = Math.max(0, afterTaxReserve - salAfterReserve);
-    const missingStripeFees = periodPayments.filter((payment) => payment.payment_method === "stripe" && payment.stripe_fee_cents == null).length;
+    const missingStripePayments = periodPayments.filter((payment) => payment.payment_method === "stripe" && payment.stripe_fee_cents == null);
+    const missingStripeFees = missingStripePayments.length;
     const periodDraws = activeFunding.filter((entry) => entry.entry_type === "owner_draw" && (!startKey || entry.entry_date >= startKey));
     const salWithdrawn = periodDraws.filter((entry) => ownerDrawRecipient(entry.party_name) === "sal").reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0);
     const mattWithdrawn = periodDraws.filter((entry) => ownerDrawRecipient(entry.party_name) === "matt").reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0);
@@ -467,7 +469,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
     const salRunningBalance = salAllTimeAfterReserve - salWithdrawnAllTime;
     const mattRunningBalance = mattAllTimeAfterReserve - mattWithdrawnAllTime;
     const labels: Record<EarningsPeriod, string> = { week: easternWeek.label, "14days": "Last 14 days", month: new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/New_York" }).format(new Date()), year: currentTaxYear, all: "All recorded time" };
-    return { estimatedProfit, combinedTaxReserve, afterTaxReserve, salGross, mattGross, salAfterReserve, mattAfterReserve, salWithdrawn, mattWithdrawn, salPeriodNet: salAfterReserve - salWithdrawn, mattPeriodNet: mattAfterReserve - mattWithdrawn, salWithdrawnAllTime, mattWithdrawnAllTime, salRunningBalance, mattRunningBalance, unassignedWithdrawn, incompleteOrders, missingStripeFees, label: labels[earningsPeriod], paymentCount: periodPayments.length };
+    return { estimatedProfit, combinedTaxReserve, afterTaxReserve, salGross, mattGross, salAfterReserve, mattAfterReserve, salWithdrawn, mattWithdrawn, salPeriodNet: salAfterReserve - salWithdrawn, mattPeriodNet: mattAfterReserve - mattWithdrawn, salWithdrawnAllTime, mattWithdrawnAllTime, salRunningBalance, mattRunningBalance, unassignedWithdrawn, incompleteOrders, missingStripeFees, firstMissingStripePaymentId: missingStripePayments[0]?.id || null, label: labels[earningsPeriod], paymentCount: periodPayments.length };
   }, [earningsPeriod, easternWeek.startKey, easternWeek.label, monthKey, currentTaxYear, paidPayments, quoteByRequest, incomeTaxReserveRate, activeFunding]);
 
   const taxReserveEstimate = useMemo(() => {
@@ -542,7 +544,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
     const missingStripeSettlements = paidPayments.filter((payment) => payment.payment_method === "stripe" && payment.stripe_fee_cents == null).length;
     const checks = [
       { label: "Customer payments have receipt records", ok: missingPaymentReceipts === 0, detail: missingPaymentReceipts ? `${missingPaymentReceipts} payment(s) need receipt IDs` : "Payment records are linked to receipts" },
-      { label: "Stripe fees are reconciled", ok: missingStripeSettlements === 0, detail: missingStripeSettlements ? `${missingStripeSettlements} paid Stripe transaction(s) need settlement details synced` : "Actual Stripe fees and net deposits are saved" },
+      { label: "Stripe processing fees are reconciled", ok: missingStripeSettlements === 0, detail: missingStripeSettlements ? `${missingStripeSettlements} paid Stripe transaction(s) need the processing fee synced; this is separate from Stripe Tax` : "Actual Stripe processing fees and net deposits are saved" },
       { label: "Expense receipts are attached", ok: missingReceipts === 0, detail: missingReceipts ? `${missingReceipts} active expense(s) do not have a receipt attached` : "Every active expense has supporting files" },
       { label: "Funding is classified", ok: unclassifiedFunding === 0, detail: unclassifiedFunding ? `${unclassifiedFunding} funding entry/entries still need classification` : "No funding entries are waiting for classification" },
       { label: "Outside gifts have gift letters", ok: undocumentedGifts === 0, detail: undocumentedGifts ? `${undocumentedGifts} gift entr${undocumentedGifts === 1 ? "y needs" : "ies need"} a signed gift letter or supporting document` : "Every outside gift has supporting documentation" },
@@ -863,7 +865,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
           <div className="ownerDrawSummary"><div className={ownerEarnings.salRunningBalance < 0 ? "isNegative" : ""}><span>Sal’s current running balance</span><strong>{money(ownerEarnings.salRunningBalance)}</strong><small>{ownerEarnings.label}: {money(ownerEarnings.salAfterReserve)} earned · {money(ownerEarnings.salWithdrawn)} withdrawn · {money(ownerEarnings.salPeriodNet)} net</small><small>{money(ownerEarnings.salWithdrawnAllTime)} withdrawn all time</small></div><div className={ownerEarnings.mattRunningBalance < 0 ? "isNegative" : ""}><span>Matt’s current running balance</span><strong>{money(ownerEarnings.mattRunningBalance)}</strong><small>{ownerEarnings.label}: {money(ownerEarnings.mattAfterReserve)} earned · {money(ownerEarnings.mattWithdrawn)} withdrawn · {money(ownerEarnings.mattPeriodNet)} net</small><small>{money(ownerEarnings.mattWithdrawnAllTime)} withdrawn all time</small></div><button type="button" className="btn secondary" disabled={!fundingReady} onClick={openOwnerDraw}>Record owner draw</button></div>
           {(ownerEarnings.salRunningBalance < 0 || ownerEarnings.mattRunningBalance < 0) ? <div className="ownerBalanceWarning"><strong>Owner draw balance is below zero.</strong><span>{[ownerEarnings.salRunningBalance < 0 ? `Sal is ${money(Math.abs(ownerEarnings.salRunningBalance))} ahead of currently estimated after-reserve earnings` : "", ownerEarnings.mattRunningBalance < 0 ? `Matt is ${money(Math.abs(ownerEarnings.mattRunningBalance))} ahead of currently estimated after-reserve earnings` : ""].filter(Boolean).join(" · ")}. Future after-reserve earnings will reduce the negative balance until it returns to zero.</span></div> : null}
           {ownerEarnings.unassignedWithdrawn ? <div className="ownerEarningsWarning"><strong>Owner name needs review.</strong><span>{money(ownerEarnings.unassignedWithdrawn)} in owner draws could not be assigned to Sal or Matt.</span></div> : null}
-          {(ownerEarnings.missingStripeFees || ownerEarnings.incompleteOrders) ? <div className="ownerEarningsWarning"><strong>Estimate needs attention.</strong><span>{[ownerEarnings.missingStripeFees ? `${ownerEarnings.missingStripeFees} Stripe fee${ownerEarnings.missingStripeFees === 1 ? " is" : "s are"} not synced` : "", ownerEarnings.incompleteOrders ? `${ownerEarnings.incompleteOrders} paid order${ownerEarnings.incompleteOrders === 1 ? " is" : "s are"} missing usable profit data` : ""].filter(Boolean).join(" · ")}.</span></div> : <div className="ownerEarningsReady">✓ All paid orders in this view have saved profit data and reconciled Stripe fees.</div>}
+          {(ownerEarnings.missingStripeFees || ownerEarnings.incompleteOrders) ? <div className="ownerEarningsWarning financeActionWarning"><div><strong>Estimate needs attention.</strong><span>{[ownerEarnings.missingStripeFees ? `${ownerEarnings.missingStripeFees} Stripe processing fee${ownerEarnings.missingStripeFees === 1 ? " is" : "s are"} not synced` : "", ownerEarnings.incompleteOrders ? `${ownerEarnings.incompleteOrders} paid order${ownerEarnings.incompleteOrders === 1 ? " is" : "s are"} missing usable profit data` : ""].filter(Boolean).join(" · ")}.</span></div>{ownerEarnings.firstMissingStripePaymentId ? <button type="button" className="btn secondary" disabled={syncingPaymentId === ownerEarnings.firstMissingStripePaymentId} onClick={() => void syncStripeSettlement(ownerEarnings.firstMissingStripePaymentId!)}>{syncingPaymentId === ownerEarnings.firstMissingStripePaymentId ? "Syncing…" : "Sync Stripe fee now"}</button> : null}</div> : <div className="ownerEarningsReady">✓ All paid orders in this view have saved profit data and reconciled Stripe fees.</div>}
           <p className="ownerEarningsNote">Planning estimate only. This card does not transfer money or record an owner draw. Confirm supplier expenses, refunds, delivery costs, and payment fees before deciding how much cash the business can safely pay out.</p>
         </section>
         <section className="card financeOwnerReserveOverview" aria-label="Owner tax reserve snapshot">
@@ -967,7 +969,7 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
               </div>
             </div>
             <div className="financeReadinessBar"><span style={{ width: `${readiness.score}%` }} /></div>
-            <div className="financeReadinessChecks financeReadinessChecksCompact">{readiness.checks.slice(0, 4).map((check) => <div key={check.label} className={check.ok ? "ready" : "needsWork"}><span>{check.ok ? "✓" : "!"}</span><div><strong>{check.label}</strong><small>{check.detail}</small></div></div>)}</div>
+            <div className="financeReadinessChecks financeReadinessChecksCompact">{readiness.checks.slice(0, 4).map((check) => <div key={check.label} className={check.ok ? "ready" : "needsWork"}><span>{check.ok ? "✓" : "!"}</span><div><strong>{check.label}</strong><small>{check.detail}</small>{!check.ok && check.label === "Stripe processing fees are reconciled" && allUnreconciledStripePayments[0] ? <button type="button" className="textButton financeReadinessFix" disabled={syncingPaymentId === allUnreconciledStripePayments[0].id} onClick={() => void syncStripeSettlement(allUnreconciledStripePayments[0].id)}>{syncingPaymentId === allUnreconciledStripePayments[0].id ? "Syncing…" : "Sync Stripe fee now →"}</button> : null}</div></div>)}</div>
           </section>
         </div>
 
@@ -1061,13 +1063,13 @@ export function AdminFinancialsPanel({ orders, quotes, payments, expenses, fundi
             <div><span>Conservative reserve attributable to gifts</span><strong>{money(taxReserveEstimate.giftTaxReserve)}</strong></div>
             <div><span>Sales tax on genuine gifts</span><strong>$0.00</strong></div>
           </div>
-          {taxReserveEstimate.missingStripeFees ? <div className="requestWarning financeActionWarning"><div><strong>Estimate needs fee reconciliation</strong><span>{taxReserveEstimate.missingStripeFees} Stripe payment{taxReserveEstimate.missingStripeFees === 1 ? "" : "s"} still need the actual settlement fee synced in Transactions.</span></div><button type="button" className="btn secondary" onClick={openFeeReconciliation}>Review & sync {taxReserveEstimate.missingStripeFees === 1 ? "payment" : "payments"} →</button></div> : null}
+          {taxReserveEstimate.missingStripeFees ? <div className="requestWarning financeActionWarning"><div><strong>Estimate needs processing-fee reconciliation</strong><span>{taxReserveEstimate.missingStripeFees} Stripe payment{taxReserveEstimate.missingStripeFees === 1 ? "" : "s"} still need the actual processing fee imported. This is separate from the sales-tax record.</span></div><button type="button" className="btn secondary" disabled={!unreconciledStripePayments[0] || syncingPaymentId === unreconciledStripePayments[0]?.id} onClick={() => unreconciledStripePayments[0] && void syncStripeSettlement(unreconciledStripePayments[0].id)}>{syncingPaymentId === unreconciledStripePayments[0]?.id ? "Syncing…" : "Sync Stripe fee now"}</button></div> : null}
           <p className="financeDisclaimer">Planning estimate only. Direct gifts to a for-profit LLC are fact-specific for income-tax purposes, so this card reserves conservatively and does not decide the final return treatment. It does not know either owner’s other income, withholding, deductions, credits, residency, or prior-year safe harbor. Unpaid owner labor is not deducted as a tax expense.</p>
         </section>
         <section className="card taxReadinessPanel">
           <div className="financePanelHead"><div><div className="eyebrow">Tax-ready organization</div><h3>Year-round readiness</h3><p>This checks whether the portal records are organized and supported so you can make and document the final tax-filing treatment.</p></div><div className="taxReadinessBig"><strong>{readiness.score}%</strong><span>organized</span></div></div>
           <div className="financeReadinessBar financeReadinessBarLarge"><span style={{ width: `${readiness.score}%` }} /></div>
-          <div className="taxReadinessChecklist">{readiness.checks.map((check) => <article key={check.label} className={check.ok ? "ready" : "needsWork"}><span>{check.ok ? "✓" : "!"}</span><div><strong>{check.label}</strong><p>{check.detail}</p></div></article>)}</div>
+          <div className="taxReadinessChecklist">{readiness.checks.map((check) => <article key={check.label} className={check.ok ? "ready" : "needsWork"}><span>{check.ok ? "✓" : "!"}</span><div><strong>{check.label}</strong><p>{check.detail}</p>{!check.ok && check.label === "Stripe processing fees are reconciled" && allUnreconciledStripePayments[0] ? <button type="button" className="textButton financeReadinessFix" disabled={syncingPaymentId === allUnreconciledStripePayments[0].id} onClick={() => void syncStripeSettlement(allUnreconciledStripePayments[0].id)}>{syncingPaymentId === allUnreconciledStripePayments[0].id ? "Syncing…" : "Sync Stripe fee now →"}</button> : null}</div></article>)}</div>
         </section>
 
         <section className="card financeExportCenter">
