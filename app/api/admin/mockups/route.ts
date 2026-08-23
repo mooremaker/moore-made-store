@@ -10,6 +10,7 @@ import {
   type MockupTemplateRef,
   type MockupView,
 } from "@/lib/mockup-types";
+import { expandMockupVariants, reconnectCustomerArtwork } from "@/lib/mockup-variants";
 import { getSupabaseAdmin, MOCKUP_STUDIO_BUCKET, QUOTE_PROOF_BUCKET } from "@/lib/supabase-admin";
 
 const ALLOWED_ASSET_BUCKETS = new Set<MockupAssetBucket>([
@@ -25,6 +26,11 @@ function text(value: unknown, max = 500) {
 function finite(value: unknown, fallback: number, min: number, max: number) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+function optionalFinite(value: unknown, min: number, max: number) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined;
 }
 
 function asset(value: unknown): MockupAssetRef | null {
@@ -52,9 +58,12 @@ function customerIntent(value: unknown): MockupCustomerIntent | null {
     placementLabel: text(row.placementLabel, 160) || undefined,
     idea: text(row.idea, 3000) || undefined,
     artworkFileName: text(row.artworkFileName, 300) || undefined,
+    details: text(row.details, 2000) || undefined,
+    backgroundRemovalRequested: Boolean(row.backgroundRemovalRequested),
     x: finite(row.x, 50, -100, 200),
     y: finite(row.y, 50, -100, 200),
     width: finite(row.width, 30, 1, 300),
+    height: optionalFinite(row.height, 1, 300),
     rotation: finite(row.rotation, 0, -360, 360),
   };
 }
@@ -69,6 +78,11 @@ function templateRef(value: unknown): MockupTemplateRef | null {
     colorName: text(row.colorName, 120) || undefined,
     colorValue: text(row.colorValue, 40) || undefined,
     viewKey: text(row.viewKey, 80) || undefined,
+    designGroupId: text(row.designGroupId, 180) || undefined,
+    orderItemId: text(row.orderItemId, 180) || undefined,
+    quantity: Math.max(0, Math.floor(finite(row.quantity, 0, 0, 1000000))) || undefined,
+    designRelationship: row.designRelationship === "primary" || row.designRelationship === "separate" ? row.designRelationship : row.designRelationship === "same" ? "same" : undefined,
+    orderItemNotes: text(row.orderItemNotes, 2000) || undefined,
   };
   return Object.values(result).some(Boolean) ? result : null;
 }
@@ -76,7 +90,7 @@ function templateRef(value: unknown): MockupTemplateRef | null {
 function normalizeDocument(value: unknown): MockupDocument {
   if (!value || typeof value !== "object") return emptyMockupDocument();
   const doc = value as Record<string, unknown>;
-  const rawViews = Array.isArray(doc.views) ? doc.views.slice(0, 12) : [];
+  const rawViews = Array.isArray(doc.views) ? doc.views.slice(0, 120) : [];
   const views: MockupView[] = rawViews.map((raw, viewIndex) => {
     const view = (raw || {}) as Record<string, unknown>;
     const id = text(view.id, 100) || `view-${viewIndex + 1}`;
@@ -91,6 +105,7 @@ function normalizeDocument(value: unknown): MockupDocument {
             x: finite(layer.x, 50, -100, 200),
             y: finite(layer.y, 50, -100, 200),
             width: finite(layer.width, 30, 1, 300),
+            height: optionalFinite(layer.height, 1, 300),
             rotation: finite(layer.rotation, 0, -360, 360),
             opacity: finite(layer.opacity, 1, 0.05, 1),
             zIndex: Math.max(0, Math.floor(finite(layer.zIndex, layerIndex + 1, 0, 1000))),
@@ -147,13 +162,18 @@ export async function GET(request: Request) {
   const requestId = new URL(request.url).searchParams.get("requestId") || "";
   if (!requestId) return NextResponse.json({ error: "Order is required." }, { status: 400 });
   const supabase = getSupabaseAdmin();
-  const { data: project, error } = await supabase.from("mockup_projects").select("id,request_id,customer_user_id,title,status,document,created_by,created_at,updated_at").eq("request_id", requestId).neq("status", "archived").maybeSingle();
+  const [{ data: project, error }, { data: order }] = await Promise.all([
+    supabase.from("mockup_projects").select("id,request_id,customer_user_id,title,status,document,created_by,created_at,updated_at").eq("request_id", requestId).neq("status", "archived").maybeSingle(),
+    supabase.from("custom_requests").select("id,order_items,artwork_paths").eq("id", requestId).maybeSingle(),
+  ]);
   if (error && error.code !== "PGRST116") {
     if ((error.message || "").toLowerCase().includes("mockup_projects")) return NextResponse.json({ error: "Mockup Studio needs its Supabase migration.", code: "MIGRATION_REQUIRED" }, { status: 503 });
     console.error("Mockup project load failed", error);
     return NextResponse.json({ error: "Could not load the mockup project." }, { status: 500 });
   }
-  const rawDocument = normalizeDocument(project?.document || emptyMockupDocument());
+  const normalizedDocument = normalizeDocument(project?.document || emptyMockupDocument());
+  const repairedDocument = reconnectCustomerArtwork(normalizedDocument, order?.artwork_paths);
+  const rawDocument = expandMockupVariants(repairedDocument, order?.order_items);
   const document = await signedDocument(rawDocument);
   const proofExports = document.views.filter((view) => view.exportAsset?.path).map((view) => ({ viewId: view.id, title: view.name, path: view.exportAsset!.path, originalName: view.exportAsset!.originalName, url: view.exportAsset!.url || null }));
   return NextResponse.json({ ok: true, project: project ? { ...project, document } : null, document, proofExports });
@@ -166,12 +186,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const requestId = text(body.requestId, 100);
     if (!requestId) return NextResponse.json({ error: "Order is required." }, { status: 400 });
-    const document = normalizeDocument(body.document);
+    const normalizedDocument = normalizeDocument(body.document);
     const title = text(body.title, 300) || "Order mockup";
     const status = body.status === "proof_ready" ? "proof_ready" : "draft";
     const supabase = getSupabaseAdmin();
-    const { data: order } = await supabase.from("custom_requests").select("id,customer_user_id").eq("id", requestId).single();
+    const { data: order } = await supabase.from("custom_requests").select("id,customer_user_id,order_items,artwork_paths").eq("id", requestId).single();
     if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    const document = expandMockupVariants(reconnectCustomerArtwork(normalizedDocument, order.artwork_paths), order.order_items);
     const payload = { request_id: requestId, customer_user_id: order.customer_user_id || null, title, status, document, created_by: auth.user.id };
     const { data: existing } = await supabase.from("mockup_projects").select("id").eq("request_id", requestId).neq("status", "archived").maybeSingle();
     const query = existing?.id ? supabase.from("mockup_projects").update({ title, status, document }).eq("id", existing.id) : supabase.from("mockup_projects").insert(payload);

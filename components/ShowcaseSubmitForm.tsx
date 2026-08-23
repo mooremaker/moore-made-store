@@ -8,7 +8,7 @@ import { clearGuestShowcaseDraft, loadGuestShowcaseDraft, saveGuestShowcaseDraft
 
 const BUCKET = "showcase-files";
 
-export function ShowcaseSubmitForm({ canSaveDraft = false, defaultEmail = "" }: { canSaveDraft?: boolean; defaultEmail?: string }) {
+export function ShowcaseSubmitForm({ canSaveDraft = false, defaultEmail = "", defaultName = "", defaultProduct = "" }: { canSaveDraft?: boolean; defaultEmail?: string; defaultName?: string; defaultProduct?: string }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -106,8 +106,8 @@ export function ShowcaseSubmitForm({ canSaveDraft = false, defaultEmail = "" }: 
   return <form ref={formRef} className="form card showcaseForm" onSubmit={onSubmit}>
     <div className="honeypotField" aria-hidden="true"><label htmlFor="website">Website</label><input id="website" name="website" tabIndex={-1} autoComplete="off"/></div>
     {canSaveDraft ? <div className="requestNote"><strong>Need more time?</strong> Save this as a private draft and finish it later from your account.{restored ? <><br/><strong>Your review was restored after sign-in.</strong></> : null}</div> : <div className="requestNote reviewSignInNote"><div><strong>Need more time?</strong><br/>Sign in and save this as a private draft. We’ll keep what you’ve already entered — including the photos you selected — and restore it after sign-in.</div><button className="btn secondary reviewSignInButton" type="button" disabled={!!submitting} onClick={()=>void signInAndPreserve()}>{submitting==="signin"?"Saving your progress...":"Sign in to save"}</button></div>}
-    <div className="twoCol"><div className="field"><label htmlFor="name">Your name *</label><input id="name" name="name"/></div><div className="field"><label htmlFor="businessName">Business / organization</label><input id="businessName" name="businessName" placeholder="Optional"/></div></div>
-    <div className="twoCol"><div className="field"><label htmlFor="email">Email *</label><input id="email" name="email" type="email" defaultValue={defaultEmail}/><span className="fieldHelp">For approval questions only. It will not be shown publicly.</span></div><div className="field"><label htmlFor="product">What did we make? *</label><input id="product" name="product" placeholder="Work shirts, mugs, wedding favors..."/></div></div>
+    <div className="twoCol"><div className="field"><label htmlFor="name">Your name *</label><input id="name" name="name" defaultValue={defaultName}/></div><div className="field"><label htmlFor="businessName">Business / organization</label><input id="businessName" name="businessName" placeholder="Optional"/></div></div>
+    <div className="twoCol"><div className="field"><label htmlFor="email">Email *</label><input id="email" name="email" type="email" defaultValue={defaultEmail}/><span className="fieldHelp">For approval questions only. It will not be shown publicly.</span></div><div className="field"><label htmlFor="product">What did we make? *</label><input id="product" name="product" defaultValue={defaultProduct} placeholder="Work shirts, mugs, wedding favors..."/></div></div>
     <div className="field"><label htmlFor="rating">Your rating *</label><select id="rating" name="rating" defaultValue="5">{[5,4,3,2,1].map(n=><option key={n} value={n}>{"★".repeat(n)}{"☆".repeat(5-n)} — {n} star{n===1?"":"s"}</option>)}</select></div>
     <div className="field"><label htmlFor="review">Your review *</label><textarea id="review" name="review" placeholder="How did everything turn out?"/></div>
     <div className="field"><label htmlFor="caption">Anything you want to say about the photos?</label><textarea id="caption" name="caption" placeholder="Event details, what the order was for, etc."/></div>

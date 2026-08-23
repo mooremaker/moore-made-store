@@ -6,7 +6,7 @@ import { ProductVisual } from "@/components/shop/ProductVisual";
 import { OrderItemsBuilder } from "@/components/shop/OrderItemsBuilder";
 import { ARTWORK_RIGHTS_POLICY_VERSION, ARTWORK_RIGHTS_UPLOAD_LABEL } from "@/lib/artwork-rights";
 import { CUSTOMER_PRODUCTION_NOTICE } from "@/lib/customer-production-notice";
-import { getProduct } from "@/lib/catalog";
+import { findProductColor, getProduct, isOtherProductColor, otherProductColorPreference } from "@/lib/catalog";
 import {
   activeSavedRequestCartId,
   clearCustomRequestCart,
@@ -39,7 +39,7 @@ function CartItemMockup({ item }: { item: CustomRequestCartItem }) {
   const colorNames = Array.from(new Set(item.orderItems.filter((row) => row.productSlug === item.productSlug).map((row) => row.colorName)));
   const [colorName, setColorName] = useState(colorNames[0] || item.colorName);
   const view = enabledViews[viewIndex] || enabledViews[0];
-  const color = product?.colors.find((option) => option.name === colorName) ?? product?.colors[0];
+  const color = findProductColor(product, colorName);
   const localPreviewUrl = useMemo(() => view?.file && filePreviewable(view.file) ? URL.createObjectURL(view.file) : null, [view?.file]);
   const previewUrl = localPreviewUrl || view?.savedFile?.url || null;
 
@@ -70,7 +70,7 @@ function CartItemMockup({ item }: { item: CustomRequestCartItem }) {
       <div className="cartMockupControls">
         <div className="customerMockupViewTabs">{enabledViews.map((option, index) => <button key={option.view} type="button" className={index === viewIndex ? "active" : ""} onClick={() => setViewIndex(index)}>{item.viewLabels[option.view]}</button>)}</div>
         {colorNames.length > 1 ? <div className="customerMockupColorPicker">{colorNames.map((name) => {
-          const option = product.colors.find((productColor) => productColor.name === name);
+          const option = findProductColor(product, name);
           return <button key={name} type="button" className={name === colorName ? "active" : ""} onClick={() => setColorName(name)}><span style={{ background: option?.value || "#e6e0d8" }} />{name}</button>;
         })}</div> : <span className="customerMockupSingleColor"><i style={{ background: color?.value || "#e6e0d8" }} />{colorName}</span>}
       </div>
@@ -257,6 +257,9 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
   }
 
   const totalQuantity = items.reduce((sum, item) => sum + orderItemsQuantity(item.orderItems), 0);
+  const reorderSourceIds = Array.from(new Set(items.map((item) => item.reorderSourceRequestId).filter((value): value is string => Boolean(value))));
+  const isLockedReorder = items.length > 0 && reorderSourceIds.length === 1 && items.every((item) => item.reorderSourceRequestId === reorderSourceIds[0]);
+  const reorderSourceRequestId = isLockedReorder ? reorderSourceIds[0] : null;
   const artworkEntries = items.flatMap((item) => item.views.filter((view) => view.enabled && view.mode === "upload" && (view.file || view.savedFile)).map((view) => ({ item, view })));
   const hasArtwork = artworkEntries.length > 0;
 
@@ -287,7 +290,11 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
 
   function validate() {
     if (!items.length) return "Add at least one customized product to your cart.";
+    if (reorderSourceIds.length || items.some((item) => item.reorderSourceRequestId)) {
+      if (!isLockedReorder) return "Submit the completed-order reorder by itself so its original price stays protected.";
+    }
     if (items.some((item) => orderItemsQuantity(item.orderItems) < 1)) return "Choose at least one size and quantity for every design in your cart.";
+    if (items.some((item) => item.orderItems.some((row) => isOtherProductColor(row.colorName) && !otherProductColorPreference(row.colorName).trim()))) return "Enter the preferred color for every item marked Other.";
     if (artworkEntries.length > MAX_FILES) return `Please keep the request to ${MAX_FILES} artwork files or fewer.`;
     if (!name.trim()) return "Please enter your name.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return "Please enter a valid email address.";
@@ -308,7 +315,7 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
     const productSummary = items.length === 1 ? items[0].productName : `${items[0].productName} + ${items.length - 1} more custom design${items.length === 2 ? "" : "s"}`;
     const colorSummary = orderItems.map((item) => `${item.productName}: ${item.colorName}`).join(" · ");
     const sizeSummary = orderItems.map((item) => `${item.productName} ${item.colorName}: ${compactSizeSummary(item) || `${orderItemQuantity(item)} each`}`).join(" | ");
-    const instructions = items.flatMap((item, itemIndex) => item.views.filter((view) => view.enabled).map((view) => `${itemIndex + 1}. ${item.productName} — ${item.viewLabels[view.view]}: customer-positioned design; ${view.mode === "idea" ? `design needed: ${view.idea}` : `uploaded artwork: ${view.file?.name || view.savedFile?.name || "file"}`}; position ${Math.round(view.x)}% across / ${Math.round(view.y)}% down; width ${Math.round(view.width)}%; height ${Math.round(view.height)}%; rotation ${Math.round(view.rotation)}°.${view.mode === "upload" && view.backgroundRemovalRequested ? " BACKGROUND REMOVAL REQUESTED — make the uploaded artwork background transparent; use vector redraw/vectorization instead of unsafe automatic enhancement when needed; include the artwork-preparation cost in the quote and send the finished proof for approval." : ""}${view.details ? ` Optional details: ${view.details}` : ""}`)).join("\n");
+    const instructions = items.flatMap((item, itemIndex) => item.views.filter((view) => view.enabled).map((view) => `${itemIndex + 1}. ${item.productName} — ${item.viewLabels[view.view]}: ${view.mode === "idea" ? `design needed: ${view.idea}` : `uploaded artwork: ${view.file?.name || view.savedFile?.name || "file"}`}; placement: ${view.placementLabel || "Custom placement"}.${view.mode === "upload" && view.backgroundRemovalRequested ? " BACKGROUND REMOVAL REQUESTED — make the uploaded artwork background transparent; use vector redraw/vectorization instead of unsafe automatic enhancement when needed; include the artwork-preparation cost in the quote and send the finished proof for approval." : ""}${view.details ? ` Optional details: ${view.details}` : ""}`)).join("\n");
 
     try {
       const fileEntries = await Promise.all(artworkEntries.map(async ({ item, view }) => {
@@ -325,6 +332,7 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(), email: email.trim(), phone: phone.trim(), smsConsent: Boolean(phone.trim()) && smsConsent,
+          reorderSourceRequestId,
           product: productSummary, quantity: totalQuantity, orderItems,
           itemType: items.map((item) => item.customItemType || item.productName).join(" · "), colors: colorSummary, sizes: sizeSummary,
           logoSize: items.flatMap((item) => item.views.filter((view) => view.enabled).map((view) => `${item.productName} ${item.viewLabels[view.view]} ${Math.round(view.width)}% preview width`)).join(" · "),
@@ -351,6 +359,10 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
       }
       if (pathByIndex.size !== fileEntries.length) uploadWarning = fileEntries.length > 0;
 
+      if (uploadWarning) {
+        throw new Error("We could not finish uploading every artwork file. The request was not finalized as artwork-ready, so please retry the upload before leaving this page.");
+      }
+
       const uploadedPaths = Array.from(pathByIndex.entries()).sort((a, b) => a[0] - b[0]).map(([, path]) => path);
       const fileIndex = new Map<string, number>();
       fileEntries.forEach((entry, index) => fileIndex.set(`${entry.item.id}:${entry.view.view}`, index));
@@ -359,7 +371,7 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
         activeViewId: `${items[0].id}-${items[0].views.find((view) => view.enabled)?.view || "front"}`,
         views: items.flatMap((item) => {
           const product = getProduct(item.productSlug);
-          const itemColor = product?.colors.find((color) => color.name === item.colorName) ?? product?.colors[0];
+          const itemColor = findProductColor(product, item.colorName);
           return item.views.filter((view) => view.enabled).map((view) => {
             const uploadIndex = fileIndex.get(`${item.id}:${view.view}`);
             const path = uploadIndex === undefined ? null : pathByIndex.get(uploadIndex) || null;
@@ -373,9 +385,9 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
         }),
       };
 
-      const filesResponse = await fetch(`/api/custom-requests/${result.requestId}/files`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionToken: result.submissionToken, paths: uploadedPaths, mockupDocument }) });
+      const filesResponse = await fetch(`/api/custom-requests/${result.requestId}/files`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionToken: result.submissionToken, paths: uploadedPaths, expectedUploadCount: fileEntries.length, mockupDocument }) });
       const filesResult = await filesResponse.json().catch(() => ({}));
-      if (!filesResponse.ok) uploadWarning = true;
+      if (!filesResponse.ok) throw new Error(filesResult.error || "The artwork file could not be confirmed. Please retry the upload before leaving this page.");
 
       if (savedCartId) {
         await fetch("/api/account/request-carts", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cartId: savedCartId }) }).catch(() => null);
@@ -417,12 +429,13 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
       <section className="requestCartItems">
         {savedCartsPanel()}
         <div className="requestCartSectionHead"><div><div className="eyebrow">Your designs</div><h2>Review everything you&apos;re requesting.</h2><p>Tap a design to expand it, then review its front, back, colors, sizes, and quantities.</p></div><span>{items.length} design{items.length === 1 ? "" : "s"} · {totalQuantity} piece{totalQuantity === 1 ? "" : "s"}</span></div>
+        {isLockedReorder ? <div className="customerReorderLockNotice"><strong>Original completed-order price protected</strong><span>Items, quantities, unit prices, fees, discounts, and payment terms stay exactly the same. You may change only pickup/delivery/shipping; Moore Made will then recalculate shipping and sales tax if needed.</span></div> : null}
         {items.map((item, index) => {
           const itemProduct = getProduct(item.productSlug);
           const itemQuantity = orderItemsQuantity(item.orderItems);
-          return <details className="requestCartItem card" key={item.id}><summary className="requestCartItemSummary"><div><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{item.productName}</h3><p>{item.coverageLabel}</p><small>{item.orderItems.map((row) => row.colorName).join(" · ")}</small></div></div><span className="requestCartItemDisclosure"><strong>{itemQuantity}</strong> piece{itemQuantity === 1 ? "" : "s"}</span></summary><div className="requestCartItemBody"><div className="requestCartItemActions"><button type="button" onClick={() => removeItem(item.id)}>Remove this design</button></div><CartItemMockup item={item} /><div className="requestCartQuantityGroups">{item.orderItems.map((row) => <div key={row.id}><div><strong>{row.colorName}</strong><span>{orderItemQuantity(row)} piece{orderItemQuantity(row) === 1 ? "" : "s"}</span></div><p>{compactSizeSummary(row)}</p></div>)}</div>{itemProduct ? <details className="requestCartQuantityEditor"><summary>Edit sizes, quantities, or colors</summary><div><OrderItemsBuilder items={item.orderItems} onChange={(nextItems) => void updateItemQuantities(item, nextItems)} primaryProduct={itemProduct} allowAdditionalProducts={false} /></div></details> : null}</div></details>;
+          return <details className="requestCartItem card" key={item.id}><summary className="requestCartItemSummary"><div><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{item.productName}</h3><p>{item.coverageLabel}</p><small>{item.orderItems.map((row) => row.colorName).join(" · ")}</small></div></div><span className="requestCartItemDisclosure"><strong>{itemQuantity}</strong> piece{itemQuantity === 1 ? "" : "s"}</span></summary><div className="requestCartItemBody">{!isLockedReorder ? <div className="requestCartItemActions"><button type="button" onClick={() => removeItem(item.id)}>Remove this design</button></div> : null}<CartItemMockup item={item} /><div className="requestCartQuantityGroups">{item.orderItems.map((row) => <div key={row.id}><div><strong>{row.colorName}</strong><span>{orderItemQuantity(row)} piece{orderItemQuantity(row) === 1 ? "" : "s"}</span></div><p>{compactSizeSummary(row)}</p></div>)}</div>{itemProduct && !isLockedReorder ? <details className="requestCartQuantityEditor"><summary>Edit sizes, quantities, or colors</summary><div><OrderItemsBuilder items={item.orderItems} onChange={(nextItems) => void updateItemQuantities(item, nextItems)} primaryProduct={itemProduct} allowAdditionalProducts={false} /></div></details> : null}</div></details>;
         })}
-        <Link className="btn secondary requestCartAddMore" href="/shop">+ Add another custom product</Link>
+        {!isLockedReorder ? <Link className="btn secondary requestCartAddMore" href="/shop">+ Add another custom product</Link> : null}
       </section>
 
       <section className="requestCartDetails card">
@@ -435,8 +448,8 @@ export function CustomRequestCartCheckout({ initialName = "", initialEmail = "",
           <label className="field"><span>Needed by <small>Optional</small></span><input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></label>
           <label className="field"><span>Fulfillment method</span><select value={delivery} onChange={(event) => setDelivery(event.target.value)}><option value="">Not sure yet</option><option>Local pickup</option><option>Local delivery</option><option>Shipping</option></select></label>
         </div>
-        {delivery === "Shipping" || delivery === "Local delivery" ? <div className="shippingAddressPanel"><div className="shippingAddressPanelHead"><strong>{delivery === "Local delivery" ? "Delivery address" : "Shipping address"}</strong><span>{delivery === "Local delivery" ? "We’ll use this to plan delivery and calculate sales tax accurately." : "We’ll use this for shipping and the automatic sales-tax calculation."}</span></div><div className="customerOrderGrid"><label className="field"><span>Recipient</span><input value={shippingAddress.name} onChange={(event) => setShippingAddress((address) => ({ ...address, name: event.target.value }))} /></label><label className="field"><span>Street address *</span><input value={shippingAddress.line1} onChange={(event) => setShippingAddress((address) => ({ ...address, line1: event.target.value }))} /></label><label className="field"><span>Apt / suite <small>Optional</small></span><input value={shippingAddress.line2} onChange={(event) => setShippingAddress((address) => ({ ...address, line2: event.target.value }))} /></label><label className="field"><span>City *</span><input value={shippingAddress.city} onChange={(event) => setShippingAddress((address) => ({ ...address, city: event.target.value }))} /></label><label className="field"><span>State *</span><input value={shippingAddress.state} onChange={(event) => setShippingAddress((address) => ({ ...address, state: event.target.value.toUpperCase().slice(0, 2) }))} maxLength={2} placeholder="OH" /></label><label className="field"><span>ZIP *</span><input value={shippingAddress.postalCode} onChange={(event) => setShippingAddress((address) => ({ ...address, postalCode: event.target.value }))} /></label><label className="field"><span>Country *</span><select value={shippingAddress.country} onChange={(event) => setShippingAddress((address) => ({ ...address, country: event.target.value }))}><option value="US">United States</option></select></label></div></div> : null}
-        <div className="customerOrderGrid requestFinalDetails"><label className="field"><span>Discount code <small>Optional</small></span><input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="Example: FAMILY10" /></label><label className="field"><span>Anything else? <small>Optional</small></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Budget, event details, special requests, inspiration, or anything else we should know." /></label></div>
+        {delivery === "Shipping" || delivery === "Local delivery" ? <div className="shippingAddressPanel"><div className="shippingAddressPanelHead"><strong>{delivery === "Local delivery" ? "Delivery address" : "Shipping address"}</strong><span>{delivery === "Local delivery" ? "We’ll use this to plan delivery and calculate sales tax accurately." : "We ship within the United States. We’ll use this for shipping and applicable sales-tax calculations."}</span></div><div className="customerOrderGrid"><label className="field"><span>Recipient</span><input value={shippingAddress.name} onChange={(event) => setShippingAddress((address) => ({ ...address, name: event.target.value }))} /></label><label className="field"><span>Street address *</span><input value={shippingAddress.line1} onChange={(event) => setShippingAddress((address) => ({ ...address, line1: event.target.value }))} /></label><label className="field"><span>Apt / suite <small>Optional</small></span><input value={shippingAddress.line2} onChange={(event) => setShippingAddress((address) => ({ ...address, line2: event.target.value }))} /></label><label className="field"><span>City *</span><input value={shippingAddress.city} onChange={(event) => setShippingAddress((address) => ({ ...address, city: event.target.value }))} /></label><label className="field"><span>State *</span><input value={shippingAddress.state} onChange={(event) => setShippingAddress((address) => ({ ...address, state: event.target.value.toUpperCase().slice(0, 2) }))} maxLength={2} placeholder="OH" /></label><label className="field"><span>ZIP *</span><input value={shippingAddress.postalCode} onChange={(event) => setShippingAddress((address) => ({ ...address, postalCode: event.target.value }))} /></label><label className="field"><span>Country *</span><select value={shippingAddress.country} onChange={(event) => setShippingAddress((address) => ({ ...address, country: event.target.value }))}><option value="US">United States</option></select></label></div></div> : null}
+        <div className="customerOrderGrid requestFinalDetails"><label className="field"><span>Discount code <small>{isLockedReorder ? "Original preserved" : "Optional"}</small></span><input value={isLockedReorder ? "" : discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder={isLockedReorder ? "Locked to completed order" : "Example: FAMILY10"} disabled={isLockedReorder} /></label><label className="field"><span>Anything else? <small>Optional</small></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Budget, event details, special requests, inspiration, or anything else we should know." /></label></div>
         {hasArtwork ? <label className={`artworkRightsCustomerCheck ${artworkRightsAccepted ? "isChecked" : ""}`}><input type="checkbox" checked={artworkRightsAccepted} onChange={(event) => setArtworkRightsAccepted(event.target.checked)} /><span><strong>Artwork authorization *</strong><small>{ARTWORK_RIGHTS_UPLOAD_LABEL}</small><em>Moore Made may pause artwork that appears unauthorized. <Link href="/terms/custom-orders" target="_blank">Read the custom-order terms ↗</Link></em></span></label> : null}
         <div className="customerReviewNotice"><strong>No payment is due now.</strong><span>Moore Made will review the full cart and send one organized proof + personalized quote for approval.</span></div>
         <div className="customerTimingSummary" aria-label="Expected reply and production timing"><span><strong>Reply</strong>1–2 business days</span><span><strong>Production</strong>Usually 1+ week after proof approval and payment</span></div>

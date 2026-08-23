@@ -96,7 +96,14 @@ export type QuoteRecord = {
   internal_packaging_cost_cents?: number;
   internal_shipping_cost_cents?: number;
   internal_payment_fee_cents?: number;
+  internal_supplier_shipping_cents?: number;
+  internal_supplier_tax_cents?: number;
+  internal_overhead_cents?: number;
   internal_other_cost_cents?: number;
+  is_outsourced_order?: boolean;
+  profitability_override_reason?: string | null;
+  profitability_warnings?: string[];
+  pricing_settings_snapshot?: Record<string, unknown> | null;
   labor_hours?: number;
   labor_rate_cents?: number;
   labor_cost_cents?: number;

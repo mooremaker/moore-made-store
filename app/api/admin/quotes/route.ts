@@ -8,6 +8,12 @@ import { validateDiscountCode } from "@/lib/discount-server";
 import { normalizeDiscountCode } from "@/lib/discount-types";
 import { expirePendingCheckoutSessionsForQuote } from "@/lib/payment-server";
 import { recordCustomerEmailNotification } from "@/lib/message-server";
+import { expandMockupVariants, missingPreviewArtworkViews, reconnectCustomerArtwork } from "@/lib/mockup-variants";
+import type { MockupDocument } from "@/lib/mockup-types";
+import { customerIdeaLines } from "@/lib/customer-ideas";
+import { estimatedPaymentFeeCents, standardShirtMinProfitForQuantity, suggestedLaborHoursForQuantity, targetMarginForQuantity, type BusinessSettingsRecord, type ProductPricingRecord } from "@/lib/pricing-types";
+import { starterPricingFor } from "@/lib/pricing-suggestions";
+import { orderItemQuantity, type StructuredOrderItem } from "@/lib/order-types";
 
 function text(value: unknown, max = 5000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -42,6 +48,31 @@ function normalizeSupplierCosts(value: unknown) {
   })).filter((row) => row.key && row.productName && row.size && row.quantity > 0);
 }
 
+function decorationLocationCount(value?: string | null, productName?: string) {
+  const full = String(value || "");
+  const matchingSegment = productName
+    ? full.split("·").find((segment) => segment.toLowerCase().includes(productName.toLowerCase()))
+    : "";
+  const normalized = String(matchingSegment || full).toLowerCase();
+  if (normalized.includes("front") && normalized.includes("back")) return 2;
+  const labels = ["front", "back", "left sleeve", "right sleeve", "side 1", "side 2"];
+  return Math.max(1, labels.filter((label) => normalized.includes(label)).length);
+}
+
+function isStandardShirt(productName: string, productSlug = "") {
+  return /(shirt|tee|crewneck|sweatshirt)/i.test(`${productName} ${productSlug}`);
+}
+
+function sameLockedLineItems(actual: QuoteLineItem[], locked: unknown) {
+  if (!Array.isArray(locked) || actual.length !== locked.length) return false;
+  return actual.every((item, index) => {
+    const saved = locked[index] as Partial<QuoteLineItem>;
+    return item.description === String(saved?.description || "")
+      && item.quantity === Number(saved?.quantity || 0)
+      && item.unitPriceCents === Number(saved?.unitPriceCents || 0);
+  });
+}
+
 type NormalizedProofItem = {
   title: string;
   notes: string | null;
@@ -72,7 +103,7 @@ function normalizeProofItems(value: unknown, requestId: string): NormalizedProof
   }).filter((item) => item.title);
 }
 
-const QUOTE_SELECT = "id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_supplier_costs,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at";
+const QUOTE_SELECT = "id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_supplier_costs,internal_supplier_shipping_cents,internal_supplier_tax_cents,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_overhead_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,is_outsourced_order,profitability_override_reason,profitability_warnings,pricing_settings_snapshot,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at";
 
 export async function POST(request: Request) {
   const auth = await requireAdminApi();
@@ -117,13 +148,24 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data: customerRequest, error: requestError } = await supabase
       .from("custom_requests")
-      .select("id,request_number,customer_name,email,product,quantity,item_type,colors,sizes,print_sides,placements,deadline,delivery")
+      .select("id,request_number,customer_name,email,product,quantity,item_type,colors,sizes,print_sides,placements,artwork_instructions,deadline,delivery,order_items,artwork_paths,reorder_source_request_id,reorder_price_lock")
       .eq("id", requestId)
       .single();
 
     if (requestError || !customerRequest) {
       return NextResponse.json({ error: "Custom request not found." }, { status: 404 });
     }
+    const requestSaysArtworkWasUploaded = /uploaded artwork\s*:/i.test(String(customerRequest.artwork_instructions || ""));
+    if (action === "send" && requestSaysArtworkWasUploaded && (!Array.isArray(customerRequest.artwork_paths) || customerRequest.artwork_paths.length === 0)) {
+      return NextResponse.json({ error: "This order says the customer uploaded artwork, but no original file is attached. Ask the customer to resend the file and add it to Mockup Studio before sending a quote." }, { status: 409 });
+    }
+
+    const [{ data: businessSettingsRow }, { data: pricingRows }] = await Promise.all([
+      supabase.from("business_settings").select("*").limit(1).maybeSingle(),
+      supabase.from("product_pricing").select("*").eq("active", true),
+    ]);
+    const businessSettings = (businessSettingsRow || null) as BusinessSettingsRecord | null;
+    const productPricing = (pricingRows || []) as ProductPricingRecord[];
 
     let mockupSnapshot: unknown | null = null;
     if (body.includeSavedMockup !== false) {
@@ -136,8 +178,22 @@ export async function POST(request: Request) {
       if (mockupError && mockupError.code !== "PGRST116") {
         console.error("Quote mockup snapshot lookup failed", mockupError);
       } else {
-        mockupSnapshot = mockupProject?.document || null;
+        const savedDocument = mockupProject?.document as MockupDocument | null | undefined;
+        mockupSnapshot = savedDocument
+          ? expandMockupVariants(reconnectCustomerArtwork(savedDocument, customerRequest.artwork_paths), customerRequest.order_items)
+          : null;
       }
+    }
+
+    const snapshotDocument = mockupSnapshot as MockupDocument | null;
+    const missingMockupArtwork = snapshotDocument ? missingPreviewArtworkViews(snapshotDocument) : [];
+    if (action === "send" && body.includeSavedMockup !== false && missingMockupArtwork.length) {
+      return NextResponse.json({ error: `The saved mockup is missing visible customer artwork on ${missingMockupArtwork.map((view) => view.name).join(", ")}. Place the uploaded art in Mockup Studio or attach a finished external proof instead.` }, { status: 400 });
+    }
+    const mockupHasCustomerDirections = Boolean(snapshotDocument?.views?.some((view) => view.customerIntent?.enabled));
+    const hasCustomerDirections = customerIdeaLines(customerRequest.artwork_instructions).length > 0 || mockupHasCustomerDirections;
+    if (action === "send" && hasCustomerDirections && body.customerIdeasReviewed !== true) {
+      return NextResponse.json({ error: "Review and confirm every customer idea/artwork direction before sending this proof." }, { status: 400 });
     }
 
     if (action === "send") {
@@ -155,16 +211,18 @@ export async function POST(request: Request) {
     let promoDiscountCents = 0;
     let discountCodeId: string | null = null;
 
-    const laborHours = Math.max(1, Number(body.laborHours) || 1);
-    const laborRateCents = cents(body.laborRateCents || 1500);
+    const minimumLaborHours = Math.max(1, Number(businessSettings?.minimum_labor_hours || 1));
+    const laborHours = Math.max(0, Number(body.laborHours) || 0);
+    const laborRateCents = cents(body.laborRateCents || businessSettings?.default_labor_rate_cents || 2500);
     const laborCostCents = Math.round(laborHours * laborRateCents);
     const internalSupplyCostCents = cents(body.internalSupplyCostCents);
     const internalPrintCostCents = cents(body.internalPrintCostCents);
     const internalPackagingCostCents = cents(body.internalPackagingCostCents);
+    const internalSupplierShippingCents = internalSupplierCosts.filter((row) => row.key === "__supplier_shipping__").reduce((sum, row) => sum + row.quantity * row.unitCostCents, 0);
+    const internalSupplierTaxCents = internalSupplierCosts.filter((row) => row.key === "__supplier_tax__").reduce((sum, row) => sum + row.quantity * row.unitCostCents, 0);
     const internalShippingCostCents = cents(body.internalShippingCostCents);
-    const internalPaymentFeeCents = cents(body.internalPaymentFeeCents);
     const internalOtherCostCents = cents(body.internalOtherCostCents);
-    const internalTotalCostCents = internalSupplyCostCents + internalPrintCostCents + internalPackagingCostCents + internalShippingCostCents + internalPaymentFeeCents + internalOtherCostCents + laborCostCents;
+    const isOutsourcedOrder = body.isOutsourcedOrder === true;
 
     const { data: existing } = await supabase
       .from("quotes")
@@ -179,25 +237,108 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This version is waiting on the customer. Wait for their response before editing it." }, { status: 409 });
     }
 
+    const reorderPriceLock = customerRequest.reorder_price_lock && typeof customerRequest.reorder_price_lock === "object"
+      ? customerRequest.reorder_price_lock as Record<string, unknown>
+      : null;
+    if (reorderPriceLock) {
+      const fulfillmentChanged = String(reorderPriceLock.delivery || "").trim().toLowerCase() !== String(customerRequest.delivery || "").trim().toLowerCase();
+      const lockedDeposit = reorderPriceLock.depositAmountCents == null ? null : cents(reorderPriceLock.depositAmountCents);
+      const lockedTerms = reorderPriceLock.paymentTerms === "deposit" ? "deposit" : "full";
+      const priceLockBroken = !sameLockedLineItems(lineItems, reorderPriceLock.lineItems)
+        || setupFeeCents !== cents(reorderPriceLock.setupFeeCents)
+        || manualDiscountCents !== cents(reorderPriceLock.manualDiscountCents)
+        || normalizedCode !== normalizeDiscountCode(text(reorderPriceLock.discountCode, 80))
+        || paymentTerms !== lockedTerms
+        || (paymentTerms === "deposit" && cents(body.depositAmountCents) !== lockedDeposit)
+        || (!fulfillmentChanged && shippingCents !== cents(reorderPriceLock.shippingCents));
+      if (priceLockBroken) {
+        return NextResponse.json({ error: "This completed-order reorder is price locked. Item prices, setup, discounts, payment terms, and unchanged-fulfillment shipping must match the original order." }, { status: 409 });
+      }
+    }
+
     if (normalizedCode) {
-      try {
-        const validated = await validateDiscountCode(supabase, { code: normalizedCode, eligibleCents: eligibleDiscountCents, customerEmail: customerRequest.email, quoteId: existing?.id || null });
-        promoDiscountCents = validated.discountCents;
-        discountCodeId = validated.code?.id || null;
-      } catch (discountError) {
-        return NextResponse.json({ error: discountError instanceof Error ? discountError.message : "That discount code could not be applied." }, { status: 400 });
+      if (reorderPriceLock) {
+        promoDiscountCents = cents(reorderPriceLock.promoDiscountCents);
+        discountCodeId = text(reorderPriceLock.discountCodeId, 100) || null;
+      } else {
+        try {
+          const validated = await validateDiscountCode(supabase, { code: normalizedCode, eligibleCents: eligibleDiscountCents, customerEmail: customerRequest.email, quoteId: existing?.id || null });
+          promoDiscountCents = validated.discountCents;
+          discountCodeId = validated.code?.id || null;
+        } catch (discountError) {
+          return NextResponse.json({ error: discountError instanceof Error ? discountError.message : "That discount code could not be applied." }, { status: 400 });
+        }
       }
     }
 
     const finalDiscountCents = Math.min(eligibleDiscountCents, manualDiscountCents + promoDiscountCents);
     const finalTotalCents = Math.max(0, subtotalCents + setupFeeCents + shippingCents + taxCents - finalDiscountCents);
     const finalRevenueBeforeTaxCents = Math.max(0, subtotalCents + setupFeeCents + shippingCents - finalDiscountCents);
-    const finalEstimatedProfitCents = finalRevenueBeforeTaxCents - internalTotalCostCents;
-    const finalEstimatedMarginBasisPoints = finalRevenueBeforeTaxCents > 0 ? Math.round((finalEstimatedProfitCents / finalRevenueBeforeTaxCents) * 10000) : 0;
     const depositAmountCents = paymentTerms === "deposit" ? cents(body.depositAmountCents) : null;
     if (paymentTerms === "deposit" && (!depositAmountCents || depositAmountCents >= finalTotalCents)) {
       return NextResponse.json({ error: "Custom deposit must be greater than $0 and less than the quote total." }, { status: 400 });
     }
+    const internalPaymentFeeCents = estimatedPaymentFeeCents({ amountCents: finalTotalCents, paymentTerms, depositAmountCents: depositAmountCents || 0, settings: businessSettings });
+    const internalOverheadCents = Math.ceil(finalRevenueBeforeTaxCents * Math.max(0, Number(businessSettings?.overhead_basis_points ?? 1000)) / 10000);
+    const internalTotalCostCents = internalSupplyCostCents + internalPrintCostCents + internalPackagingCostCents + internalSupplierShippingCents + internalSupplierTaxCents + internalShippingCostCents + internalPaymentFeeCents + internalOverheadCents + internalOtherCostCents + laborCostCents;
+    const finalEstimatedProfitCents = finalRevenueBeforeTaxCents - internalTotalCostCents;
+    const finalEstimatedMarginBasisPoints = finalRevenueBeforeTaxCents > 0 ? Math.round((finalEstimatedProfitCents / finalRevenueBeforeTaxCents) * 10000) : 0;
+
+    const orderItems = (Array.isArray(customerRequest.order_items) ? customerRequest.order_items : []) as StructuredOrderItem[];
+    const totalQuantity = Math.max(1, orderItems.reduce((sum, item) => sum + orderItemQuantity(item), 0) || lineItems.reduce((sum, item) => sum + item.quantity, 0));
+    const pricingBySlug = new Map(productPricing.map((row) => [row.product_slug, row]));
+    let minimumProfitTotalCents = 0;
+    let expectedPrintCostCents = 0;
+    const locations = decorationLocationCount(customerRequest.print_sides);
+    for (const item of orderItems) {
+      const quantityForItem = orderItemQuantity(item);
+      const profile = pricingBySlug.get(item.productSlug);
+      const starter = starterPricingFor(item.productSlug);
+      const basePrint = Number(profile?.print_cost_cents ?? starter.printCostCents);
+      const additionalLocation = Number(profile?.additional_location_cost_cents ?? starter.additionalLocationCostCents ?? basePrint);
+      const itemLocations = decorationLocationCount(customerRequest.print_sides, item.productName);
+      expectedPrintCostCents += quantityForItem * (basePrint + Math.max(0, itemLocations - 1) * additionalLocation);
+      if (isStandardShirt(item.productName, item.productSlug) && !isOutsourcedOrder) {
+        minimumProfitTotalCents += quantityForItem * standardShirtMinProfitForQuantity(totalQuantity, businessSettings);
+      }
+    }
+    if (!orderItems.length && isStandardShirt(customerRequest.product) && !isOutsourcedOrder) {
+      minimumProfitTotalCents = totalQuantity * standardShirtMinProfitForQuantity(totalQuantity, businessSettings);
+    }
+    const targetMarginBasisPoints = isOutsourcedOrder
+      ? Number(businessSettings?.outsourced_min_margin_basis_points ?? 3500)
+      : targetMarginForQuantity(totalQuantity, businessSettings);
+    const marginFloorBasisPoints = isOutsourcedOrder
+      ? Number(businessSettings?.outsourced_min_margin_basis_points ?? 3500)
+      : Number(businessSettings?.minimum_margin_floor_basis_points ?? Math.min(4000, targetMarginBasisPoints));
+    const expectedLaborHours = suggestedLaborHoursForQuantity(totalQuantity, minimumLaborHours);
+    const profitabilityWarnings = [
+      finalEstimatedMarginBasisPoints < marginFloorBasisPoints ? `True margin is ${(finalEstimatedMarginBasisPoints / 100).toFixed(1)}%, below the ${(marginFloorBasisPoints / 100).toFixed(1)}% floor.` : "",
+      minimumProfitTotalCents > 0 && finalEstimatedProfitCents < minimumProfitTotalCents ? `Estimated profit is ${money(finalEstimatedProfitCents)}; the configured minimum is ${money(minimumProfitTotalCents)}.` : "",
+      internalSupplyCostCents <= 0 ? "Supplier/product cost is missing or $0." : "",
+      finalTotalCents > 0 && internalPaymentFeeCents <= 0 ? "Payment fees have not been calculated." : "",
+      laborHours + 0.001 < expectedLaborHours ? `Labor appears too low; enter total person-hours (warning threshold ${expectedLaborHours.toFixed(1)} hours).` : "",
+      locations > 1 && internalPrintCostCents + 1 < expectedPrintCostCents ? `The ${locations}-location order does not include the configured additional decoration cost.` : "",
+      internalShippingCostCents > shippingCents ? `Moore Made shipping/delivery cost (${money(internalShippingCostCents)}) exceeds the customer charge (${money(shippingCents)}).` : "",
+      finalDiscountCents > 0 && finalEstimatedMarginBasisPoints < marginFloorBasisPoints ? "The discount pushes this order below the profit floor." : "",
+    ].filter(Boolean);
+    const profitabilityOverrideReason = text(body.profitabilityOverrideReason, 1000);
+    if (action === "send" && profitabilityWarnings.length > 0 && profitabilityOverrideReason.length < 5) {
+      return NextResponse.json({ error: "This quote has profitability warnings. Add an explicit admin override reason before sending it." , warnings: profitabilityWarnings }, { status: 400 });
+    }
+    const pricingSettingsSnapshot = {
+      targetMarginBasisPoints,
+      marginFloorBasisPoints,
+      minimumProfitTotalCents,
+      outsourcedMinimumMarginBasisPoints: Number(businessSettings?.outsourced_min_margin_basis_points ?? 3500),
+      overheadBasisPoints: Number(businessSettings?.overhead_basis_points ?? 1000),
+      paymentFeeBasisPoints: Number(businessSettings?.payment_fee_basis_points ?? 290),
+      paymentFeeFixedCents: Number(businessSettings?.payment_fee_fixed_cents ?? 30),
+      weeklySalesGoalCents: Number(businessSettings?.weekly_sales_goal_cents ?? 750000),
+      weeklyProfitGoalCents: Number(businessSettings?.weekly_profit_goal_cents ?? 300000),
+      customerIdeasReviewed: body.customerIdeasReviewed === true,
+      customerDirectionCount: customerIdeaLines(customerRequest.artwork_instructions).length + (mockupHasCustomerDirections ? 1 : 0),
+    };
 
     let highestStoredVersion = 0;
     if (existing?.id) {
@@ -247,17 +388,24 @@ export async function POST(request: Request) {
           payment_terms: existing.payment_terms === "deposit" ? "deposit" : "full",
           deposit_amount_cents: existing.deposit_amount_cents || null,
           internal_supply_cost_cents: Number(existing.internal_supply_cost_cents || 0),
+          internal_supplier_shipping_cents: Number(existing.internal_supplier_shipping_cents || 0),
+          internal_supplier_tax_cents: Number(existing.internal_supplier_tax_cents || 0),
           internal_print_cost_cents: Number(existing.internal_print_cost_cents || 0),
           internal_packaging_cost_cents: Number(existing.internal_packaging_cost_cents || 0),
           internal_shipping_cost_cents: Number(existing.internal_shipping_cost_cents || 0),
           internal_payment_fee_cents: Number(existing.internal_payment_fee_cents || 0),
+          internal_overhead_cents: Number(existing.internal_overhead_cents || 0),
           internal_other_cost_cents: Number(existing.internal_other_cost_cents || 0),
           labor_hours: Number(existing.labor_hours || 0),
-          labor_rate_cents: Number(existing.labor_rate_cents || 1500),
+          labor_rate_cents: Number(existing.labor_rate_cents || 2500),
           labor_cost_cents: Number(existing.labor_cost_cents || 0),
           internal_total_cost_cents: Number(existing.internal_total_cost_cents || 0),
           estimated_profit_cents: Number(existing.estimated_profit_cents || 0),
           estimated_margin_basis_points: Number(existing.estimated_margin_basis_points || 0),
+          is_outsourced_order: Boolean(existing.is_outsourced_order),
+          profitability_override_reason: existing.profitability_override_reason || null,
+          profitability_warnings: existing.profitability_warnings || [],
+          pricing_settings_snapshot: existing.pricing_settings_snapshot || {},
           proof_version: Number(existing.proof_version || 1),
           sent_at: existing.sent_at || null,
           responded_at: existing.responded_at || null,
@@ -296,10 +444,13 @@ export async function POST(request: Request) {
       deposit_amount_cents: depositAmountCents,
       internal_supply_cost_cents: internalSupplyCostCents,
       internal_supplier_costs: internalSupplierCosts,
+      internal_supplier_shipping_cents: internalSupplierShippingCents,
+      internal_supplier_tax_cents: internalSupplierTaxCents,
       internal_print_cost_cents: internalPrintCostCents,
       internal_packaging_cost_cents: internalPackagingCostCents,
       internal_shipping_cost_cents: internalShippingCostCents,
       internal_payment_fee_cents: internalPaymentFeeCents,
+      internal_overhead_cents: internalOverheadCents,
       internal_other_cost_cents: internalOtherCostCents,
       labor_hours: laborHours,
       labor_rate_cents: laborRateCents,
@@ -307,6 +458,10 @@ export async function POST(request: Request) {
       internal_total_cost_cents: internalTotalCostCents,
       estimated_profit_cents: finalEstimatedProfitCents,
       estimated_margin_basis_points: finalEstimatedMarginBasisPoints,
+      is_outsourced_order: isOutsourcedOrder,
+      profitability_override_reason: profitabilityWarnings.length ? profitabilityOverrideReason : null,
+      profitability_warnings: profitabilityWarnings,
+      pricing_settings_snapshot: pricingSettingsSnapshot,
       revision_number: action === "send" ? targetRevisionNumber : currentRevisionNumber,
       revision_reason: needsNewRevision ? revisionReason : existing?.revision_reason || null,
       notes: text(body.notes, 5000) || null,
@@ -476,10 +631,13 @@ export async function POST(request: Request) {
       payment_terms: paymentTerms,
       deposit_amount_cents: depositAmountCents,
       internal_supply_cost_cents: internalSupplyCostCents,
+      internal_supplier_shipping_cents: internalSupplierShippingCents,
+      internal_supplier_tax_cents: internalSupplierTaxCents,
       internal_print_cost_cents: internalPrintCostCents,
       internal_packaging_cost_cents: internalPackagingCostCents,
       internal_shipping_cost_cents: internalShippingCostCents,
       internal_payment_fee_cents: internalPaymentFeeCents,
+      internal_overhead_cents: internalOverheadCents,
       internal_other_cost_cents: internalOtherCostCents,
       labor_hours: laborHours,
       labor_rate_cents: laborRateCents,
@@ -487,6 +645,10 @@ export async function POST(request: Request) {
       internal_total_cost_cents: internalTotalCostCents,
       estimated_profit_cents: finalEstimatedProfitCents,
       estimated_margin_basis_points: finalEstimatedMarginBasisPoints,
+      is_outsourced_order: isOutsourcedOrder,
+      profitability_override_reason: profitabilityWarnings.length ? profitabilityOverrideReason : null,
+      profitability_warnings: profitabilityWarnings,
+      pricing_settings_snapshot: pricingSettingsSnapshot,
       proof_version: targetVersion,
       sent_at: now,
       responded_at: null,

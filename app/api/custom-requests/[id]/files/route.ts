@@ -5,6 +5,7 @@ import type {
   MockupLayer,
   MockupView,
 } from "@/lib/mockup-types";
+import { expandMockupVariants, reconnectCustomerArtwork } from "@/lib/mockup-variants";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const ALLOWED_ASSET_BUCKETS = new Set<MockupAssetBucket>(["custom-request-files", "mockup-studio-files"]);
@@ -21,7 +22,7 @@ function finite(value: unknown, fallback: number, min: number, max: number) {
 function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allowedPaths: string[]): MockupDocument | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
-  const rawViews = Array.isArray(raw.views) ? raw.views.slice(0, 24) : [];
+  const rawViews = Array.isArray(raw.views) ? raw.views.slice(0, 120) : [];
   if (!rawViews.length) return null;
   const pathSet = new Set(allowedPaths);
 
@@ -113,9 +114,10 @@ export async function PATCH(
     const { id } = await context.params;
     const body = await request.json();
     const submissionToken = typeof body.submissionToken === "string" ? body.submissionToken : "";
-    const paths = Array.isArray(body.paths)
+    const paths: string[] = Array.isArray(body.paths)
       ? body.paths.filter((path: unknown): path is string => typeof path === "string" && path.startsWith(`${id}/`)).slice(0, 20)
       : [];
+    const expectedUploadCount = Math.max(0, Math.min(20, Math.floor(Number(body.expectedUploadCount) || 0)));
 
     if (!id || !submissionToken) {
       return NextResponse.json({ error: "Invalid request." }, { status: 400 });
@@ -124,13 +126,21 @@ export async function PATCH(
     const supabase = getSupabaseAdmin();
     const { data: order, error: orderError } = await supabase
       .from("custom_requests")
-      .select("id,request_number,product,customer_user_id")
+      .select("id,request_number,product,customer_user_id,order_items")
       .eq("id", id)
       .eq("submission_token", submissionToken)
       .maybeSingle();
 
     if (orderError || !order) {
       return NextResponse.json({ error: "Invalid or expired request link." }, { status: 403 });
+    }
+
+    // A filename in the mockup is not an upload. Confirm every expected file
+    // exists in storage before allowing it to become a customer-artwork view.
+    const { data: storedFiles, error: storedFilesError } = await supabase.storage.from("custom-request-files").list(id, { limit: 25 });
+    const storedPaths = new Set((storedFiles || []).map((file) => `${id}/${file.name}`));
+    if (storedFilesError || paths.length !== expectedUploadCount || paths.some((path) => !storedPaths.has(path))) {
+      return NextResponse.json({ error: "The artwork file did not finish uploading. It was not attached to the mockup or marked ready for quote. Please retry the upload or send the file directly to Moore Made." }, { status: 409 });
     }
 
     const { error: updateError } = await supabase
@@ -145,7 +155,10 @@ export async function PATCH(
     }
 
     let mockupWarning = false;
-    const document = sanitizeCustomerMockupDocument(body.mockupDocument, id, paths);
+    const sanitizedDocument = sanitizeCustomerMockupDocument(body.mockupDocument, id, paths);
+    const document = sanitizedDocument
+      ? expandMockupVariants(reconnectCustomerArtwork(sanitizedDocument, paths), order.order_items)
+      : null;
     if (document) {
       const title = `MM-${String(order.request_number).padStart(6, "0")} · ${order.product}`;
       const { data: existing, error: existingError } = await supabase

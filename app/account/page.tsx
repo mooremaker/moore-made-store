@@ -23,7 +23,7 @@ type RequestRow = {
 };
 type QuoteRow = { id: string; request_id: string; public_token: string; status: QuoteStatus; total_cents: number; valid_until: string | null; proof_version: number; payment_terms: PaymentTerms; deposit_amount_cents: number | null; };
 type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; published_snapshot:unknown|null; updated_at:string; };
-type ReceiptRow = { id:string; request_id:string; amount_cents:number; payment_method:string; paid_at:string|null; created_at:string; receipt_number:number|null; receipt_token:string|null; status:string; };
+type ReceiptRow = { id:string; request_id:string; amount_cents:number; payment_method:string; paid_at:string|null; created_at:string; receipt_number:number|null; receipt_token:string|null; receipt_order_number:number|null; receipt_payment_sequence:number|null; status:string; };
 type MockupProjectRow = { request_id:string; document:unknown; status:string; updated_at:string; };
 type FinishedPhotoRow = { id:string; request_id:string; storage_path:string; original_filename:string; sort_order:number; created_at:string; };
 
@@ -65,7 +65,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const quotes = (quoteData ?? []) as QuoteRow[];
   const quoteByRequest = new Map(quotes.map((quote) => [quote.request_id, quote]));
   const { data: paymentData } = requestIds.length
-    ? await supabase.from("payments").select("id,request_id,amount_cents,payment_method,paid_at,created_at,receipt_number,receipt_token,status").in("request_id", requestIds).eq("status", "paid").order("paid_at", { ascending: false })
+    ? await supabase.from("payments").select("id,request_id,amount_cents,payment_method,paid_at,created_at,receipt_number,receipt_token,receipt_order_number,receipt_payment_sequence,status").in("request_id", requestIds).eq("status", "paid").order("paid_at", { ascending: false })
     : { data: [] as ReceiptRow[] };
   const receiptRows = (paymentData ?? []) as ReceiptRow[];
   const receiptsByRequest = new Map<string, ReceiptRow[]>();
@@ -163,10 +163,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       {quote && ["sent","changes_requested","approved"].includes(quote.status) ? <Link className="btn" href={`/quote/${quote.public_token}`}>{quote.status === "approved" && request.payment_status !== "paid" ? "Open payment" : "Review proof + quote"}</Link> : null}
                       {quote?.status === "approved" ? <Link className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank">Invoice</Link> : null}
                       <Link className="btn secondary" href={`/account/messages?order=${request.id}`}>Message Moore Made</Link>
-                      {request.status !== "cancelled" ? <ReorderRequestButton requestId={request.id} /> : null}
+                      {request.status === "completed" ? <ReorderRequestButton requestId={request.id} /> : null}
                       {role === "admin" && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
-                    {receipts.length ? <div className="accountReceipts"><strong>Payment receipts</strong><div>{receipts.map((receipt) => receipt.receipt_token ? <a key={receipt.id} href={`/receipt/${receipt.receipt_token}`} target="_blank" rel="noreferrer"><span>{receiptLabel(receipt.receipt_number)}</span><small>{paymentMethodLabel(receipt.payment_method)} · {money(receipt.amount_cents)}</small></a> : null)}</div></div> : null}
+                    {receipts.length ? <div className="accountReceipts"><strong>Payment receipts</strong><div>{receipts.map((receipt) => receipt.receipt_token ? <a key={receipt.id} href={`/receipt/${receipt.receipt_token}`} target="_blank" rel="noreferrer"><span>{receiptLabel(receipt.receipt_number, receipt.receipt_order_number || request.request_number, receipt.receipt_payment_sequence)}</span><small>{paymentMethodLabel(receipt.payment_method)} · {money(receipt.amount_cents)}</small></a> : null)}</div></div> : null}
                     {request.estimated_fulfillment_date && !["ready","shipped","completed","cancelled"].includes(request.status) ? <div className="accountEstimatedFulfillment">
                       <div><span className="eyebrow">Production estimate</span><strong>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated ship date" : (request.delivery || "").toLowerCase().includes("delivery") ? "Estimated delivery-ready date" : "Estimated pickup-ready date"}</strong></div>
                       <span className="accountEstimatedDate">{dateLabel(request.estimated_fulfillment_date)}</span>

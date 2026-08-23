@@ -56,6 +56,17 @@ function normalizeShippingAddress(value: unknown): ShippingAddress | null {
   return address;
 }
 
+function priceRelevantOrderShape(items: StructuredOrderItem[]) {
+  return items.map((item) => ({
+    productSlug: item.productSlug,
+    productName: item.productName,
+    colorName: item.colorName,
+    customItemType: item.customItemType || "",
+    customColorNotes: item.customColorNotes || "",
+    quantities: Object.fromEntries(Object.entries(item.quantities || {}).filter(([, quantity]) => Number(quantity) > 0).sort(([a], [b]) => a.localeCompare(b))),
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
+
 function sanitizeFileName(name: string) {
   const cleaned = name
     .normalize("NFKD")
@@ -141,6 +152,47 @@ export async function POST(request: Request) {
     const customerUserId = authData.user?.id ?? null;
 
     const supabase = getSupabaseAdmin();
+    const reorderSourceRequestId = text(body.reorderSourceRequestId, 80);
+    let reorderPriceLock: Record<string, unknown> | null = null;
+    let requestedDiscountCode = text(body.discountCode, 80).toUpperCase();
+    if (reorderSourceRequestId) {
+      if (!customerUserId) return NextResponse.json({ error: "Sign in again to submit this protected reorder." }, { status: 401 });
+      const { data: sourceOrder } = await supabase.from("custom_requests")
+        .select("id,request_number,customer_user_id,status,delivery,order_items")
+        .eq("id", reorderSourceRequestId)
+        .eq("customer_user_id", customerUserId)
+        .eq("status", "completed")
+        .maybeSingle();
+      if (!sourceOrder) return NextResponse.json({ error: "The completed source order could not be verified." }, { status: 409 });
+      const sourceItems = normalizeOrderItems(sourceOrder.order_items);
+      if (JSON.stringify(priceRelevantOrderShape(orderItems)) !== JSON.stringify(priceRelevantOrderShape(sourceItems))) {
+        return NextResponse.json({ error: "A price-locked reorder must keep the original items, colors, sizes, and quantities." }, { status: 409 });
+      }
+      const { data: sourceQuote } = await supabase.from("quotes")
+        .select("id,status,line_items,setup_fee_cents,shipping_cents,manual_discount_cents,promo_discount_cents,discount_cents,discount_code_id,applied_discount_code,payment_terms,deposit_amount_cents,total_cents")
+        .eq("request_id", sourceOrder.id)
+        .eq("status", "approved")
+        .maybeSingle();
+      if (!sourceQuote) return NextResponse.json({ error: "The approved completed-order price could not be verified." }, { status: 409 });
+      requestedDiscountCode = String(sourceQuote.applied_discount_code || "");
+      reorderPriceLock = {
+        sourceRequestId: sourceOrder.id,
+        sourceRequestNumber: sourceOrder.request_number,
+        lineItems: sourceQuote.line_items || [],
+        setupFeeCents: Number(sourceQuote.setup_fee_cents || 0),
+        shippingCents: Number(sourceQuote.shipping_cents || 0),
+        delivery: sourceOrder.delivery || "",
+        manualDiscountCents: Number(sourceQuote.manual_discount_cents ?? Math.max(0, Number(sourceQuote.discount_cents || 0) - Number(sourceQuote.promo_discount_cents || 0))),
+        promoDiscountCents: Number(sourceQuote.promo_discount_cents || 0),
+        discountCents: Number(sourceQuote.discount_cents || 0),
+        discountCodeId: sourceQuote.discount_code_id || null,
+        discountCode: sourceQuote.applied_discount_code || "",
+        paymentTerms: sourceQuote.payment_terms === "deposit" ? "deposit" : "full",
+        depositAmountCents: sourceQuote.deposit_amount_cents || null,
+        originalTotalCents: Number(sourceQuote.total_cents || 0),
+        lockedAt: new Date().toISOString(),
+      };
+    }
     const { data: created, error: insertError } = await supabase
       .from("custom_requests")
       .insert({
@@ -162,9 +214,11 @@ export async function POST(request: Request) {
         deadline: text(body.deadline, 20) || null,
         delivery: fulfillmentMethod || null,
         notes: text(body.notes, 5000) || null,
-        requested_discount_code: text(body.discountCode, 80).toUpperCase() || null,
+        requested_discount_code: requestedDiscountCode || null,
         order_items: orderItems,
         shipping_address: shippingAddress,
+        reorder_source_request_id: reorderSourceRequestId || null,
+        reorder_price_lock: reorderPriceLock,
         artwork_rights_accepted: artworkRightsAccepted,
         artwork_rights_accepted_at: artworkRightsAccepted ? new Date().toISOString() : null,
         artwork_rights_policy_version: artworkRightsPolicyVersion || null,

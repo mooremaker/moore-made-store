@@ -6,6 +6,7 @@ import { quoteRequiredDeposit, type PaymentTerms } from "@/lib/payment-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { recordCustomerEmailNotification } from "@/lib/message-server";
+import { retrieveStripeSettlement } from "@/lib/stripe-settlement";
 
 export async function recalculateOrderPayment(requestId: string, quoteId: string) {
   const supabase = getSupabaseAdmin();
@@ -143,6 +144,14 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
     ? session.payment_intent
     : session.payment_intent?.id || null;
   const amountReceived = Math.max(0, Number(session.amount_total ?? existing.amount_cents ?? 0));
+  let settlement: Awaited<ReturnType<typeof retrieveStripeSettlement>> = null;
+  if (paymentIntentId) {
+    try {
+      settlement = await retrieveStripeSettlement(paymentIntentId);
+    } catch (settlementError) {
+      console.error("Could not retrieve Stripe settlement fee", settlementError);
+    }
+  }
 
   if (amountReceived <= 0) throw new Error("Stripe reported a paid Checkout Session without an amount.");
   if (amountReceived !== Number(existing.amount_cents || 0)) {
@@ -160,6 +169,9 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
       status: "paid",
       stripe_checkout_session_id: session.id,
       stripe_payment_intent_id: paymentIntentId,
+      stripe_fee_cents: settlement?.feeCents ?? null,
+      stripe_net_cents: settlement?.netCents ?? null,
+      stripe_balance_transaction_id: settlement?.balanceTransactionId ?? null,
       paid_at: new Date().toISOString(),
       payer_name: session.metadata?.payer_name || existing.payer_name || null,
       payer_email: session.metadata?.payer_email || existing.payer_email || null,
@@ -170,7 +182,14 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
   const summary = await recalculateOrderPayment(requestId, quoteId);
   if (summary.remainingCents <= 0 && summary.taxMode === "automatic" && summary.stripeTaxCalculationId && !summary.stripeTaxTransactionId) {
     try {
-      const taxTransaction = await getStripe().tax.transactions.createFromCalculation({ calculation: summary.stripeTaxCalculationId, reference: `order-${requestId}` });
+      const taxTransaction = await getStripe().tax.transactions.createFromCalculation(
+        {
+          calculation: summary.stripeTaxCalculationId,
+          reference: `order-${requestId}`,
+          metadata: { quote_id: quoteId, request_id: requestId, source: "payment_webhook" },
+        },
+        { idempotencyKey: `moore-made-tax-${quoteId}` },
+      );
       await supabase.from("quotes").update({ stripe_tax_transaction_id: taxTransaction.id }).eq("id", quoteId).is("stripe_tax_transaction_id", null);
     } catch (taxTransactionError) {
       console.error("Final Stripe Tax transaction recording failed", taxTransactionError);
@@ -178,7 +197,7 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
   }
   const { data: receiptPayment } = await supabase
     .from("payments")
-    .select("receipt_number,receipt_token")
+    .select("receipt_number,receipt_token,receipt_order_number,receipt_payment_sequence")
     .eq("id", paymentId)
     .single();
 
@@ -258,6 +277,8 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
     summary,
     receiptToken: receiptPayment?.receipt_token || null,
     receiptNumber: receiptPayment?.receipt_number || null,
+    receiptOrderNumber: receiptPayment?.receipt_order_number || summary.request.request_number,
+    receiptPaymentSequence: receiptPayment?.receipt_payment_sequence || 1,
   };
 }
 

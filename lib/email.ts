@@ -65,14 +65,16 @@ export async function sendMooreMadeEmail(input: SendEmailInput) {
 export function emailShell(title: string, body: string) {
   return `<!doctype html>
 <html>
-  <body style="margin:0;background:#f7f5f0;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+  <body style="margin:0;background:#f6f7f9;font-family:Arial,Helvetica,sans-serif;color:#202124;">
     <div style="max-width:680px;margin:0 auto;padding:34px 18px;">
-      <div style="font-size:14px;font-weight:900;letter-spacing:.14em;margin-bottom:18px;">MOORE MADE</div>
-      <div style="background:#ffffff;border:1px solid #ded9d1;border-radius:20px;padding:28px;">
-        <h1 style="font-size:28px;line-height:1.1;margin:0 0 18px;">${escapeHtml(title)}</h1>
+      <div style="padding:0 6px 16px;"><div style="font-size:18px;font-weight:900;letter-spacing:.08em;">MOORE<span style="font-weight:400;">/</span>MADE</div><div style="margin-top:5px;font-size:12px;color:#6b7280;">Your Idea. Moore Made.</div></div>
+      <div style="background:#ffffff;border:1px solid #e3e5e8;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.03);">
+        <div style="padding:12px 28px;border-bottom:1px solid #edf0f2;"><span style="display:inline-block;background:#eef4ef;color:#356046;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">Moore Made update</span></div>
+        <div style="padding:25px 28px 28px;"><h1 style="font-size:27px;line-height:1.15;margin:0 0 18px;letter-spacing:-.02em;">${escapeHtml(title)}</h1>
         ${body}
+        </div>
       </div>
-      <div style="font-size:12px;color:#777;margin-top:16px;line-height:1.5;">Moore Made · Custom goods, made your way.</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:16px;line-height:1.55;padding:0 6px;">Questions? Reply to this email or visit mooremade.store.<br>Custom orders are made for you and are final sale; if something is not right, please contact Moore Made so we can help.</div>
     </div>
   </body>
 </html>`;

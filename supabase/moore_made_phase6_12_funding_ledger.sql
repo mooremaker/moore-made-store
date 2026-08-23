@@ -16,6 +16,7 @@ create table if not exists public.business_funding_entries (
     'reimbursement_due',
     'reimbursement_paid',
     'equity_investment',
+    'gift_received',
     'needs_classification'
   )),
   amount_cents bigint not null check (amount_cents > 0),

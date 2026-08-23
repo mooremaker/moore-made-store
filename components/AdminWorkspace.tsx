@@ -16,12 +16,15 @@ import { AdminFinancialsPanel } from "@/components/admin/AdminFinancialsPanel";
 import { MockupStudio } from "@/components/admin/MockupStudio";
 import { AdminMockupTemplatesPanel } from "@/components/admin/AdminMockupTemplatesPanel";
 import { AdminProductPricingPanel } from "@/components/admin/AdminProductPricingPanel";
+import { AdminSupportGiftsPanel } from "@/components/admin/AdminSupportGiftsPanel";
 import { PaymentShareLinkControl } from "@/components/PaymentShareLinkControl";
 import { AdminCustomerMockupSummary } from "@/components/admin/AdminCustomerMockupSummary";
+import { AdminCustomerIdeasPanel } from "@/components/admin/AdminCustomerIdeasPanel";
 import { ProductionChecklist } from "@/components/admin/ProductionChecklist";
 import { OrderNotificationControl } from "@/components/admin/OrderNotificationControl";
 import { ArtworkRightsControl } from "@/components/admin/ArtworkRightsControl";
 import { FinishedProductPhotosManager } from "@/components/admin/FinishedProductPhotosManager";
+import { StripeTaxRecordingControl } from "@/components/admin/StripeTaxRecordingControl";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
 import type { BusinessExpenseRow, BusinessFinanceAuditRow, BusinessFundingRow, BusinessGoalRow, FinancialPaymentRow } from "@/lib/finance-types";
 import type { DiscountCodeRecord } from "@/lib/discount-types";
@@ -35,6 +38,7 @@ import {
 import { SHOWCASE_STATUS_LABELS, type ShowcaseStatus } from "@/lib/showcase-types";
 import type { ShowcasePhotoPreview } from "@/lib/showcase-photo-preview";
 import { money, type QuoteRecord } from "@/lib/quote-types";
+import { customerIdeaLines } from "@/lib/customer-ideas";
 
 type FileLink = { path: string; url: string };
 
@@ -84,11 +88,14 @@ export type AdminRequestRow = {
   estimated_fulfillment_note: string | null;
   estimated_fulfillment_notified_at: string | null;
   estimated_fulfillment_notified_for_date: string | null;
+  review_request_sent_at: string | null;
   cash_payment_request_status: "none" | "pending" | "contacted" | "completed" | "cancelled";
   cash_payment_requested_at: string | null;
   cash_payment_requested_amount_cents: number | null;
   cash_payment_contacted_at: string | null;
   created_at: string;
+  reorder_source_request_id: string | null;
+  reorder_price_lock: Record<string, unknown> | null;
   fileLinks: FileLink[];
 };
 
@@ -188,7 +195,7 @@ function submittedDate(value: string) {
 }
 
 export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, goals, financeAudit, financialsReady, fundingReady, goalsReady, auditReady, discountCodes, discountsReady, productPricing, businessSettings, pricingReady }: Props) {
-  const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase" | "mockups" | "pricing">("orders");
+  const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase" | "mockups" | "pricing" | "support">("orders");
   const [query, setQuery] = useState("");
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
@@ -265,6 +272,14 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
     setOrderFilter(filter);
   }
 
+  function openOrderFromFinance(requestId: string) {
+    setTab("orders");
+    setOrderFilter("all");
+    setQuery("");
+    setOpenRequestId(requestId);
+    window.setTimeout(() => document.getElementById(`order-${requestId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
   return (
     <>
       <section className="adminStats adminStatsModern" aria-label="Dashboard overview">
@@ -291,7 +306,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         </button>
       </section>
 
-      <nav className="adminWorkspaceSwitcher adminWorkspaceSwitcherFour" aria-label="Admin workspace area">
+      <nav className="adminWorkspaceSwitcher adminWorkspaceSwitcherFive" aria-label="Admin workspace area">
         <button type="button" className={["orders","messages","showcase"].includes(tab) ? "active" : ""} onClick={() => setTab("orders")}>
           <span className="adminWorkspaceSwitcherIcon">▣</span>
           <span><strong>Orders & customers</strong><small>Requests, messages, production, showcase</small></span>
@@ -307,6 +322,10 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         <button type="button" className={tab === "financials" ? "active" : ""} onClick={() => setTab("financials")}>
           <span className="adminWorkspaceSwitcherIcon">$</span>
           <span><strong>Business & financials</strong><small>Money, goals, records, tax readiness</small></span>
+        </button>
+        <button type="button" className={tab === "support" ? "active" : ""} onClick={() => setTab("support")}>
+          <span className="adminWorkspaceSwitcherIcon">♥</span>
+          <span><strong>Support gifts</strong><small>Private link, interest, gift letters</small></span>
         </button>
       </nav>
 
@@ -375,7 +394,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     </div>
 
                     <div className="adminRequestQuickActions">
-                      <RequestStatusControl id={request.id} initialStatus={request.status} delivery={request.delivery} />
+                      <RequestStatusControl id={request.id} initialStatus={request.status} delivery={request.delivery} initialReviewRequestSentAt={request.review_request_sent_at} />
                       <button className="btn adminViewButton" type="button" onClick={() => setOpenRequestId(isOpen ? null : request.id)} aria-expanded={isOpen}>
                         {isOpen ? "Close details" : "View details"}
                       </button>
@@ -383,11 +402,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                     </div>
                   </div>
 
-                  <section className="adminOrderDocuments adminOrderDocumentsAlways" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
-                    <div className="adminOrderDocumentsHeading">
-                      <div><span className="eyebrow">Documents</span><strong>Quick access</strong></div>
-                      <small>These stay available without opening the full order details.</small>
-                    </div>
+                  <details className="adminOrderDocuments adminOrderDocumentsAlways" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
+                    <summary className="adminOrderDocumentsHeading">
+                      <div><span className="eyebrow">Documents</span><strong>Quote, invoice & receipt</strong></div>
+                      <small>Open shortcuts</small>
+                    </summary>
                     <div className="adminOrderDocumentButtons">
                       {quote?.public_token ? (
                         <a className="btn secondary" href={`/proforma/${quote.public_token}`} target="_blank" rel="noreferrer">Pro Forma + Proof ↗</a>
@@ -405,10 +424,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         <span className="btn secondary isDisabled" aria-disabled="true" title="Receipt available after payment">Receipt · after payment</span>
                       )}
                     </div>
-                  </section>
+                  </details>
 
                   {isOpen ? (
                     <div className="adminRequestExpanded">
+                      <AdminCustomerIdeasPanel requestId={request.id} artworkInstructions={request.artwork_instructions} customerNotes={request.notes} />
                       <div className="adminDetailGrid">
                         <section className="adminDetailGroup">
                           <div className="adminDetailGroupTitle"><span>01</span><h4>Contact</h4></div>
@@ -456,12 +476,6 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                           </details>
                         </section>
 
-                        {request.notes ? (
-                          <section className="adminDetailGroup adminDetailGroupWide">
-                            <div className="adminDetailGroupTitle"><span>04</span><h4>Customer notes</h4></div>
-                            <p className="adminScrollableText adminNoteText">{request.notes}</p>
-                          </section>
-                        ) : null}
                       </div>
 
                       <div className="requestFiles adminFilesBlock">
@@ -489,13 +503,14 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                       <section className="adminQuoteSection">
                         <div className="adminDetailGroupTitle"><span>$</span><h4>Proof + quote approval</h4></div>
                         {quoteReady ? (
-                          <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} customerEmail={request.email} />
+                          <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} printSides={request.print_sides} customerIdeas={customerIdeaLines(request.artwork_instructions)} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} customerEmail={request.email} reorderPriceLock={request.reorder_price_lock} />
                         ) : <div className="requestWarning">Proof + quote data needs the latest database updates. If proofs were already working, run <code>supabase/moore_made_phase6_46_size_pricing_final_tax.sql</code>.</div>}
                       </section>
 
                       {quote ? (
                         <section className="adminQuoteSection adminPaymentSection">
                           <div className="adminDetailGroupTitle"><span>$</span><h4>Payment</h4></div>
+                          <StripeTaxRecordingControl quote={quote} amountPaidCents={request.amount_paid_cents} />
                           <ManualPaymentControl
                             requestId={request.id}
                             quoteId={quote.id}
@@ -553,8 +568,10 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
         </section>
       ) : tab === "messages" ? (
         messagesReady ? <AdminMessagesPanel threads={messageThreads} adminUsers={adminUsers} currentAdminUserId={currentAdminUserId} /> : <section className="adminWorkspacePanel"><div className="formError">Messages are not set up in Supabase yet. Run supabase/moore_made_phase5_messages.sql.</div></section>
+      ) : tab === "support" ? (
+        <AdminSupportGiftsPanel />
       ) : tab === "financials" ? (
-        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} goals={goals} financeAudit={financeAudit} adminUsers={adminUsers} fundingReady={fundingReady} goalsReady={goalsReady} auditReady={auditReady} discountCodes={discountCodes} discountsReady={discountsReady} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need the latest database update. Run <code>supabase/moore_made_phase6_16_finance_command_center.sql</code> after your existing financial migrations.</div></section>
+        financialsReady ? <AdminFinancialsPanel orders={requests.map((request) => ({ id: request.id, request_number: request.request_number, customer_name: request.customer_name, product: request.product, amount_paid_cents: request.amount_paid_cents, payment_status: request.payment_status, status: request.status }))} quotes={quotes} payments={payments} expenses={expenses} funding={funding} goals={goals} financeAudit={financeAudit} adminUsers={adminUsers} fundingReady={fundingReady} goalsReady={goalsReady} auditReady={auditReady} discountCodes={discountCodes} discountsReady={discountsReady} businessSettings={businessSettings} onOpenOrder={openOrderFromFinance} /> : <section className="adminWorkspacePanel"><div className="formError">Financials need the latest database update. Run <code>supabase/moore_made_phase6_16_finance_command_center.sql</code> after your existing financial migrations.</div></section>
       ) : tab === "mockups" ? (
         <AdminMockupTemplatesPanel />
       ) : tab === "pricing" ? (

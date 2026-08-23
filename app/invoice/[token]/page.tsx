@@ -79,7 +79,7 @@ export default async function InvoicePage({ params }: Props) {
       <div className="invoiceActions"><a className="btn secondary" href="/account">Back to account</a><a className="btn secondary" href={`/quote/${token}`}>Open approved proof</a><PrintDocumentButton label="Print / Save Invoice PDF" /></div>
       <article className="invoicePaper">
         <header className="invoiceHeader">
-          <Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="invoiceLogo" priority />
+          <div><Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="invoiceLogo" priority /><div className="customerDocumentTagline">Your Idea. Moore Made.</div></div>
           <div className="invoiceTitle"><span className={`invoiceStatus invoiceStatus-${invoiceStatus.toLowerCase().replace(/\s+/g,"-")}`}>{invoiceStatus}</span><h1>Invoice</h1><p>{invoiceNumber}</p></div>
         </header>
         <div className="invoiceRule" />

@@ -16,6 +16,13 @@ export type FinancialPaymentRow = {
   created_at: string;
   receipt_number: number | null;
   receipt_token: string | null;
+  receipt_order_number?: number | null;
+  receipt_payment_sequence?: number | null;
+  order_tax_cents?: number | null;
+  order_total_cents?: number | null;
+  stripe_fee_cents?: number | null;
+  stripe_net_cents?: number | null;
+  stripe_balance_transaction_id?: string | null;
 };
 
 export type BusinessExpenseCategory =
@@ -71,7 +78,12 @@ export type BusinessExpenseRow = {
   receipts?: BusinessExpenseReceipt[];
 };
 
-export function receiptLabel(receiptNumber: number | null | undefined) {
+export function receiptLabel(receiptNumber: number | null | undefined, orderNumber?: number | string | null, paymentSequence?: number | null) {
+  if (orderNumber !== null && orderNumber !== undefined && String(orderNumber).trim()) {
+    const rawOrder = String(orderNumber).replace(/^MM-/i, "");
+    const base = `MM-R-${rawOrder.padStart(6, "0")}`;
+    return Number(paymentSequence || 1) > 1 ? `${base}-${Number(paymentSequence)}` : base;
+  }
   if (!receiptNumber) return "Receipt";
   return `MM-R-${String(receiptNumber).padStart(6, "0")}`;
 }
@@ -97,6 +109,7 @@ export type FinancialOrderSummary = {
 export type FundingPartyKind = "member" | "family" | "external";
 export type FundingEntryType =
   | "owner_contribution"
+  | "owner_draw"
   | "loan_received"
   | "loan_repayment"
   | "reimbursement_due"
@@ -113,6 +126,7 @@ export const FUNDING_PARTY_KIND_LABELS: Record<FundingPartyKind, string> = {
 
 export const FUNDING_ENTRY_TYPE_LABELS: Record<FundingEntryType, string> = {
   owner_contribution: "Owner contribution",
+  owner_draw: "Owner draw / distribution",
   loan_received: "Loan to Moore Made",
   loan_repayment: "Loan repayment",
   reimbursement_due: "Personal expense owed back",

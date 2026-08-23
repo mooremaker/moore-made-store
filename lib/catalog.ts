@@ -56,13 +56,34 @@ export type Product = {
   examples: ProductExample[];
 };
 
+export const OTHER_PRODUCT_COLOR = "Other";
+
+export function isOtherProductColor(colorName: string) {
+  return colorName === OTHER_PRODUCT_COLOR || colorName.startsWith(`${OTHER_PRODUCT_COLOR}:`);
+}
+
+export function otherProductColorPreference(colorName: string) {
+  return isOtherProductColor(colorName) ? colorName.slice(OTHER_PRODUCT_COLOR.length).replace(/^:\s*/, "") : "";
+}
+
+export function findProductColor(product: Product | null | undefined, colorName: string) {
+  if (!product) return undefined;
+  const lookupName = isOtherProductColor(colorName) ? OTHER_PRODUCT_COLOR : colorName;
+  return product.colors.find((color) => color.name === lookupName) ?? product.colors[0];
+}
+
 const apparelColors: ProductColor[] = [
   { name: "White", value: "#f4f2ed" },
-  { name: "Black", value: "#252525" },
-  { name: "Navy", value: "#26354f" },
+  { name: "Sand", value: "#c5ae8a" },
   { name: "Heather Gray", value: "#9b9b98" },
-  { name: "Forest", value: "#405443" },
+  { name: "Black", value: "#252525" },
+  { name: "Forest Green", value: "#405443" },
   { name: "Royal Blue", value: "#385b91" },
+  { name: "Navy", value: "#26354f" },
+  { name: "Light Pink", value: "#efb4c4" },
+  { name: "Red", value: "#b43a3a" },
+  { name: "Maroon", value: "#651f34" },
+  { name: OTHER_PRODUCT_COLOR, value: "#f4f2ed" },
 ];
 
 const frontApparel: PlacementOption[] = [

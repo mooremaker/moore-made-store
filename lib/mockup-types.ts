@@ -43,6 +43,11 @@ export type MockupTemplateRef = {
   colorName?: string;
   colorValue?: string;
   viewKey?: string;
+  designGroupId?: string;
+  orderItemId?: string;
+  quantity?: number;
+  designRelationship?: "primary" | "same" | "separate";
+  orderItemNotes?: string;
 };
 
 export type MockupView = {

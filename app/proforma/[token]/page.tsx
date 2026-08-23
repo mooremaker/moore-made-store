@@ -127,7 +127,7 @@ export default async function ProFormaPage({ params }: Props) {
 
       <article className="proformaPaper">
         <header className="proformaHeader">
-          <Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="proformaLogo" priority />
+          <div><Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="proformaLogo" priority /><div className="customerDocumentTagline">Your Idea. Moore Made.</div></div>
           <div className="proformaTitle">
             <span className="proformaBadge">PRO FORMA · NOT A RECEIPT</span>
             <h1>Pro Forma + Proof</h1>

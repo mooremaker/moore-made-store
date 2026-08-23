@@ -54,6 +54,7 @@ export type CustomRequestCartItem = {
   mockupSettings?: CatalogMockupSettings;
   orderItems: StructuredOrderItem[];
   views: CartArtworkView[];
+  reorderSourceRequestId?: string;
 };
 
 export type AccountSavedRequestCart = {

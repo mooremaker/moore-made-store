@@ -33,15 +33,18 @@ export async function POST(request: Request) {
     const note = clean(form.get("note"), 1500) || null;
     const ownershipRaw = clean(form.get("ownershipPercent"), 20);
     const ownershipPercent = ownershipRaw ? Number(ownershipRaw) : null;
+    const giftAcknowledged = clean(form.get("giftAcknowledged"), 10) === "yes";
     const documents = form.getAll("documents").filter((value): value is File => value instanceof File && value.size > 0);
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) return NextResponse.json({ error: "Choose a valid date." }, { status: 400 });
     if (!partyName) return NextResponse.json({ error: "Enter the person or funding source." }, { status: 400 });
     if (!partyKinds.has(partyKind)) return NextResponse.json({ error: "Choose who provided or received the money." }, { status: 400 });
     if (!entryTypes.has(entryType)) return NextResponse.json({ error: "Choose a valid funding type." }, { status: 400 });
+    if (entryType === "owner_draw" && partyKind !== "member") return NextResponse.json({ error: "An owner draw must be assigned to a Moore Made owner/member." }, { status: 400 });
     if (!Number.isInteger(amountCents) || amountCents <= 0) return NextResponse.json({ error: "Enter a valid amount." }, { status: 400 });
     if (ownershipPercent != null && (!Number.isFinite(ownershipPercent) || ownershipPercent < 0 || ownershipPercent > 100)) return NextResponse.json({ error: "Ownership percent must be between 0 and 100." }, { status: 400 });
     if (entryType === "equity_investment" && ownershipPercent == null) return NextResponse.json({ error: "Enter the ownership percent documented for this equity investment." }, { status: 400 });
+    if (entryType === "gift_received" && !giftAcknowledged) return NextResponse.json({ error: "Confirm that this is an unconditional gift with nothing promised in return." }, { status: 400 });
     if (documents.length > MAX_DOCUMENTS) return NextResponse.json({ error: `Attach no more than ${MAX_DOCUMENTS} documents.` }, { status: 400 });
     for (const file of documents) {
       if (file.size > MAX_DOCUMENT_BYTES) return NextResponse.json({ error: `${file.name} is larger than 20 MB.` }, { status: 400 });
@@ -64,6 +67,7 @@ export async function POST(request: Request) {
 
     if (error || !entry) {
       console.error("Funding entry insert failed", error);
+      if (entryType === "owner_draw" && error?.code === "23514") return NextResponse.json({ error: "Run the Phase 6.59 owner-draw SQL update in Supabase, then save this draw again." }, { status: 409 });
       return NextResponse.json({ error: "Could not save this funding entry." }, { status: 500 });
     }
 

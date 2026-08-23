@@ -1,6 +1,6 @@
 "use client";
 
-import { products, type Product } from "@/lib/catalog";
+import { isOtherProductColor, OTHER_PRODUCT_COLOR, otherProductColorPreference, products, type Product } from "@/lib/catalog";
 import { compactSizeSummary, orderItemQuantity, orderItemsQuantity, type StructuredOrderItem } from "@/lib/order-types";
 
 function newId() {
@@ -72,7 +72,7 @@ export function OrderItemsBuilder({
   function addColor() {
     const source = items[0] || makeStructuredOrderItem(primaryProduct, primaryProduct.colors[0]?.name, "primary");
     const p = productFor(source.productSlug);
-    const unused = p.colors.find((color) => !items.some((item) => item.productSlug === p.slug && item.colorName === color.name));
+    const unused = p.colors.find((color) => !items.some((item) => item.productSlug === p.slug && (color.name === OTHER_PRODUCT_COLOR ? isOtherProductColor(item.colorName) : item.colorName === color.name)));
     const next = makeStructuredOrderItem(p, unused?.name || p.colors[0]?.name, "same");
     onChange([...items, next]);
   }
@@ -123,9 +123,10 @@ export function OrderItemsBuilder({
                   </label>
                   <label className="field">
                     <span>Color</span>
-                    <select value={item.colorName} onChange={(event) => patchItem(item.id, { colorName: event.target.value })}>
+                    <select value={isOtherProductColor(item.colorName) ? OTHER_PRODUCT_COLOR : item.colorName} onChange={(event) => patchItem(item.id, { colorName: event.target.value })}>
                       {itemProduct.colors.map((color) => <option key={color.name} value={color.name}>{color.name}</option>)}
                     </select>
+                    {isOtherProductColor(item.colorName) ? <span className="orderItemOtherColor"><input aria-label={`Preferred color for ${item.productName}`} value={otherProductColorPreference(item.colorName)} onChange={(event) => patchItem(item.id, { colorName: event.target.value ? `${OTHER_PRODUCT_COLOR}: ${event.target.value}` : OTHER_PRODUCT_COLOR })} maxLength={100} placeholder="Type the preferred color" /><small>White will be used in the mockup until the exact blank is confirmed.</small></span> : null}
                   </label>
                 </div>
 

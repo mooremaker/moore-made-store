@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { markCheckoutSessionFailed, recordPaidCheckoutSession } from "@/lib/payment-server";
+import { markSupportGiftFailed, recordPaidSupportGift } from "@/lib/support-gift-server";
 import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
 
 export async function POST(request: Request) {
@@ -19,13 +20,16 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":
-        await recordPaidCheckoutSession(event.data.object as Stripe.Checkout.Session);
+        if ((event.data.object as Stripe.Checkout.Session).metadata?.kind === "support_gift") await recordPaidSupportGift(event.data.object as Stripe.Checkout.Session);
+        else await recordPaidCheckoutSession(event.data.object as Stripe.Checkout.Session);
         break;
       case "checkout.session.async_payment_failed":
-        await markCheckoutSessionFailed(event.data.object as Stripe.Checkout.Session, "async_payment_failed");
+        if ((event.data.object as Stripe.Checkout.Session).metadata?.kind === "support_gift") await markSupportGiftFailed(event.data.object as Stripe.Checkout.Session, "failed");
+        else await markCheckoutSessionFailed(event.data.object as Stripe.Checkout.Session, "async_payment_failed");
         break;
       case "checkout.session.expired":
-        await markCheckoutSessionFailed(event.data.object as Stripe.Checkout.Session, "expired");
+        if ((event.data.object as Stripe.Checkout.Session).metadata?.kind === "support_gift") await markSupportGiftFailed(event.data.object as Stripe.Checkout.Session, "expired");
+        else await markCheckoutSessionFailed(event.data.object as Stripe.Checkout.Session, "expired");
         break;
       default:
         break;

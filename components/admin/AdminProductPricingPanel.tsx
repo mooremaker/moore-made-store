@@ -10,7 +10,9 @@ type EditablePricing = {
   active: boolean;
   blank: string;
   print: string;
+  additionalLocation: string;
   packaging: string;
+  minimumProfit: string;
   margin: string;
   taxCode: string;
   notes: string;
@@ -43,7 +45,9 @@ export function AdminProductPricingPanel({
       active: row?.active ?? true,
       blank: dollars(row?.blank_cost_cents ?? starter.blankCostCents),
       print: dollars(row?.print_cost_cents ?? starter.printCostCents),
+      additionalLocation: dollars(row?.additional_location_cost_cents ?? starter.additionalLocationCostCents),
       packaging: dollars(row?.packaging_cost_cents ?? starter.packagingCostCents),
+      minimumProfit: dollars(row?.minimum_profit_per_item_cents ?? starter.minimumProfitPerItemCents),
       margin: ((row?.target_margin_basis_points ?? starter.targetMarginBasisPoints) / 100).toFixed(0),
       taxCode: row?.tax_code || settings?.default_tax_code || "txcd_99999999",
       notes: row?.notes || "",
@@ -54,8 +58,25 @@ export function AdminProductPricingPanel({
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [globalLaborRate, setGlobalLaborRate] = useState(dollars(settings?.default_labor_rate_cents ?? 1500));
+  const [globalLaborRate, setGlobalLaborRate] = useState(dollars(settings?.default_labor_rate_cents ?? 2500));
   const [minimumLaborHours, setMinimumLaborHours] = useState(String(settings?.minimum_labor_hours ?? 1));
+  const [margin1to9, setMargin1to9] = useState(String((settings?.margin_1_9_basis_points ?? 5500) / 100));
+  const [margin10to24, setMargin10to24] = useState(String((settings?.margin_10_24_basis_points ?? 5000) / 100));
+  const [margin25to49, setMargin25to49] = useState(String((settings?.margin_25_49_basis_points ?? 4500) / 100));
+  const [margin50plus, setMargin50plus] = useState(String((settings?.margin_50_plus_basis_points ?? 4250) / 100));
+  const [minimumMarginFloor, setMinimumMarginFloor] = useState(String((settings?.minimum_margin_floor_basis_points ?? 3500) / 100));
+  const [standardShirtProfit, setStandardShirtProfit] = useState(dollars(settings?.standard_shirt_min_profit_cents ?? 1200));
+  const [outsourcedMargin, setOutsourcedMargin] = useState(String((settings?.outsourced_min_margin_basis_points ?? 3500) / 100));
+  const [overheadPercent, setOverheadPercent] = useState(String((settings?.overhead_basis_points ?? 1000) / 100));
+  const [paymentFeePercent, setPaymentFeePercent] = useState(String((settings?.payment_fee_basis_points ?? 290) / 100));
+  const [paymentFeeFixed, setPaymentFeeFixed] = useState(dollars(settings?.payment_fee_fixed_cents ?? 30));
+  const [defaultShippingCharge, setDefaultShippingCharge] = useState(dollars(settings?.default_shipping_charge_cents ?? 0));
+  const [incomeTaxReservePercent, setIncomeTaxReservePercent] = useState(String((settings?.income_tax_reserve_basis_points ?? 3000) / 100));
+  const [laborMinutesPerPiece, setLaborMinutesPerPiece] = useState(String(settings?.labor_warning_minutes_per_piece ?? 3));
+  const [weeklySalesGoal, setWeeklySalesGoal] = useState(dollars(settings?.weekly_sales_goal_cents ?? 750000));
+  const [weeklyProfitGoal, setWeeklyProfitGoal] = useState(dollars(settings?.weekly_profit_goal_cents ?? 300000));
+  const [weeklyOwnerGoal, setWeeklyOwnerGoal] = useState(dollars(settings?.weekly_owner_goal_cents ?? 270000));
+  const [weeklyReserveGoal, setWeeklyReserveGoal] = useState(dollars(settings?.weekly_reserve_goal_cents ?? 30000));
   const pickup = settings?.pickup_address || {};
   const [pickupAddress, setPickupAddress] = useState({
     name: String(pickup.name || "Moore Made"),
@@ -77,7 +98,9 @@ export function AdminProductPricingPanel({
     patch(slug, {
       blank: dollars(starter.blankCostCents),
       print: dollars(starter.printCostCents),
+      additionalLocation: dollars(starter.additionalLocationCostCents),
       packaging: dollars(starter.packagingCostCents),
+      minimumProfit: dollars(starter.minimumProfitPerItemCents),
       margin: (starter.targetMarginBasisPoints / 100).toFixed(0),
       sizeBlankCosts: Object.fromEntries((products.find((product) => product.slug === slug)?.sizes || []).map((size) => [size, dollars(starter.sizeBlankCostsCents[size] ?? starter.blankCostCents)])),
       sizeSurcharges: Object.fromEntries((products.find((product) => product.slug === slug)?.sizes || []).map((size) => [size, dollars(starter.sizeCustomerSurchargesCents[size] ?? 0)])),
@@ -103,7 +126,9 @@ export function AdminProductPricingPanel({
           sizeBlankCosts: Object.fromEntries(Object.entries(row.sizeBlankCosts).map(([size, amount]) => [size, cents(amount)])),
           sizeCustomerSurcharges: Object.fromEntries(Object.entries(row.sizeSurcharges).map(([size, amount]) => [size, cents(amount)])),
           printCostCents: cents(row.print),
+          additionalLocationCostCents: cents(row.additionalLocation),
           packagingCostCents: cents(row.packaging),
+          minimumProfitPerItemCents: cents(row.minimumProfit),
           // Kept at zero for database compatibility. Labor is configured once
           // in business settings and added once to the complete quote.
           defaultLaborHours: 0,
@@ -133,6 +158,23 @@ export function AdminProductPricingPanel({
           kind: "settings",
           defaultLaborRateCents: cents(globalLaborRate),
           minimumLaborHours: Math.max(1, Number(minimumLaborHours) || 1),
+          margin1to9BasisPoints: Math.round((Number(margin1to9) || 0) * 100),
+          margin10to24BasisPoints: Math.round((Number(margin10to24) || 0) * 100),
+          margin25to49BasisPoints: Math.round((Number(margin25to49) || 0) * 100),
+          margin50plusBasisPoints: Math.round((Number(margin50plus) || 0) * 100),
+          minimumMarginFloorBasisPoints: Math.round((Number(minimumMarginFloor) || 0) * 100),
+          standardShirtMinProfitCents: cents(standardShirtProfit),
+          outsourcedMinMarginBasisPoints: Math.round((Number(outsourcedMargin) || 0) * 100),
+          overheadBasisPoints: Math.round((Number(overheadPercent) || 0) * 100),
+          paymentFeeBasisPoints: Math.round((Number(paymentFeePercent) || 0) * 100),
+          paymentFeeFixedCents: cents(paymentFeeFixed),
+          defaultShippingChargeCents: cents(defaultShippingCharge),
+          incomeTaxReserveBasisPoints: Math.round((Number(incomeTaxReservePercent) || 0) * 100),
+          laborWarningMinutesPerPiece: Math.max(0, Number(laborMinutesPerPiece) || 0),
+          weeklySalesGoalCents: cents(weeklySalesGoal),
+          weeklyProfitGoalCents: cents(weeklyProfitGoal),
+          weeklyOwnerGoalCents: cents(weeklyOwnerGoal),
+          weeklyReserveGoalCents: cents(weeklyReserveGoal),
           pickupAddress,
           defaultTaxCode: settings?.default_tax_code || "txcd_99999999",
           shippingTaxCode: settings?.shipping_tax_code || "txcd_92010001",
@@ -148,7 +190,7 @@ export function AdminProductPricingPanel({
     }
   }
 
-  if (!ready) return <section className="adminWorkspacePanel"><div className="formError">Products & pricing need the latest database updates. Run Phase 6.26 if it has never been installed, then run <code>supabase/moore_made_phase6_46_size_pricing_final_tax.sql</code>.</div></section>;
+  if (!ready) return <section className="adminWorkspacePanel"><div className="formError">Products & pricing need the latest database updates. Run Phase 6.26 if it has never been installed, then Phase 6.46 and <code>supabase/moore_made_phase6_47_profitability_reorder_goals.sql</code>.</div></section>;
 
   return (
     <section className="adminWorkspacePanel productPricingAdmin">
@@ -158,11 +200,32 @@ export function AdminProductPricingPanel({
       {error ? <div className="formError">{error}</div> : null}
 
       <div className="pricingSettingsCard card">
-        <div className="pricingSettingsHead"><div><strong>Whole-order labor defaults</strong><span>Applied once to the complete quote, regardless of its quantity or number of product types.</span></div><span className="badge">Admin only</span></div>
+        <div className="pricingSettingsHead"><div><strong>Profit, labor & weekly-goal safeguards</strong><span>Private defaults used to calculate a profitable starting quote and warn before undercharging.</span></div><span className="badge">Admin only</span></div>
         <div className="pricingSettingsGrid">
-          <label className="field"><span>Internal labor rate per hour</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={globalLaborRate} onChange={(e) => setGlobalLaborRate(e.target.value)} /></div><small>Starts at $15/hour and remains private.</small></label>
-          <label className="field"><span>Minimum labor for the entire order</span><input type="number" min="1" step="0.25" value={minimumLaborHours} onChange={(e) => setMinimumLaborHours(e.target.value)} /><small>One hour means a $15 minimum for the whole order—not for each item.</small></label>
+          <label className="field"><span>Internal labor rate per person-hour</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={globalLaborRate} onChange={(e) => setGlobalLaborRate(e.target.value)} /></div><small>Starts at $25/hour. Sal 2 hr + Matt 2 hr = 4 total person-hours.</small></label>
+          <label className="field"><span>Minimum labor for the entire order</span><input type="number" min="1" step="0.25" value={minimumLaborHours} onChange={(e) => setMinimumLaborHours(e.target.value)} /><small>Applied once to the whole order—not once per product or line.</small></label>
+          <label className="field"><span>Labor warning minutes per piece</span><input type="number" min="0" step="0.5" value={laborMinutesPerPiece} onChange={(e) => setLaborMinutesPerPiece(e.target.value)} /><small>Warns when entered person-hours appear unusually low.</small></label>
+          <label className="field"><span>Overhead reserve</span><div className="percentInput"><input type="number" min="0" max="50" step="0.5" value={overheadPercent} onChange={(e) => setOverheadPercent(e.target.value)} /><span>%</span></div><small>Software, wear, misprints, ads, insurance, and bookkeeping.</small></label>
+          <label className="field"><span>Payment fee rate</span><div className="percentInput"><input type="number" min="0" max="20" step="0.01" value={paymentFeePercent} onChange={(e) => setPaymentFeePercent(e.target.value)} /><span>%</span></div></label>
+          <label className="field"><span>Payment fee fixed amount</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={paymentFeeFixed} onChange={(e) => setPaymentFeeFixed(e.target.value)} /></div><small>Applied per payment; deposit orders estimate two payments.</small></label>
+          <label className="field"><span>Default customer shipping charge</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={defaultShippingCharge} onChange={(e) => setDefaultShippingCharge(e.target.value)} /></div><small>Auto-fills only when the customer chose Shipping. You can still override it on any quote.</small></label>
+          <label className="field"><span>Owner income-tax reserve estimate</span><div className="percentInput"><input type="number" min="0" max="60" step="1" value={incomeTaxReservePercent} onChange={(e) => setIncomeTaxReservePercent(e.target.value)} /><span>%</span></div><small>Private planning reserve applied to estimated year-to-date taxable profit. Starts at 30%; your CPA can adjust it.</small></label>
         </div>
+        <details className="pricingSafeguardSettings" open><summary>Quantity margins and minimum profit</summary><div className="pricingSettingsGrid">
+          <label className="field"><span>1–9 piece target margin</span><div className="percentInput"><input type="number" min="0" max="95" value={margin1to9} onChange={(e) => setMargin1to9(e.target.value)} /><span>%</span></div></label>
+          <label className="field"><span>10–24 piece target margin</span><div className="percentInput"><input type="number" min="0" max="95" value={margin10to24} onChange={(e) => setMargin10to24(e.target.value)} /><span>%</span></div></label>
+          <label className="field"><span>25–49 piece target margin</span><div className="percentInput"><input type="number" min="0" max="95" value={margin25to49} onChange={(e) => setMargin25to49(e.target.value)} /><span>%</span></div></label>
+          <label className="field"><span>50+ piece target margin</span><div className="percentInput"><input type="number" min="0" max="95" value={margin50plus} onChange={(e) => setMargin50plus(e.target.value)} /><span>%</span></div></label>
+          <label className="field"><span>Absolute margin warning floor</span><div className="percentInput"><input type="number" min="0" max="95" value={minimumMarginFloor} onChange={(e) => setMinimumMarginFloor(e.target.value)} /><span>%</span></div></label>
+          <label className="field"><span>Standard T-shirt minimum profit each (1–9)</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={standardShirtProfit} onChange={(e) => setStandardShirtProfit(e.target.value)} /></div><small>Bulk automatically tapers to $10 (10–24), $8 (25–49), and $6.50 (50+) while margin floors still apply.</small></label>
+          <label className="field"><span>Outsourced-order minimum margin</span><div className="percentInput"><input type="number" min="0" max="95" value={outsourcedMargin} onChange={(e) => setOutsourcedMargin(e.target.value)} /><span>%</span></div></label>
+        </div></details>
+        <details className="pricingSafeguardSettings"><summary>Weekly income goals</summary><div className="pricingSettingsGrid">
+          <label className="field"><span>Weekly sales goal</span><div className="moneyInput"><span>$</span><input type="number" min="1" step="50" value={weeklySalesGoal} onChange={(e) => setWeeklySalesGoal(e.target.value)} /></div></label>
+          <label className="field"><span>Weekly business-profit goal</span><div className="moneyInput"><span>$</span><input type="number" min="1" step="50" value={weeklyProfitGoal} onChange={(e) => setWeeklyProfitGoal(e.target.value)} /></div></label>
+          <label className="field"><span>Combined owner goal</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="50" value={weeklyOwnerGoal} onChange={(e) => setWeeklyOwnerGoal(e.target.value)} /></div><small>Before Sal and Matt’s personal tax reserves.</small></label>
+          <label className="field"><span>Weekly business reserve</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="25" value={weeklyReserveGoal} onChange={(e) => setWeeklyReserveGoal(e.target.value)} /></div></label>
+        </div></details>
         <div className="pricingPickupSettings">
           <div><strong>Pickup / business address for tax</strong><span>Automatic tax uses this customer location for local-pickup orders.</span></div>
           <div className="pricingSettingsGrid">
@@ -188,8 +251,10 @@ export function AdminProductPricingPanel({
               <div className="productPricingFields">
                 <label><span>Blank / product cost each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.blank} onChange={(e) => patch(product.slug, { blank: e.target.value })} /></div></label>
                 <label><span>Print / decoration each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.print} onChange={(e) => patch(product.slug, { print: e.target.value })} /></div></label>
+                <label><span>Each additional location</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.additionalLocation} onChange={(e) => patch(product.slug, { additionalLocation: e.target.value })} /></div></label>
                 <label><span>Packaging each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.01" value={row.packaging} onChange={(e) => patch(product.slug, { packaging: e.target.value })} /></div></label>
-                <label><span>Target margin</span><div className="percentInput"><input type="number" min="0" max="95" step="1" value={row.margin} onChange={(e) => patch(product.slug, { margin: e.target.value })} /><span>%</span></div></label>
+                <label><span>Minimum profit each</span><div className="moneyInput"><span>$</span><input type="number" min="0" step="0.25" value={row.minimumProfit} onChange={(e) => patch(product.slug, { minimumProfit: e.target.value })} /></div></label>
+                <label><span>Product baseline margin <small>Reference</small></span><div className="percentInput"><input type="number" min="0" max="95" step="1" value={row.margin} onChange={(e) => patch(product.slug, { margin: e.target.value })} /><span>%</span></div></label>
               </div>
               <div className="pricingRecommendation"><span>Direct cost per item (before order labor)</span><strong>{money(directUnitCost)}</strong><span>Baseline revenue before order labor at {Number(row.margin) || 0}% margin</span><strong>{money(recommended)}</strong></div>
               {product.sizes.some((size) => /^(?:XS|S|M|L|XL|[2-9]XL)$/i.test(size)) ? <details className="pricingAdvanced pricingSizeCosts"><summary>Supplier cost and customer surcharge by size</summary><p className="fieldHelp">Copy today&apos;s Jiffy price for each size. These remain private estimates. The surcharge is the additional amount the customer sees above the product&apos;s standard price.</p><div className="pricingSizeCostHead"><span>Size</span><span>Jiffy / supplier cost</span><span>Customer surcharge</span></div>{product.sizes.map((size) => <div className="pricingSizeCostRow" key={size}><strong>{size}</strong><div className="moneyInput"><span>$</span><input aria-label={`${product.name} ${size} supplier cost`} type="number" min="0" step="0.01" value={row.sizeBlankCosts[size] || "0.00"} onChange={(event) => patch(product.slug, { sizeBlankCosts: { ...row.sizeBlankCosts, [size]: event.target.value } })} /></div><div className="moneyInput"><span>+$</span><input aria-label={`${product.name} ${size} customer surcharge`} type="number" min="0" step="0.01" value={row.sizeSurcharges[size] || "0.00"} onChange={(event) => patch(product.slug, { sizeSurcharges: { ...row.sizeSurcharges, [size]: event.target.value } })} /></div></div>)}</details> : null}

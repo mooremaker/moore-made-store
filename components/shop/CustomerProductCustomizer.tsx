@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Product, PlacementOption } from "@/lib/catalog";
+import { findProductColor, isOtherProductColor, OTHER_PRODUCT_COLOR, otherProductColorPreference, type Product, type PlacementOption } from "@/lib/catalog";
 import type { CatalogMockupSettings } from "@/lib/mockup-template-types";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { formatRequestNumber } from "@/lib/custom-request-types";
@@ -193,7 +193,7 @@ export function CustomerProductCustomizer({
 
   const primaryItem = orderItems[0] ?? makeStructuredOrderItem(product, product.colors[0]?.name, "primary");
   const colorName = primaryItem.colorName;
-  const selectedColor = product.colors.find((color) => color.name === colorName) ?? product.colors[0];
+  const selectedColor = findProductColor(product, colorName);
   const isCustomProduct = product.previewKind === "custom";
   const current = activeView === "front" ? front : back;
   const printArea = artworkPrintArea(product);
@@ -395,6 +395,8 @@ export function CustomerProductCustomizer({
 
   function validateQuantities() {
     if (totalQuantity < 1) return "Add at least one item to your request.";
+    const missingOtherColor = orderItems.find((item) => isOtherProductColor(item.colorName) && !otherProductColorPreference(item.colorName).trim());
+    if (missingOtherColor) return `Enter the preferred color for ${missingOtherColor.productName}, or choose a listed color.`;
     const empty = orderItems.find((item) => orderItemQuantity(item) < 1);
     if (empty) return `Add a quantity for ${empty.productName} (${empty.colorName}) or remove that item.`;
     return "";
@@ -497,7 +499,7 @@ export function CustomerProductCustomizer({
   function instructionFor(view: ViewKey, state: ViewState) {
     const label = product.viewLabels[view];
     const source = state.mode === "upload" ? `uploaded artwork (${state.file?.name || "file"})` : `design needed: ${state.idea.trim()}`;
-    return `${label}: customer-positioned design; ${source}; preview position ${Math.round(state.x)}% across / ${Math.round(state.y)}% down; preview width ${Math.round(state.width)}%; preview height ${Math.round(state.height)}%; rotation ${Math.round(state.rotation)}°.${state.mode === "upload" && state.backgroundRemovalRequested ? " BACKGROUND REMOVAL REQUESTED — make the uploaded artwork background transparent; use vector redraw/vectorization instead of unsafe automatic enhancement when needed; include the artwork-preparation cost in the quote and send the finished proof for approval." : ""}${state.details.trim() ? ` Optional details: ${state.details.trim()}` : ""}`;
+    return `${label}: ${source}; placement: ${placementFor(product, view, state.placement).label}.${state.mode === "upload" && state.backgroundRemovalRequested ? " BACKGROUND REMOVAL REQUESTED — make the uploaded artwork background transparent; use vector redraw/vectorization instead of unsafe automatic enhancement when needed; include the artwork-preparation cost in the quote and send the finished proof for approval." : ""}${state.details.trim() ? ` Optional details: ${state.details.trim()}` : ""}`;
   }
 
   async function submitCustomization() {
@@ -591,6 +593,10 @@ export function CustomerProductCustomizer({
       }
       if (pathByIndex.size !== fileEntries.length) uploadWarning = fileEntries.length > 0;
 
+      if (uploadWarning) {
+        throw new Error("We could not finish uploading every artwork file. The request was not finalized as artwork-ready, so please retry the upload before leaving this page.");
+      }
+
       const uploadedPaths = Array.from(pathByIndex.entries()).sort((a, b) => a[0] - b[0]).map(([, path]) => path);
       const mockupDocument = {
         version: 2,
@@ -652,10 +658,10 @@ export function CustomerProductCustomizer({
       const filesResponse = await fetch(`/api/custom-requests/${result.requestId}/files`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionToken: result.submissionToken, paths: uploadedPaths, mockupDocument }),
+        body: JSON.stringify({ submissionToken: result.submissionToken, paths: uploadedPaths, expectedUploadCount: fileEntries.length, mockupDocument }),
       });
       const filesResult = await filesResponse.json().catch(() => ({}));
-      if (!filesResponse.ok) uploadWarning = true;
+      if (!filesResponse.ok) throw new Error(filesResult.error || "The artwork file could not be confirmed. Please retry the upload before leaving this page.");
 
       setSuccess({
         requestNumber: result.requestNumber,
@@ -717,7 +723,7 @@ export function CustomerProductCustomizer({
   const displayedReviewOverlay = artworkPreview(displayedReviewState, `Your ${product.viewLabels[displayedReviewView].toLowerCase()} artwork preview`);
   const reviewColorNames = Array.from(new Set(orderItems.filter((item) => item.productSlug === product.slug).map((item) => item.colorName)));
   const displayedReviewColorName = reviewColorNames.includes(reviewColorName) ? reviewColorName : reviewColorNames[0] || colorName;
-  const displayedReviewColor = product.colors.find((color) => color.name === displayedReviewColorName) ?? selectedColor;
+  const displayedReviewColor = findProductColor(product, displayedReviewColorName) ?? selectedColor;
 
   function moveReviewView(direction: -1 | 1) {
     if (reviewViews.length < 2) return;
@@ -731,7 +737,7 @@ export function CustomerProductCustomizer({
         <div className="customerMockupReviewHead">
           <div><div className="eyebrow">Design preview</div><h2>{title}</h2><p>{description}</p></div>
           {reviewColorNames.length > 1 ? <div className="customerMockupColorPicker" aria-label="Preview a selected color">{reviewColorNames.map((name) => {
-            const color = product.colors.find((option) => option.name === name);
+            const color = findProductColor(product, name);
             return <button key={name} type="button" className={displayedReviewColorName === name ? "active" : ""} aria-pressed={displayedReviewColorName === name} onClick={() => setReviewColorName(name)}><span style={{ background: color?.value || "#e6e0d8" }} />{name}</button>;
           })}</div> : <span className="customerMockupSingleColor"><i style={{ background: displayedReviewColor?.value || "#e6e0d8" }} />{displayedReviewColorName}</span>}
         </div>
@@ -835,7 +841,10 @@ export function CustomerProductCustomizer({
                 <div className="customerControlNumber">03</div>
                 <div className="customerControlContent">
                   <div className="customerControlHeading"><div><h3>{isCustomProduct ? "Product color & material" : "Product color"}</h3><p>Choose the product color after your design sides and artwork are set.</p></div></div>
-                  <div className="field"><span className="customerFieldLabel">{isCustomProduct ? "Preferred color" : "Product color"}</span><div className="customerColorSwatches">{product.colors.map((color) => <button key={color.name} type="button" className={`customerColorSwatch ${colorName === color.name ? "active" : ""}`} aria-pressed={colorName === color.name} onClick={() => setPrimaryColor(color.name)} title={color.name}><span className="customerColorDot" style={{ background: color.value }} /><span>{color.name}</span>{colorName === color.name ? <b aria-hidden="true">✓</b> : null}</button>)}</div></div>
+                  <div className="field"><span className="customerFieldLabel">{isCustomProduct ? "Preferred color" : "Product color"}</span><div className="customerColorSwatches">{product.colors.map((color) => {
+                    const active = color.name === OTHER_PRODUCT_COLOR ? isOtherProductColor(colorName) : colorName === color.name;
+                    return <button key={color.name} type="button" className={`customerColorSwatch ${active ? "active" : ""}`} aria-pressed={active} onClick={() => setPrimaryColor(color.name)} title={color.name}><span className="customerColorDot" style={{ background: color.value }} /><span>{color.name}</span>{active ? <b aria-hidden="true">✓</b> : null}</button>;
+                  })}</div>{isOtherProductColor(colorName) ? <label className="customerOtherColor"><span>Preferred color name</span><input autoFocus value={otherProductColorPreference(colorName)} onChange={(event) => setPrimaryColor(event.target.value ? `${OTHER_PRODUCT_COLOR}: ${event.target.value}` : OTHER_PRODUCT_COLOR)} maxLength={100} placeholder="Example: seafoam, rust, or a Jiffy color" /><small>The mockup will display white. Moore Made will confirm the exact product and color before quoting.</small></label> : <small className="customerColorAvailability">Color availability varies by brand and product. Moore Made will confirm the exact blank in your proof and quote.</small>}</div>
                   {isCustomProduct ? <label className="field"><span>Color / material notes <small>Optional</small></span><input value={customColorNotes} onChange={(event) => setCustomColorNotes(event.target.value)} maxLength={240} placeholder="Example: sage green, stainless steel, natural wood…" /></label> : null}
                 </div>
               </section>
@@ -871,7 +880,7 @@ export function CustomerProductCustomizer({
 
           {delivery === "Shipping" || delivery === "Local delivery" ? (
             <div className="shippingAddressPanel">
-              <div className="shippingAddressPanelHead"><strong>{delivery === "Local delivery" ? "Delivery address" : "Shipping address"}</strong><span>{delivery === "Local delivery" ? "We’ll use this to plan local delivery and calculate sales tax accurately when your quote is prepared." : "We’ll use this for shipping and the automatic sales-tax calculation when your quote is prepared."}</span></div>
+              <div className="shippingAddressPanelHead"><strong>{delivery === "Local delivery" ? "Delivery address" : "Shipping address"}</strong><span>{delivery === "Local delivery" ? "We’ll use this to plan local delivery and calculate sales tax accurately when your quote is prepared." : "We ship within the United States. We’ll use this for shipping and applicable sales-tax calculations when your quote is prepared."}</span></div>
               <div className="customerOrderGrid">
                 <label className="field"><span>Recipient</span><input value={shippingAddress.name} onChange={(event) => setShippingAddress((address) => ({ ...address, name: event.target.value }))} autoComplete="shipping name" /></label>
                 <label className="field"><span>Street address *</span><input value={shippingAddress.line1} onChange={(event) => setShippingAddress((address) => ({ ...address, line1: event.target.value }))} autoComplete="shipping address-line1" /></label>

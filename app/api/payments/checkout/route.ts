@@ -10,6 +10,7 @@ import { recordPaidCheckoutSession } from "@/lib/payment-server";
 import { hashPaymentShareToken } from "@/lib/payment-share";
 import { calculateAutomaticOrderTax } from "@/lib/automatic-tax-server";
 import { money } from "@/lib/quote-types";
+import { estimatedPaymentFeeCents, type BusinessSettingsRecord } from "@/lib/pricing-types";
 
 function text(value: unknown, max = 200) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
 
     let quoteQuery = supabase
       .from("quotes")
-      .select("id,request_id,public_token,status,subtotal_cents,setup_fee_cents,shipping_cents,discount_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,total_cents,payment_terms,deposit_amount_cents,proof_version,revision_number,custom_requests(id,request_number,customer_name,email,product,payment_status,amount_paid_cents)");
+      .select("id,request_id,public_token,status,subtotal_cents,setup_fee_cents,shipping_cents,discount_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,total_cents,payment_terms,deposit_amount_cents,internal_payment_fee_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,proof_version,revision_number,custom_requests(id,request_number,customer_name,email,product,payment_status,amount_paid_cents)");
     quoteQuery = quoteIdFromShare ? quoteQuery.eq("id", quoteIdFromShare) : quoteQuery.eq("public_token", token);
     const { data: quote, error: quoteError } = await quoteQuery.single();
 
@@ -153,7 +154,13 @@ export async function POST(request: Request) {
         checkoutTaxCents = finalTax.taxCents;
         finalTaxCalculationId = finalTax.calculationId;
         checkoutTotalCents = Math.max(0, Number(quote.subtotal_cents || 0) + Number(quote.setup_fee_cents || 0) + Number(quote.shipping_cents || 0) + checkoutTaxCents - Number(quote.discount_cents || 0));
-        const { error: taxUpdateError } = await supabase.from("quotes").update({ tax_cents: checkoutTaxCents, total_cents: checkoutTotalCents, stripe_tax_calculation_id: finalTax.calculationId, tax_calculated_at: finalTax.calculatedAt, tax_input_fingerprint: finalTax.inputFingerprint, tax_breakdown: finalTax.breakdown }).eq("id", quote.id);
+        const { data: settingsRow } = await supabase.from("business_settings").select("payment_fee_basis_points,payment_fee_fixed_cents").limit(1).maybeSingle();
+        const refreshedPaymentFeeCents = estimatedPaymentFeeCents({ amountCents: checkoutTotalCents, paymentTerms: quote.payment_terms === "deposit" ? "deposit" : "full", depositAmountCents: Number(quote.deposit_amount_cents || 0), settings: settingsRow as BusinessSettingsRecord | null });
+        const refreshedInternalTotalCostCents = Math.max(0, Number(quote.internal_total_cost_cents || 0) - Number(quote.internal_payment_fee_cents || 0) + refreshedPaymentFeeCents);
+        const refreshedRevenueBeforeTaxCents = Math.max(0, checkoutTotalCents - checkoutTaxCents);
+        const refreshedProfitCents = refreshedRevenueBeforeTaxCents - refreshedInternalTotalCostCents;
+        const refreshedMarginBasisPoints = refreshedRevenueBeforeTaxCents > 0 ? Math.round(refreshedProfitCents / refreshedRevenueBeforeTaxCents * 10000) : 0;
+        const { error: taxUpdateError } = await supabase.from("quotes").update({ tax_cents: checkoutTaxCents, total_cents: checkoutTotalCents, internal_payment_fee_cents: refreshedPaymentFeeCents, internal_total_cost_cents: refreshedInternalTotalCostCents, estimated_profit_cents: refreshedProfitCents, estimated_margin_basis_points: refreshedMarginBasisPoints, stripe_tax_calculation_id: finalTax.calculationId, tax_calculated_at: finalTax.calculatedAt, tax_input_fingerprint: finalTax.inputFingerprint, tax_breakdown: finalTax.breakdown }).eq("id", quote.id);
         if (taxUpdateError) throw new Error("The final tax was calculated, but the order total could not be saved.");
       } catch (taxError) {
         return NextResponse.json({ error: taxError instanceof Error ? taxError.message : "Could not verify final sales tax before payment." }, { status: 409 });

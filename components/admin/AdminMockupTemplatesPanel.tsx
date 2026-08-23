@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { products } from "@/lib/catalog";
+import { findProductColor, products } from "@/lib/catalog";
 import {
   catalogSettingsFromTemplateDocument,
   defaultCatalogMockupSettings,
@@ -36,7 +36,7 @@ export function AdminMockupTemplatesPanel() {
   const [message, setMessage] = useState("");
   const stageRef = useRef<HTMLDivElement | null>(null);
 
-  const selectedColor = product?.colors.find((color) => color.name === colorName) ?? product?.colors[0];
+  const selectedColor = findProductColor(product, colorName);
   const savedTemplate = useMemo(
     () => templates.find((item) => item.product_key === product?.slug && item.visibility === "shop" && item.is_active),
     [templates, product?.slug],

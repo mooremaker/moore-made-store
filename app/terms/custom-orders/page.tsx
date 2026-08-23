@@ -58,7 +58,7 @@ export default function CustomOrderTermsPage() {
 
         <section>
           <h3>7. Shipping, local delivery, and pickup</h3>
-          <p>Customers are responsible for providing accurate pickup, local-delivery, or shipping information. Local delivery timing and drop-off details may be coordinated directly with the customer. Tracking information will be provided for shipped orders when available. Moore Made will communicate significant fulfillment issues when reasonably possible.</p>
+          <p>Moore Made ships within the United States. Shipping, applicable sales tax, and delivery timing are confirmed with the final quote or at checkout. Customers are responsible for providing accurate pickup, local-delivery, or shipping information. Local delivery timing and drop-off details may be coordinated directly with the customer. Tracking information will be provided for shipped orders when available. Moore Made will communicate significant fulfillment issues when reasonably possible.</p>
         </section>
 
         <section>

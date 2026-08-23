@@ -34,12 +34,20 @@ export async function POST(request: Request) {
     const requestId = text(body.requestId, 80);
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin.from("custom_requests")
-      .select("id,request_number,product,order_items,print_sides,artwork_paths")
+      .select("id,request_number,product,order_items,print_sides,artwork_paths,status")
       .eq("id", requestId)
       .eq("customer_user_id", user.id)
       .maybeSingle();
     if (error) throw error;
     if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    if (order.status !== "completed") return NextResponse.json({ error: "Price-locked reorders are available after the original order is completed." }, { status: 409 });
+
+    const { data: approvedQuote } = await admin.from("quotes")
+      .select("id")
+      .eq("request_id", requestId)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (!approvedQuote) return NextResponse.json({ error: "This completed order does not have an approved price to lock. Message Moore Made for help." }, { status: 409 });
 
     const { data: project } = await admin.from("mockup_projects").select("document").eq("request_id", requestId).neq("status", "archived").maybeSingle();
     const signedDocument = project?.document ? await signMockupDocumentForDisplay(project.document, 15 * 60) : null;
@@ -94,6 +102,7 @@ export async function POST(request: Request) {
       const activeSides = preparedViews.filter((view) => view.enabled).map((view) => view.view);
       const coverageLabel = activeSides.includes("front") && activeSides.includes("back") ? `${product.viewLabels.front} + ${product.viewLabels.back}` : activeSides[0] === "back" ? `${product.viewLabels.back} only` : `${product.viewLabels.front} only`;
       return {
+        reorderSourceRequestId: order.id,
         productSlug: product.slug,
         productName: product.name,
         previewKind: product.previewKind as ProductPreviewKind,

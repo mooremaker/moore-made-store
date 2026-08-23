@@ -43,7 +43,7 @@ export default async function ReceiptPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data: payment } = await supabase
     .from("payments")
-    .select("id,request_id,quote_id,amount_cents,order_tax_cents,order_total_cents,status,payment_method,manual_reference,payer_name,payer_email,paid_at,receipt_number,receipt_token,voided_at,void_reason")
+    .select("id,request_id,quote_id,amount_cents,order_tax_cents,order_total_cents,status,payment_method,manual_reference,payer_name,payer_email,paid_at,receipt_number,receipt_token,receipt_order_number,receipt_payment_sequence,voided_at,void_reason")
     .eq("receipt_token", token)
     .in("status", ["paid", "voided"])
     .maybeSingle();
@@ -67,6 +67,7 @@ export default async function ReceiptPage({ params }: Props) {
   const receiptTaxCents = Number(payment.order_tax_cents ?? quote.tax_cents ?? 0);
   const remainingCents = Math.max(0, totalCents - paidToDate);
   const orderNumber = formatRequestNumber(order.request_number);
+  const receiptNumber = receiptLabel(payment.receipt_number, payment.receipt_order_number || order.request_number, payment.receipt_payment_sequence);
   const lineItems = Array.isArray(quote.line_items) ? quote.line_items : [];
   const fulfillmentChargeLabel = String(order.delivery || "").toLowerCase().includes("delivery")
     ? "Local delivery"
@@ -79,8 +80,8 @@ export default async function ReceiptPage({ params }: Props) {
       <div className="receiptActions"><a className="btn secondary" href="/account">Back to account</a><a className="btn secondary" href={`/invoice/${quote.public_token}`}>View invoice</a><PrintReceiptButton /></div>
       <article className="receiptPaper">
         <header className="receiptHeader">
-          <Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="receiptLogo" priority />
-          <div className="receiptTitle"><div className="eyebrow">{payment.status === "voided" ? "Corrected payment record" : "Payment receipt"}</div><h1>{receiptLabel(payment.receipt_number)}</h1><p>{dateTime(payment.paid_at)}</p></div>
+          <div><Image src="/moore-made-header-logo.png" width={190} height={63} alt="Moore Made" className="receiptLogo" priority /><div className="customerDocumentTagline">Your Idea. Moore Made.</div></div>
+          <div className="receiptTitle"><div className="eyebrow">{payment.status === "voided" ? "Corrected payment record" : "Payment receipt"}</div><h1>{receiptNumber}</h1><p>{dateTime(payment.paid_at)}</p></div>
         </header>
 
         <div className="receiptRule" />
@@ -150,7 +151,7 @@ export default async function ReceiptPage({ params }: Props) {
           <div className="receiptPrintTitle">
             <span className={`receiptPrintStatus ${payment.status === "voided" ? "isVoided" : "isPaid"}`}>{payment.status === "voided" ? "VOIDED" : "PAID"}</span>
             <strong>PAYMENT RECEIPT</strong>
-            <span>{receiptLabel(payment.receipt_number)}</span>
+            <span>{receiptNumber}</span>
             <small>{dateTime(payment.paid_at)}</small>
           </div>
         </header>

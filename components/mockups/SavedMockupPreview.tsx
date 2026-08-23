@@ -15,6 +15,23 @@ function requestedViews(document: MockupDocument) {
   return active.length ? active : document.views.slice(0, 2);
 }
 
+function artworkCanPreview(name: string) {
+  return /\.(png|jpe?g|webp|gif|svg|avif)$/i.test(name);
+}
+
+function needsPlacedArtwork(view: MockupView) {
+  return view.customerIntent?.enabled && view.customerIntent.source === "upload" && !view.layers.some((layer) => layer.asset.path && artworkCanPreview(layer.asset.originalName));
+}
+
+function MockupLayerVisual({ layer }: { layer: MockupView["layers"][number] }) {
+  if (!layer.asset.url) return null;
+  return (
+    <div className={`savedMockupLayer ${artworkCanPreview(layer.asset.originalName) ? "" : "isUnsupported"}`} key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: layer.height ? `${layer.height}%` : undefined, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
+      {artworkCanPreview(layer.asset.originalName) ? <img src={layer.asset.url} alt={layer.asset.originalName} /> : <div className="savedMockupUnsupported"><strong>PREVIEW NEEDED</strong><span>{layer.asset.originalName}</span></div>}
+    </div>
+  );
+}
+
 export function SavedMockupPreview({
   document,
   compact = false,
@@ -42,31 +59,24 @@ export function SavedMockupPreview({
           const exported = view.exportAsset?.url;
           return (
             <article className="savedMockupView" key={view.id}>
-              <div className="savedMockupViewLabel"><strong>{view.name}</strong><span>{view.customerIntent?.placementLabel || view.customerIntent?.placement || "Custom placement"}</span></div>
+              <div className="savedMockupViewLabel"><strong>{view.name}</strong><span>{view.template?.quantity ? `${view.template.quantity} pc${view.template.quantity === 1 ? "" : "s"} · ` : ""}{view.customerIntent?.placementLabel || view.customerIntent?.placement || "Custom placement"}</span></div>
               <div className="savedMockupStage">
                 {exported ? (
                   <img className="savedMockupExport" src={exported} alt={`${view.name} mockup`} />
                 ) : view.base?.url ? (
                   <div className="savedMockupBaseStage">
                     <img className="savedMockupBase" src={view.base.url} alt={`${view.name} product`} />
-                    {(view.layers || []).map((layer) => layer.asset.url ? (
-                      <div className="savedMockupLayer" key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: layer.height ? `${layer.height}%` : undefined, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
-                        <img src={layer.asset.url} alt={layer.asset.originalName} />
-                      </div>
-                    ) : null)}
+                    {(view.layers || []).map((layer) => <MockupLayerVisual layer={layer} key={layer.id} />)}
                   </div>
                 ) : (
                   <ProductVisual kind={kind} view={view.template?.viewKey === "back" ? "back" : "front"} label={view.template?.viewKey === "back" ? "BACK" : "FRONT"} color={color} className="savedMockupProductVisual">
-                    {(view.layers || []).map((layer) => layer.asset.url ? (
-                      <div className="savedMockupLayer" key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: layer.height ? `${layer.height}%` : undefined, opacity: layer.opacity, zIndex: layer.zIndex, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}>
-                        <img src={layer.asset.url} alt={layer.asset.originalName} />
-                      </div>
-                    ) : null)}
+                    {(view.layers || []).map((layer) => <MockupLayerVisual layer={layer} key={layer.id} />)}
                     {view.customerIntent?.enabled && view.customerIntent.source === "idea" ? (
                       <div className="savedMockupIdea" style={{ left: `${view.customerIntent.x}%`, top: `${view.customerIntent.y}%`, width: `${view.customerIntent.width}%`, height: view.customerIntent.height ? `${view.customerIntent.height}%` : undefined, transform: `translate(-50%, -50%) rotate(${view.customerIntent.rotation}deg)` } as CSSProperties}>
                         <strong>DESIGN IDEA</strong><span>{view.customerIntent.idea || view.customerIntent.placementLabel || "Moore Made to create"}</span>
                       </div>
                     ) : null}
+                    {needsPlacedArtwork(view) ? <div className="savedMockupMissingArtwork"><strong>ORIGINAL FILE MISSING</strong><span>{view.customerIntent?.artworkFileName || "Customer upload"}</span><small>Ask the customer to resend it before quoting.</small></div> : null}
                   </ProductVisual>
                 )}
               </div>

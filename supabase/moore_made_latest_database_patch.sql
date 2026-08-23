@@ -1,11 +1,35 @@
 -- Moore Made latest database patch
 -- Run this ONCE after replacing the project with the latest complete package.
+-- Default customer charge auto-filled for Shipping orders in Quote Builder.
+alter table public.business_settings
+  add column if not exists default_shipping_charge_cents integer not null default 0
+  check (default_shipping_charge_cents >= 0);
+
+alter table public.business_settings
+  add column if not exists income_tax_reserve_basis_points integer not null default 3000
+  check (income_tax_reserve_basis_points between 0 and 6000);
+
+-- Actual Stripe settlement details stay private and keep tax/accounting totals honest.
+alter table public.payments
+  add column if not exists stripe_fee_cents integer check (stripe_fee_cents is null or stripe_fee_cents >= 0),
+  add column if not exists stripe_net_cents integer check (stripe_net_cents is null or stripe_net_cents >= 0),
+  add column if not exists stripe_balance_transaction_id text;
+
 -- Phase 6.40: one-time completed-order review invitation.
 alter table public.custom_requests
   add column if not exists review_request_sent_at timestamptz;
 
+alter table public.custom_requests
+  add column if not exists review_request_token uuid not null default gen_random_uuid();
+
+create unique index if not exists custom_requests_review_request_token_unique
+  on public.custom_requests(review_request_token);
+
 comment on column public.custom_requests.review_request_sent_at is
   'When the one-time customer review invitation was successfully claimed and sent after this order was marked completed.';
+
+comment on column public.custom_requests.review_request_token is
+  'Private customer review-link credential. It pre-fills the completed order review without exposing an order id.';
 -- Safe to run if the Phase 4 payment columns already exist.
 
 -- Base payment summary fields expected by the latest admin/account UI.

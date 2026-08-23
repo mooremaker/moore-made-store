@@ -39,5 +39,5 @@ export function ReorderRequestButton({ requestId }: { requestId: string }) {
     }
   }
 
-  return <div className="accountReorderAction"><button className="btn secondary" type="button" disabled={busy} onClick={reorder}>{busy ? "Copying to cart…" : "Reorder with changes"}</button>{error ? <small role="alert">{error}</small> : null}</div>;
+  return <div className="accountReorderAction"><button className="btn secondary" type="button" disabled={busy} onClick={reorder}>{busy ? "Copying to cart…" : "Reorder at original price"}</button>{error ? <small role="alert">{error}</small> : null}</div>;
 }
