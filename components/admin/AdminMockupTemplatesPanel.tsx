@@ -27,7 +27,7 @@ export function AdminMockupTemplatesPanel() {
   const [colorName, setColorName] = useState(product?.colors[0]?.name ?? "Default");
   const [templates, setTemplates] = useState<ProductMockupTemplateRecord[]>([]);
   const [settings, setSettings] = useState<CatalogMockupSettings>(() => product ? defaultCatalogMockupSettings(product) : {
-    productX: 50, productY: 50, productScale: 1, productRotation: 0, logoX: 50, logoY: 50, logoWidth: 30, logoRotation: 0,
+    ...defaultCatalogMockupSettings(products[0]!), productX: 50, productY: 50, productScale: 1, productRotation: 0, logoX: 50, logoY: 50, logoWidth: 30, logoRotation: 0,
   });
   const [selectedLayer, setSelectedLayer] = useState<Layer>("logo");
   const [loading, setLoading] = useState(true);
@@ -175,6 +175,14 @@ export function AdminMockupTemplatesPanel() {
           <select value={product.slug} onChange={(event) => setProductKey(event.target.value)}>
             {products.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}
           </select>
+        </label>
+        <label className="field">
+          <span>Customer mockup</span>
+          <select value={settings.designEngine.mockupType} onChange={(event) => patch({ designEngine: { ...settings.designEngine, mockupType: event.target.value as "2d" | "3d" } })}>
+            <option value="2d">2D blank</option>
+            {settings.designEngine.allowedMockupTypes.includes("3d") ? <option value="3d">3D interactive</option> : null}
+          </select>
+          <small>{settings.designEngine.allowedMockupTypes.includes("3d") ? "Uses the starter 3D model until a production GLB is assigned." : "This product stays on the existing 2D renderer."}</small>
         </label>
         <label className="field">
           <span>Preview color</span>

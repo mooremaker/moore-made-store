@@ -36,15 +36,22 @@ type SendEmailInput = {
   subject: string;
   html: string;
   replyTo?: string;
+  attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
 };
 
 export async function sendMooreMadeEmail(input: SendEmailInput) {
   const resend = getResend();
   const from = process.env.MOORE_MADE_FROM_EMAIL;
+  const adminEmail = process.env.MOORE_MADE_ADMIN_EMAIL?.trim();
 
   if (!resend || !from) {
     return { ok: false as const, skipped: true as const, error: "Email is not configured." };
   }
+
+  const recipients = (Array.isArray(input.to) ? input.to : [input.to]).map((email) => email.trim().toLowerCase());
+  // Keep the owner's inbox as the complete, searchable record of what customers receive.
+  // Do not BCC when the owner is already a direct recipient.
+  const bcc = adminEmail && !recipients.includes(adminEmail.toLowerCase()) ? [adminEmail] : undefined;
 
   const { data, error } = await resend.emails.send({
     from,
@@ -52,6 +59,8 @@ export async function sendMooreMadeEmail(input: SendEmailInput) {
     subject: input.subject,
     html: input.html,
     replyTo: input.replyTo,
+    attachments: input.attachments,
+    bcc,
   });
 
   if (error) {

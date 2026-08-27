@@ -93,6 +93,7 @@ function lockedNumber(lock: Record<string, unknown> | null | undefined, key: str
 }
 
 export function QuoteBuilder({ requestId, requestNumber, product, quantity, existingQuote, discountCodes = [], requestedDiscountCode = null, amountPaidCents = 0, orderItems = [], printSides = null, customerIdeas = [], delivery = null, shippingAddress = null, pricingProfiles = [], businessSettings = null, customerEmail = null, reorderPriceLock = null }: Props) {
+  const welcomeDiscount = discountCodes.find((code) => normalizeDiscountCode(code.code) === "MOOREMADE15" && code.active && !code.retired_at) || null;
   const router = useRouter();
   const normalizedDelivery = String(delivery || "").trim().toLowerCase();
   const fulfillmentMode = normalizedDelivery.includes("ship") ? "shipping" : normalizedDelivery.includes("delivery") ? "delivery" : normalizedDelivery.includes("pickup") ? "pickup" : "";
@@ -225,7 +226,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const [taxLocation, setTaxLocation] = useState<string>("");
   const [calculatingTax, setCalculatingTax] = useState(false);
   const [manualDiscount, setManualDiscount] = useState(dollars(existingQuote?.manual_discount_cents ?? existingQuote?.discount_cents ?? (isReorderPriceLocked ? lockedNumber(reorderPriceLock, "manualDiscountCents") : 0)));
-  const [discountCode, setDiscountCode] = useState(existingQuote?.applied_discount_code || (isReorderPriceLocked ? String(reorderPriceLock?.discountCode || "") : requestedDiscountCode) || "");
+  const [discountCode, setDiscountCode] = useState(existingQuote?.applied_discount_code || (isReorderPriceLocked ? String(reorderPriceLock?.discountCode || "") : welcomeDiscount?.code || requestedDiscountCode) || "");
   const [supplyCost, setSupplyCost] = useState(existingQuote ? dollars(existingQuote.internal_supply_cost_cents) : dollars(pricingDefaults.supply));
   const [supplierCostRows, setSupplierCostRows] = useState<SupplierCostRow[]>(defaultSupplierRows);
   const [printCost, setPrintCost] = useState(existingQuote ? dollars(existingQuote.internal_print_cost_cents) : dollars(pricingDefaults.print));
@@ -262,7 +263,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const [importingMockups, setImportingMockups] = useState(false);
   const [mockupImportChecked, setMockupImportChecked] = useState(false);
   const [hasSavedMockup, setHasSavedMockup] = useState(Boolean(existingQuote?.mockup_snapshot));
-  const [useSavedMockup, setUseSavedMockup] = useState(Boolean(existingQuote?.mockup_snapshot) || !existingQuote);
+  // Portal-created mockups are placement references; final uploaded proof files are opt-in.
+  const [useSavedMockup, setUseSavedMockup] = useState(Boolean(existingQuote?.mockup_snapshot));
   const [mockupCustomerDirections, setMockupCustomerDirections] = useState<string[]>([]);
   const [unplacedMockupArtwork, setUnplacedMockupArtwork] = useState<string[]>([]);
   const effectiveCustomerIdeas = Array.from(new Set([...customerIdeas, ...mockupCustomerDirections]));
@@ -428,7 +430,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
     });
 
     setError("");
-    setMessage("Recommended pricing applied. You can still adjust any line item before sending the quote.");
+    setMessage(`Suggested price applied to the customer line items. The quote is now approximately ${money(recommendedRevenue)} before sales tax; you can still fine-tune any item price.`);
   }
 
   function updateLine(index: number, field: keyof EditableLine, value: string) {
@@ -781,6 +783,9 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       setMessage(result.message || (action === "send" ? "Proof and quote sent." : "Draft saved."));
       if (approvedQuote && revisionMode && action === "send") setRevisionMode(false);
       router.refresh();
+      // The payment panel lives outside this client editor. Reload after a send so
+      // it cannot keep displaying the pre-send quote total from its old props.
+      if (action === "send") window.setTimeout(() => window.location.reload(), 120);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save proof and quote.");
     } finally {
@@ -899,19 +904,22 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           </section>
 
           <section className="proofBuilderSection">
-            <div className="proofBuilderHeading"><div><span className="eyebrow">Quote setup</span><h5>Build the customer quote</h5><p>Work through the five steps below. Customer prices remain exactly as you enter them; private costs are used only to help Moore Made check profit.</p></div></div>
+            <div className="proofBuilderHeading"><div><span className="eyebrow">Quote setup</span><h5>Build the customer quote</h5><p>Start with the suggested price, check your private costs, then handle tax and send. Customers only see the finished quote—not your costs or profit.</p></div></div>
 
             <div className="quoteAdminGuide" aria-label="Quote setup steps">
-              <div><span>1</span><strong>Set customer price</strong></div>
-              <div><span>2</span><strong>Check cost & profit</strong></div>
-              <div><span>3</span><strong>Handle tax & discounts</strong></div>
-              <div><span>4</span><strong>Choose payment terms</strong></div>
-              <div><span>5</span><strong>Review & send</strong></div>
+              <div><span>1</span><strong>Set the price</strong></div>
+              <div><span>2</span><strong>Check private costs</strong></div>
+              <div><span>3</span><strong>Tax & discount</strong></div>
+              <div><span>4</span><strong>Send for approval</strong></div>
             </div>
 
-            <div className="manualQuoteNotice">
-              <div><span>Step 1 · Customer price</span><strong>What should the customer pay?</strong><small>New quotes start at the profitable safeguarded price. You can still override it unless this is a completed-order reorder.</small></div>
-              {!locked && !isReorderPriceLocked ? <button className="btn quoteApplySuggestedPrice" type="button" onClick={applyRecommendedPricing}>Use suggested customer price</button> : null}
+            <div className="manualQuoteNotice quotePriceStart">
+              <div><span>Step 1 · Customer price</span><strong>Start with a price, then adjust if you want</strong><small>The suggested price uses the private costs and your profit safeguard. Applying it updates the shirt prices below—saving a draft alone does not.</small></div>
+              <div className="quotePriceStartNumbers">
+                <span>Suggested total before tax<strong>{money(recommendedRevenue)}</strong></span>
+                <span>Current total before tax<strong>{money(revenueBeforeTax)}</strong></span>
+              </div>
+              {!locked && !isReorderPriceLocked ? <button className="btn quoteApplySuggestedPrice" type="button" onClick={applyRecommendedPricing}>Apply suggested price · {money(recommendedRevenue)}</button> : null}
             </div>
 
             {isReorderPriceLocked ? <div className="reorderPriceLockNotice"><strong>Completed-order price lock</strong><span>Original item prices, setup, discounts, and payment terms are preserved. {fulfillmentChangedOnReorder ? "The fulfillment method changed, so shipping and tax must be recalculated." : "Original shipping is preserved; tax is recalculated from the current fulfillment details."}</span></div> : null}
@@ -964,10 +972,10 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
             </div>
 
             <div className="quoteDiscountEditor">
-              <div className="proofBuilderHeading"><div><span className="eyebrow">Optional discount</span><h5>Promo or family code</h5><p>Leave this blank unless the customer has a valid code. The dollar discount from Step 1 and a promo code can be combined.</p></div></div>
+              <div className="proofBuilderHeading"><div><span className="eyebrow">Customer appreciation</span><h5>Welcome discount</h5><p>{welcomeDiscount ? "Every new quote starts with the Moore Made New Customer Appreciation Discount. You can replace it only when a different promotion applies." : "Create the Moore Made welcome discount in Admin → Financials → Discounts to apply it automatically to every new quote."}</p></div></div>
               <div className="twoCol">
                 <label className="field"><span>Discount code <small>Optional</small></span><input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} list={`discount-codes-${requestId}`} placeholder="FAMILY10" disabled={locked || isReorderPriceLocked} /><datalist id={`discount-codes-${requestId}`}>{discountCodes.filter((code) => code.active && !code.retired_at).map((code) => <option value={code.code} key={code.id}>{code.description || code.code}</option>)}</datalist>{requestedDiscountCode && !existingQuote?.applied_discount_code ? <small className="fieldHelp">Customer entered: <strong>{requestedDiscountCode}</strong></small> : null}</label>
-                <div className="quoteDiscountPreview"><span>Promo discount</span><strong>{selectedDiscountCode ? `−${money(promoDiscount)}` : normalizedDiscountCode ? "Validated when saved" : money(0)}</strong><small>{selectedDiscountCode?.description || (normalizedDiscountCode ? "The server will verify status, dates, limits, and minimum order." : "No promo code applied")}</small></div>
+                <div className="quoteDiscountPreview"><span>{normalizedDiscountCode === "MOOREMADE15" ? "Welcome discount" : "Promo discount"}</span><strong>{selectedDiscountCode ? `−${money(promoDiscount)}` : normalizedDiscountCode ? "Validated when saved" : money(0)}</strong><small>{selectedDiscountCode?.description || (normalizedDiscountCode ? "The server will verify status, dates, limits, and minimum order." : "No promo code applied")}</small></div>
               </div>
             </div>
 
@@ -1056,11 +1064,10 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
                 </div>
 
                 <details className="quotePricingSuggestionDetails">
-                  <summary><span>Want help choosing the customer price?</span><small>Show the optional price suggestion</small></summary>
+                  <summary><span>Price calculation details</span><small>Optional private reference</small></summary>
                   <div className="quotePricingSuggestion">
-                    <div><span>Suggested customer total before tax</span><strong>{money(recommendedRevenue)}</strong><small>Based on {money(internalTotalCost)} entered cost and a {(targetMarginBasisPoints / 100).toFixed(0)}% target profit margin.</small></div>
                     <div><span>Suggested merchandise subtotal</span><strong>{money(recommendedLineSubtotal)}</strong><small>{setupFeeCents > 0 ? `The suggestion accounts for the ${money(setupFeeCents)} setup fee already entered.` : quotedPieceCount > 0 ? `About ${money(recommendedAverageUnitPrice)} per piece across ${quotedPieceCount} piece${quotedPieceCount === 1 ? "" : "s"}.` : "Add quantities to see a per-piece suggestion."}</small></div>
-                    <div className={recommendationGap > 0 ? "suggestionGapNeedsIncrease" : "suggestionGapHealthy"}><span>Your current price compared with the suggestion</span><strong>{recommendationGap === 0 ? "On target" : recommendationGap > 0 ? `${money(recommendationGap)} lower` : `${money(Math.abs(recommendationGap))} higher`}</strong><small>This does not change the quote unless you press the button below.</small></div>
+                    <div className={recommendationGap > 0 ? "suggestionGapNeedsIncrease" : "suggestionGapHealthy"}><span>Current price compared with suggestion</span><strong>{recommendationGap === 0 ? "On target" : recommendationGap > 0 ? `${money(recommendationGap)} lower` : `${money(Math.abs(recommendationGap))} higher`}</strong><small>Use the Apply suggested price button at the top to update the item rows.</small></div>
                   </div>
                 </details>
               </div>

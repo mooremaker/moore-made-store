@@ -291,7 +291,8 @@ export async function POST(request: Request) {
       ),
     });
     if (!customerEmail.ok) emailWarning = true;
-    else await recordCustomerEmailNotification({ requestId: created.id, recipientEmails: email, subject: `We received your Moore Made request ${reference}`, body: "Your custom request is saved. Please allow 1–2 business days for review. The next normal step is your mockup + personalized quote.", topic: "order", label: "Request confirmation email sent" });
+    await getSupabaseAdmin().from("notification_email_log").insert({ request_id: created.id, quote_id: null, notification_type: "order_received", recipient_email: email, subject: `We received your Moore Made request ${reference}`, status: customerEmail.ok ? "sent" : "failed", provider_message_id: customerEmail.id || null, error_message: customerEmail.ok ? null : customerEmail.error || "Email could not be sent.", created_by: null, sent_at: new Date().toISOString() });
+    if (customerEmail.ok) await recordCustomerEmailNotification({ requestId: created.id, recipientEmails: email, subject: `We received your Moore Made request ${reference}`, body: "Your custom request is saved. Please allow 1–2 business days for review. The next normal step is your mockup + personalized quote.", topic: "order", label: "Request confirmation email sent" });
 
     if (adminEmail) {
       const adminResult = await sendMooreMadeEmail({

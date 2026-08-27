@@ -2,6 +2,8 @@
 
 import type { ProductPreviewKind } from "@/lib/catalog";
 import type { CatalogMockupSettings } from "@/lib/mockup-template-types";
+import type { MockupVectorLayer } from "@/lib/mockup-types";
+import type { ArtworkImprovementRequest, PrintQuality } from "@/lib/design-engine/types";
 import type { StructuredOrderItem } from "@/lib/order-types";
 
 export const CUSTOM_REQUEST_CART_EVENT = "moore-made-request-cart-changed";
@@ -25,12 +27,18 @@ export type SavedCartFile = {
 export type CartArtworkView = {
   view: CartViewKey;
   enabled: boolean;
-  mode: "upload" | "idea";
+  mode: "upload" | "idea" | "text" | "drawing" | "mixed";
   placement: string;
   placementLabel: string;
   idea: string;
   details: string;
   backgroundRemovalRequested?: boolean;
+  artworkImprovementRequests?: ArtworkImprovementRequest[];
+  sourceWidthPx?: number;
+  sourceHeightPx?: number;
+  intendedWidthIn?: number;
+  intendedHeightIn?: number;
+  printQuality?: PrintQuality;
   file: File | null;
   savedFile?: SavedCartFile | null;
   x: number;
@@ -38,6 +46,7 @@ export type CartArtworkView = {
   width: number;
   height: number;
   rotation: number;
+  vectorLayers?: MockupVectorLayer[];
 };
 
 export type CustomRequestCartItem = {

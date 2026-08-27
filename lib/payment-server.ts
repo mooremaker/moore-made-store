@@ -223,6 +223,7 @@ export async function recordPaidCheckoutSession(session: Stripe.Checkout.Session
            </div>`
         ),
       });
+      await supabase.from("notification_email_log").insert({ request_id: requestId, quote_id: quoteId, notification_type: "payment_receipt", recipient_email: summary.request.email, subject: `Payment received — ${reference}`, status: customerReceiptEmail.ok ? "sent" : "failed", provider_message_id: customerReceiptEmail.id || null, error_message: customerReceiptEmail.ok ? null : customerReceiptEmail.error || "Email could not be sent.", created_by: null, sent_at: new Date().toISOString() });
       if (customerReceiptEmail.ok) await recordCustomerEmailNotification({ requestId, recipientEmails: summary.request.email, subject: `Payment received — ${reference}`, body: `Payment received: ${money(amountReceived)}. Paid to date: ${money(summary.amountPaidCents)}. Remaining balance: ${money(summary.remainingCents)}.`, topic: "payment", label: "Payment receipt email sent" });
     } catch (customerEmailError) {
       console.error("Stripe customer receipt email failed", customerEmailError);

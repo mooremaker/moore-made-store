@@ -6,7 +6,7 @@ import { money, type QuoteLineItem } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { recordCustomerEmailNotification } from "@/lib/message-server";
 
-const TYPES = ["quote_approval", "order_received", "payment_receipt", "production_update", "ready", "shipped", "general"] as const;
+const TYPES = ["quote_approval", "order_received", "reviewing", "payment_receipt", "production_update", "ready", "shipped", "general"] as const;
 type NotificationType = (typeof TYPES)[number];
 
 function text(value: unknown, max = 5000) {
@@ -162,6 +162,11 @@ export async function POST(request: Request) {
       htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, we received your <strong>${escapeHtml(order.product)}</strong> request <strong>${escapeHtml(reference)}</strong>.</p>
         <p style="line-height:1.7;margin:0 0 16px;">Moore Made will review the details and prepare your mockup + personalized quote. No payment is due until the proof and quote are ready for approval.</p>
         <p style="line-height:1.7;margin:0;color:#6b6b6b;">If we need clarification, we'll contact you.</p>`;
+    } else if (type === "reviewing") {
+      subject = `We’re reviewing your Moore Made order — ${reference}`;
+      title = "We have your order and are reviewing it.";
+      notificationSummary = "Your order is being reviewed. Moore Made will send the next update within 1–2 business days.";
+      htmlBody = `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(customerName)}, thank you for choosing Moore Made. We’re reviewing your <strong>${escapeHtml(order.product)}</strong> order <strong>${escapeHtml(reference)}</strong> now.</p><p style="line-height:1.7;margin:0 0 16px;">We’ll send your next update within <strong>1–2 business days</strong>. If we need sizes, names, artwork clarification, or another detail, we’ll reach out through your order messages.</p><p style="line-height:1.7;margin:0;">No payment is due until we send your complete proof and personalized quote for approval.</p>`;
     } else if (type === "payment_receipt") {
       if (!latestPayment) return NextResponse.json({ error: "There is no completed payment to resend a receipt for." }, { status: 409 });
       const receiptUrl = latestPayment.receipt_token ? `${publicSiteUrl()}/receipt/${latestPayment.receipt_token}` : "";

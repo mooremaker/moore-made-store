@@ -37,7 +37,7 @@ export function RequestStatusControl({ id, initialStatus, delivery, initialRevie
     } else {
       const body = await response.json().catch(() => ({}));
       if (body.reviewRequestSent) setReviewRequestSentAt(body.reviewRequestSentAt || new Date().toISOString());
-      setMessage(body.reviewRequestSent ? "Saved · review email sent" : "Saved");
+      setMessage(body.reviewRequestSent ? "Saved · review email sent" : body.reviewingEmailSent ? "Saved · customer update sent" : "Saved");
       router.refresh();
     }
     setSaving(false);

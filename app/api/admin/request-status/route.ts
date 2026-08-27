@@ -20,7 +20,7 @@ export async function PATCH(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: current, error: currentError } = await supabase
     .from("custom_requests")
-    .select("status,payment_status,request_number,customer_name,email,product,delivery,tracking_number,tracking_url,review_request_sent_at,review_request_token")
+    .select("status,payment_status,request_number,customer_name,email,product,delivery,tracking_number,tracking_url,reviewing_email_sent_at,review_request_sent_at,review_request_token")
     .eq("id", id)
     .single();
   if (currentError || !current) return NextResponse.json({ error: "Order not found." }, { status: 404 });
@@ -35,6 +35,23 @@ export async function PATCH(request: Request) {
   if (error) {
     console.error("Admin status update failed", error);
     return NextResponse.json({ error: "Could not update this request." }, { status: 500 });
+  }
+
+  const shouldSendReviewingEmail = status === "reviewing" && current.status !== "reviewing" && !current.reviewing_email_sent_at;
+  if (shouldSendReviewingEmail) {
+    const sentAt = new Date().toISOString();
+    const reference = formatRequestNumber(current.request_number);
+    const emailResult = await sendMooreMadeEmail({
+      to: current.email,
+      subject: `We’re reviewing your Moore Made order — ${reference}`,
+      replyTo: process.env.MOORE_MADE_ADMIN_EMAIL,
+      html: emailShell("We have your order and are reviewing it.", `<p style="font-size:16px;line-height:1.7;margin:0 0 14px;">Hi ${escapeHtml(current.customer_name)}, thank you for choosing Moore Made. We’re reviewing your <strong>${escapeHtml(current.product)}</strong> order <strong>${escapeHtml(reference)}</strong> now.</p><p style="line-height:1.7;margin:0 0 14px;">We’ll send your next update within <strong>1–2 business days</strong>. If we need sizes, names, artwork clarification, or another detail, we’ll reach out through your order messages.</p><p style="line-height:1.7;margin:0;">No payment is due until we send your complete proof and personalized quote for approval.</p>`),
+    });
+    await getSupabaseAdmin().from("notification_email_log").insert({ request_id: id, quote_id: null, notification_type: "reviewing", recipient_email: current.email, subject: `We’re reviewing your Moore Made order — ${reference}`, status: emailResult.ok ? "sent" : "failed", provider_message_id: emailResult.id || null, error_message: emailResult.ok ? null : emailResult.error || "Email could not be sent.", created_by: auth.user.id, sent_at: sentAt });
+    if (emailResult.ok) {
+      await getSupabaseAdmin().from("custom_requests").update({ reviewing_email_sent_at: sentAt }).eq("id", id).is("reviewing_email_sent_at", null);
+      await recordCustomerEmailNotification({ requestId: id, recipientEmails: current.email, subject: `We’re reviewing your Moore Made order — ${reference}`, body: "Your order is being reviewed. Moore Made will send the next update within 1–2 business days.", topic: "order", label: "Order reviewing email sent" });
+    }
   }
 
   const shouldSendReviewRequest = status === "completed" && current.status !== "completed" && !current.review_request_sent_at;
@@ -93,5 +110,5 @@ export async function PATCH(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, reviewRequestSent: false });
+  return NextResponse.json({ ok: true, reviewRequestSent: false, reviewingEmailSent: shouldSendReviewingEmail });
 }

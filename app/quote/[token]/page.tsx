@@ -235,7 +235,7 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>{quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? "Estimated sales tax" : "Sales tax"}</span><strong>{money(quote.tax_cents)}</strong></div> : null}
-            {quote.discount_cents ? <div><span>{quote.applied_discount_code ? `Discount (${quote.applied_discount_code})` : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>{quote.applied_discount_code === "MOOREMADE15" ? "Moore Made New Customer Appreciation Discount (15%)" : quote.applied_discount_code ? `Discount (${quote.applied_discount_code})` : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="publicQuoteGrandTotal"><span>{quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? "Estimated approval total" : "Total"}</span><strong>{money(quote.total_cents)}</strong></div>
           </div>
           {quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? <p className="fieldHelp">Automatic sales tax is estimated from the current pickup, delivery, or shipping details. Moore Made checks it again immediately before payment. If only tax changes, the secure payment page shows the updated final total; product, quantity, artwork, or base-price changes still require a revised quote.</p> : null}

@@ -556,7 +556,7 @@ export async function POST(request: Request) {
       setupFeeCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">Setup fee</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(setupFeeCents))}</td></tr>` : "",
       shippingCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">${escapeHtml(fulfillmentChargeLabel)}</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(shippingCents))}</td></tr>` : "",
       taxCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">${taxMode === "automatic" ? "Estimated sales tax" : "Sales tax"}</td><td style="padding:6px 0;text-align:right;font-weight:700;">${escapeHtml(money(taxCents))}</td></tr>` : "",
-      finalDiscountCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">Discount</td><td style="padding:6px 0;text-align:right;font-weight:700;">−${escapeHtml(money(finalDiscountCents))}</td></tr>` : "",
+      finalDiscountCents ? `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#6b6b6b;">${normalizedCode === "MOOREMADE15" ? "Moore Made New Customer Appreciation Discount (15%)" : "Discount"}</td><td style="padding:6px 0;text-align:right;font-weight:700;">−${escapeHtml(money(finalDiscountCents))}</td></tr>` : "",
     ].join("");
 
     const proofSummary = proofItems.map((item, index) => {
@@ -669,6 +669,7 @@ export async function POST(request: Request) {
     }
 
     await supabase.from("custom_requests").update({ status: "quote_sent" }).eq("id", requestId);
+    await supabase.from("notification_email_log").insert({ request_id: requestId, quote_id: quote.id, notification_type: "quote_approval", recipient_email: customerRequest.email, subject: `${needsNewRevision ? "Updated Moore Made proof + quote" : "Your Moore Made proof + quote is ready"} — ${reference}`, status: "sent", provider_message_id: emailResult.id || null, error_message: null, created_by: auth.user.id, sent_at: now });
     await recordCustomerEmailNotification({
       requestId,
       recipientEmails: customerRequest.email,

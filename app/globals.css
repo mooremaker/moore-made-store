@@ -223,7 +223,12 @@ p { line-height: 1.65; }
 .pageHero { padding: 60px 0 26px; }
 .empty { text-align: center; padding: 70px 24px; border: 1px dashed #bbb3a9; border-radius: 18px; background: rgba(255,255,255,.5); }
 .siteFooter { border-top: 1px solid var(--border); margin-top: 60px; padding: 38px 0 50px; color: var(--muted); }
-.footerInner { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.footerInner { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.footerBrand { display: grid; gap: 2px; }
+.footerBrand strong { color: var(--text); }
+.footerBrand a { width: fit-content; margin-top: 4px; }
+.footerLegal { display: flex; align-items: center; justify-content: flex-end; gap: 10px; text-align: right; white-space: nowrap; }
+@media (max-width: 680px) { .footerInner { align-items: flex-start; flex-direction: column; } .footerLegal { justify-content: flex-start; text-align: left; white-space: normal; flex-wrap: wrap; } }
 @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .productGrid { grid-template-columns: repeat(2,1fr); } .grid { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .headerInner { align-items: flex-start; padding: 16px 0; flex-direction: column; } .nav { margin-left: 0; gap: 12px 16px; } .hero { padding-top: 52px; } .productGrid { grid-template-columns: 1fr; } .twoCol { grid-template-columns: 1fr; } }
 
@@ -6998,6 +7003,12 @@ p { line-height: 1.65; }
 .mockupCustomerDirection.isDisabled { opacity: .65; }
 .mockupArtworkRequired { display:grid; gap:4px; padding:11px 12px; border:1px solid #a65347; border-radius:12px; background:#fff3f0; color:#6f2d25; }
 .mockupArtworkRequired strong { font-size:.8rem; }
+.adminMockupStatus { display:grid; gap:3px; margin:0 0 10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:.82rem; }
+.adminMockupStatus strong { font-size:.86rem; }
+.adminMockupStatus span { color:var(--muted); line-height:1.4; }
+.adminMockupStatus.isComplete { border-color:#b9d4bd; background:#f3f9f3; }
+.adminMockupStatus.isAttention { border-color:#e2c98e; background:#fff8e8; }
+.adminMockupStatus.isMissing { border-color:#dfc1ba; background:#fff4f1; }
 .mockupArtworkRequired span,.mockupArtworkRequired small { font-size:.72rem; line-height:1.4; }
 .mockupArtworkRequired small { color:#754840; }
 .mockupCustomerIdeaLayer { position: absolute; z-index: 4; display: grid; gap: 2px; place-items: center; min-width: 90px; min-height: 52px; padding: 8px; border: 2px dashed #765f47; border-radius: 8px; background: rgba(247,245,240,.9); text-align: center; pointer-events: none; }
@@ -7193,6 +7204,27 @@ p { line-height: 1.65; }
 .requestFinalDetails{align-items:start}
 @media(max-width:900px){.internalCostGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.profitabilityCard{grid-template-columns:repeat(2,minmax(0,1fr))}.discountCodeSummary{grid-template-columns:1fr}.discountCodeActions{justify-content:flex-start}}
 @media(max-width:640px){.internalCostGrid,.laborCostEditor,.profitabilityCard{grid-template-columns:1fr}.quoteRevisionList>div{grid-template-columns:1fr}.discountCodeStats{grid-template-columns:1fr 1fr}.discountFormFooter{align-items:stretch;flex-direction:column}.discountUsageHistory>div>div{grid-template-columns:1fr auto}.discountUsageHistory small{grid-column:1/-1;text-align:left}}
+
+/* Customer Design Studio — editable text and vector drawing */
+.customerDesignToolGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:4px}
+.customerDesignToolGrid>button,.customerDesignToolGrid>label{min-width:0;min-height:88px;padding:11px;border:1px solid #d2cec7;border-radius:14px;background:#fff;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"icon title" "icon help";column-gap:9px;align-content:center;text-align:left;color:var(--ink);font:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+.customerDesignToolGrid>button:hover,.customerDesignToolGrid>label:hover,.customerDesignToolGrid>.active{border-color:#655f58;background:#f9f7f3;box-shadow:inset 0 0 0 1px #655f58}
+.customerDesignToolGrid>button>span,.customerDesignToolGrid>label>span{grid-area:icon;width:34px;height:34px;border-radius:10px;background:#efebe4;display:grid;place-items:center;font-size:1.08rem;font-weight:900}
+.customerDesignToolGrid strong{grid-area:title;font-size:.8rem;line-height:1.15}.customerDesignToolGrid small{grid-area:help;color:var(--muted);font-size:.65rem;line-height:1.25}
+.customerTextEditor,.customerDrawingEditor{display:grid;gap:12px;padding:15px;border:1px solid #cfc7bb;border-radius:16px;background:#fbfaf7}
+.customerEditorHead{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.customerEditorHead>div{display:grid;gap:3px}.customerEditorHead span{color:var(--muted);font-size:.75rem}.customerEditorHead>button{border:0;background:transparent;color:#93453b;font:inherit;font-size:.72rem;font-weight:800;cursor:pointer}
+.customerTextOptions{display:grid;grid-template-columns:1.2fr .9fr .8fr;gap:9px}.customerColorInput>span:last-child{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#fff;display:flex;align-items:center;gap:8px;padding:6px 9px}.customerColorInput input{width:38px;height:30px;padding:0;border:0;background:transparent}.customerColorInput code{font-size:.72rem;color:var(--muted)}
+.customerDrawingTools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.customerDrawingTools label{display:flex;align-items:center;gap:7px;font-size:.72rem;font-weight:800}.customerDrawingTools input[type="color"]{width:38px;height:32px;padding:2px}.customerDrawingTools input[type="range"]{width:100px}.customerDrawingTools button{border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px 10px;font:inherit;font-size:.72rem;font-weight:800;cursor:pointer}.customerDrawingTools button:disabled{opacity:.45;cursor:not-allowed}
+.customerDrawingSurface{display:block;width:100%;aspect-ratio:5/3;border:1px solid #bdb8b0;border-radius:12px;background-color:#fff;background-image:linear-gradient(#f1eee9 1px,transparent 1px),linear-gradient(90deg,#f1eee9 1px,transparent 1px);background-size:30px 30px;touch-action:none;cursor:crosshair}
+.customerDrawingEditor>small{color:var(--muted);font-size:.72rem}
+.customerLayerPicker{display:flex;gap:7px;flex-wrap:wrap;padding:8px;border:1px solid #d6d1ca;border-radius:12px;background:#f7f5f1}.customerLayerPicker button{max-width:180px;border:1px solid transparent;border-radius:8px;background:transparent;padding:7px 10px;color:#555;font:inherit;font-size:.72rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.customerLayerPicker button.active{background:#222;color:#fff;border-color:#222}
+.customerArtworkLayer.customerVectorLayer{overflow:visible}.customerArtworkLayer.customerVectorLayer:not(.isSelected){outline:0}.customerArtworkLayer.customerVectorLayer.isSelected{outline:2px solid rgba(35,35,35,.9);outline-offset:3px}
+.customerTextArtwork{width:100%;height:100%;display:flex;align-items:center;justify-content:center;white-space:pre-wrap;overflow:hidden;line-height:1.02;font-size:clamp(9px,2.15vw,32px);word-break:break-word;text-shadow:0 1px 0 rgba(255,255,255,.14)}
+.customerVectorLayer.is-text .customerArtworkClip,.savedMockupVectorLayer.is-text,.mockupVectorLayer.is-text{overflow:visible}.customerDrawingArtwork{display:block;width:100%;height:100%;overflow:visible}
+.savedMockupVectorLayer,.mockupVectorLayer{position:absolute;pointer-events:none;transform-origin:center}.mockupVectorLayer .customerTextArtwork{font-size:clamp(8px,1.7vw,28px)}
+.mockupVectorSummary{display:grid;gap:8px;padding:12px;border:1px solid #cec8bf;border-radius:13px;background:#f7f5f1}.mockupVectorSummary>div{display:grid;gap:2px}.mockupVectorSummary span,.mockupVectorSummary small{color:var(--muted);font-size:.72rem}.mockupVectorSummary article{display:flex;justify-content:space-between;gap:10px;padding:8px 9px;border-radius:9px;background:#fff;border:1px solid #dedad4}.mockupVectorSummary article strong{font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mockupVectorSummary>button{border:1px solid #aaa39a;border-radius:9px;background:#fff;padding:8px 10px;font:inherit;font-size:.72rem;font-weight:850;cursor:pointer}
+@media(max-width:780px){.customerDesignToolGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.customerTextOptions{grid-template-columns:1fr 1fr}.customerTextOptions>*:last-child{grid-column:1/-1}.customerTextArtwork{font-size:clamp(8px,4vw,24px)}}
+@media(max-width:430px){.customerDesignToolGrid>button,.customerDesignToolGrid>label{min-height:78px;padding:9px}.customerDesignToolGrid>button>span,.customerDesignToolGrid>label>span{width:30px;height:30px}.customerTextOptions{grid-template-columns:1fr}.customerTextOptions>*:last-child{grid-column:auto}.customerEditorHead{align-items:stretch;flex-direction:column}.customerDrawingTools input[type="range"]{width:82px}}
 
 /* =========================================================
    Phase 6.26 — Admin-controlled Shop mockup defaults
@@ -7748,6 +7780,16 @@ p { line-height: 1.65; }
 .customerArtworkResizeHandle.handleNE { right:-10px; top:-10px; cursor:nesw-resize; }
 .customerArtworkResizeHandle.handleSW { left:-10px; bottom:-10px; cursor:nesw-resize; }
 .customerArtworkResizeHandle.handleSE { right:-10px; bottom:-10px; }
+.customerArtworkRotateHandle { position:absolute;z-index:13;left:50%;top:-37px;transform:translateX(-50%);display:grid;place-items:center;width:25px;height:25px;padding:0;border:2px solid #171717;border-radius:50%;background:#171717;color:#fff;font:900 15px/1 Arial,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.18);cursor:grab;touch-action:none; }
+.customerArtworkRotateHandle:active { cursor:grabbing; }
+.customerSimpleEditBar { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:#f8f6f2;color:#5b524a;font-size:.68rem;line-height:1.35; }
+.customerSimpleEditBar strong { color:var(--ink); }
+.customerSimpleEditBar .customerRotateQuickActions { display:flex;gap:5px;flex:0 0 auto; }
+.customerSimpleEditBar .customerRotateQuickActions button { min-width:38px;padding:7px 8px;border:1px solid #d7d0c7;border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-size:.59rem;font-weight:850;cursor:pointer; }
+.customerSimpleEditBar .customerRotateQuickActions button strong { display:none; }
+.customerEditorSideSwitch { position:absolute;left:50%;bottom:18px;z-index:20;display:flex;gap:4px;padding:5px;border:1px solid rgba(65,52,42,.12);border-radius:999px;background:rgba(255,255,255,.94);box-shadow:0 10px 30px rgba(32,25,18,.13);transform:translateX(-50%); }
+.customerEditorSideSwitch button { border:0;border-radius:999px;padding:10px 17px;background:transparent;color:#3d342e;font:inherit;font-weight:800;cursor:pointer; }
+.customerEditorSideSwitch button.active { background:#392e28;color:#fff; }
 .customerArtworkLayer.isEditable::after { inset:-7px; border-style:solid; border-color:rgba(35,35,35,.7); }
 
 .customerSmsConsent { justify-self:start; align-self:end; width:min(100%,420px); min-height:54px; padding:9px 12px; border:1.5px solid #cdbfae; background:#f6f1e8; color:var(--ink); cursor:pointer; }
@@ -8984,6 +9026,53 @@ p { line-height: 1.65; }
   line-height: 1.4;
 }
 .manualQuoteNotice .quoteApplySuggestedPrice { margin-top: 10px; }
+.quotePriceStart {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  border-color: #cbb8a5;
+  background: #fffaf3;
+}
+.quotePriceStart .quoteApplySuggestedPrice {
+  margin: 0;
+  min-width: 220px;
+}
+.quotePriceStartNumbers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(125px, 1fr));
+  gap: 7px;
+}
+.quotePriceStartNumbers > span {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #e1d7c9;
+  border-radius: 10px;
+  background: rgba(255,255,255,.76);
+  color: var(--muted);
+  font-size: .59rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+.quotePriceStartNumbers > span > strong {
+  color: var(--ink);
+  font-size: .98rem;
+  letter-spacing: 0;
+}
+
+/* Order worksheets — admin collection and customer-shareable roster */
+.adminOrderWorksheet { margin: 18px 0; padding: 18px; border: 1px solid #d9d0c5; border-radius: 16px; background: #faf8f4; }
+.adminOrderWorksheetHead { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+.adminOrderWorksheet h4 { margin:4px 0; font-size:1.05rem; }.adminOrderWorksheet p { margin:0; color:var(--muted); font-size:.78rem; line-height:1.5; }
+.worksheetEditorGrid { display:grid; grid-template-columns: minmax(180px,.55fr) minmax(0,1fr); gap:12px; margin:15px 0; }.worksheetEditorGrid textarea { min-height:72px; }
+.worksheetRosterCapacity { display:grid; grid-template-columns:minmax(0,1fr) 120px auto; align-items:end; gap:12px; margin:15px 0; padding:14px; border:1px solid #ded6cb; border-radius:12px; background:#f8f5ef; }.worksheetRosterCapacity>div { display:grid; gap:4px; }.worksheetRosterCapacity small { color:var(--muted); font-size:.76rem; }.worksheetRosterCapacity label { display:grid; gap:5px; font-size:.75rem; font-weight:700; }.worksheetRosterCapacity label span { color:var(--muted); }.worksheetRosterCapacity input { min-width:0; }
+.mockupReviewControl { display:grid; gap:13px; padding:18px; border:1px solid #ded6cb; border-radius:14px; background:#fffaf5; }.mockupReviewControl h5 { margin:3px 0 5px; font-size:1.05rem; }.mockupReviewControl p { margin:0; color:var(--muted); font-size:.86rem; line-height:1.5; }.mockupReviewFiles { display:flex; flex-wrap:wrap; gap:8px; }.mockupReviewFiles span { display:flex; gap:8px; align-items:center; padding:7px 9px; border:1px solid #ded6cb; border-radius:999px; background:#fff; font-size:.78rem; }.mockupReviewFiles button { border:0; background:transparent; font-size:1.05rem; cursor:pointer; }.mockupReviewActions { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; }.mockupReviewControl>small { color:var(--muted); font-size:.77rem; }
+.worksheetColumnList { display:grid; gap:7px; padding:12px; border:1px solid #ded6cb; border-radius:12px; background:#fff; }.worksheetColumnRow { display:grid; grid-template-columns:minmax(0,1fr) 125px auto; gap:9px; align-items:center; }.worksheetColumnRow label { font-size:.72rem; white-space:nowrap; }
+.worksheetImport { display:flex; align-items:center; gap:10px; margin:12px 0; }.worksheetImport small { color:var(--muted); font-size:.7rem; }.worksheetRowsPreview { padding:12px; border-radius:12px; background:#f3efe9; }.worksheetRowsPreview > strong { font-size:.8rem; }.worksheetRowsTable { display:grid; gap:5px; margin-top:8px; }.worksheetRowsTable > div { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:6px; padding:7px; border-radius:8px; background:#fff; font-size:.72rem; }.worksheetRowsTable small { display:block; color:var(--muted); font-size:.58rem; text-transform:uppercase; }.worksheetActions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }.worksheetActions > input { min-width:210px; flex:1; }
+.orderWorksheetPage { max-width:980px; padding-top:48px; padding-bottom:72px; }.orderWorksheetHero { padding:clamp(22px,5vw,48px); border-radius:22px 22px 0 0; background:#f2eee8; }.orderWorksheetHero h1 { margin:7px 0; }.orderWorksheetHero > p { margin:6px 0; }.orderWorksheetNote { margin-top:18px; padding:12px 14px; border-left:4px solid #5d473a; background:rgba(255,255,255,.72); font-size:.82rem; line-height:1.45; }.orderWorksheetCard { padding:clamp(16px,4vw,30px); border:1px solid #ded6cb; border-top:0; border-radius:0 0 22px 22px; background:#fff; }.orderWorksheetTools { display:flex; justify-content:flex-end; gap:8px; margin-bottom:16px; }.orderWorksheetTable { overflow-x:auto; border:1px solid #ded6cb; border-radius:12px; margin-bottom:12px; }.orderWorksheetTableHead,.orderWorksheetTableRow { min-width:640px; display:grid; grid-template-columns:repeat(var(--worksheet-columns,4),minmax(130px,1fr)) 38px; gap:7px; align-items:center; padding:9px; }.orderWorksheetTableHead { background:#f4f0ea; font-size:.72rem; }.orderWorksheetTableRow { border-top:1px solid #eee8df; }.orderWorksheetTableRow input { min-width:0; }.worksheetBulkAdd { display:flex; align-items:end; gap:10px; margin:2px 0 14px; }.worksheetBulkAdd label { display:grid; gap:5px; color:var(--muted); font-size:.76rem; font-weight:700; }.worksheetBulkAdd input { width:92px; min-height:42px; }.worksheetAddOne { border:0; background:transparent; padding:12px 4px; color:var(--ink); font-weight:700; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }.orderWorksheetFinish { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-top:22px; padding:15px; border-radius:13px; background:#f5f1eb; }.orderWorksheetFinish div { display:grid; gap:4px; }.orderWorksheetFinish span { color:var(--muted); font-size:.75rem; }.worksheetPhotoUpload { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-top:14px; padding:14px; border:1px dashed #bdb2a5; border-radius:13px; background:#fffaf3; }.worksheetPhotoUpload div { display:grid; gap:3px; }.worksheetPhotoUpload span { color:var(--muted); font-size:.74rem; }
 .outsourcedCostQuickEntry {
   display: grid;
   grid-template-columns: minmax(220px, 340px) minmax(0, 1fr);
@@ -9043,6 +9132,18 @@ p { line-height: 1.65; }
 }
 
 @media (max-width: 720px) {
+  .adminOrderWorksheetHead,.orderWorksheetFinish,.worksheetPhotoUpload,.worksheetRosterCapacity { display:grid; }.worksheetRosterCapacity,.mockupReviewActions { grid-template-columns:1fr; }.worksheetBulkAdd { align-items:end; flex-wrap:wrap; }.worksheetEditorGrid { grid-template-columns:1fr; }.worksheetColumnRow { grid-template-columns:1fr auto; }.worksheetColumnRow .textButton { grid-column:1 / -1; justify-self:start; }.worksheetImport { display:grid; align-items:start; }.worksheetActions { display:grid; }.worksheetActions > input { min-width:0; }.orderWorksheetTools { justify-content:stretch; }.orderWorksheetTools > * { flex:1; }.orderWorksheetPage { padding-top:20px; }
+  .quotePriceStart {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .quotePriceStart .quoteApplySuggestedPrice {
+    width: 100%;
+    min-width: 0;
+  }
+  .quotePriceStartNumbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .outsourcedCostQuickEntry {
     grid-template-columns: 1fr;
     align-items: stretch;
@@ -9774,3 +9875,36 @@ p { line-height: 1.65; }
 .giftPage,.giftReceiptPage{min-height:100vh;padding:clamp(20px,5vw,64px) 16px;background:radial-gradient(circle at 82% 7%,#ead7c3,transparent 30%),#f4f1ec;color:#201a16}.giftPageShell{width:min(780px,100%);margin:0 auto}.giftHeader{padding:clamp(26px,6vw,52px);border-radius:26px 26px 0 0;background:linear-gradient(145deg,#251b17,#54372a);color:#fff;text-align:center}.giftBrand{display:grid;gap:3px}.giftBrand strong{font-size:18px;letter-spacing:.08em}.giftBrand small{color:inherit;font-size:11px;opacity:.72}.giftBadge,.giftSuccess>span,.giftThankYou>span{display:inline-flex;margin-top:24px;padding:6px 9px;border-radius:999px;background:#efd7b8;color:#573822;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.giftHeader h1{margin:13px 0 10px;color:#fff;font-size:clamp(34px,7vw,58px);line-height:1.02;letter-spacing:-.04em}.giftHeader>p{max-width:610px;margin:0 auto;color:#e6dcd2;font-size:16px;line-height:1.6}.giftTrust{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:#d9d0c5;border-inline:1px solid #d9d0c5}.giftTrust article{display:grid;gap:5px;padding:16px;background:#fff}.giftTrust strong{font-size:12px}.giftTrust span{color:#6a625b;font-size:10px;line-height:1.4}.giftForm{display:grid;gap:16px;padding:clamp(22px,5vw,42px);border:1px solid #d9d0c5;border-top:0;background:#fff}.giftFormIntro span{color:#416b4d;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.giftFormIntro h2{margin:6px 0 5px;font-size:clamp(23px,4vw,31px)}.giftFormIntro p{margin:0;color:#6a625b;font-size:12px}.giftFormGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.giftForm label:not(.giftAcknowledgement){display:grid;gap:6px;font-size:12px;font-weight:850}.giftForm label small{color:#777;font-weight:500}.giftForm input,.giftForm textarea{width:100%;min-height:46px;padding:11px 12px;border:1px solid #cfc7bd;border-radius:11px;background:#fff;font:inherit;box-sizing:border-box}.giftForm textarea{resize:vertical}.giftAmount{display:grid;grid-template-columns:34px 1fr;align-items:center;border:1px solid #cfc7bd;border-radius:11px;overflow:hidden}.giftAmount b{text-align:center;color:#6a625b}.giftAmount input{border:0;border-left:1px solid #e0d9d1;border-radius:0}.giftAcknowledgement{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:10px;padding:15px;border:1px solid #d7c28f;border-radius:12px;background:#fff9e9;color:#55452d;font-size:12px;line-height:1.5}.giftAcknowledgement input{width:18px;min-height:18px;margin-top:2px}.giftAcknowledgement span{display:grid;gap:4px}.giftSubmit{min-height:49px;border:0;border-radius:999px;background:#171512;color:#fff;font:inherit;font-weight:900;cursor:pointer}.giftSubmit:disabled{opacity:.6}.giftFormFinePrint{margin:0;color:#777;font-size:10px;text-align:center}.giftHoneypot{position:absolute!important;left:-9999px!important}.giftLegal{padding:20px 24px;border:1px solid #d9d0c5;border-top:0;border-radius:0 0 26px 26px;background:#faf7f2}.giftLegal p{margin:6px 0 0;color:#675e55;font-size:11px;line-height:1.55}.giftSuccess,.giftThankYou{padding:clamp(38px,8vw,70px);border-radius:24px;background:#fff;text-align:center}.giftSuccess h2,.giftThankYou h1{margin:12px 0}.giftSuccess p,.giftThankYou p{color:#675e55;line-height:1.6}.giftThankYou a{display:inline-flex;margin-top:12px;padding:12px 18px;border-radius:999px;background:#171512;color:#fff;font-weight:900;text-decoration:none}
 .giftReceipt{width:min(760px,100%);margin:0 auto;padding:40px;border:1px solid #d9d0c5;border-radius:18px;background:#fff;box-sizing:border-box}.giftReceipt header{display:flex;justify-content:space-between;align-items:start;padding-bottom:20px;border-bottom:1px solid #e5dfd7}.giftReceipt header>span{padding:6px 10px;border-radius:999px;background:#e5f2e8;color:#2d633c;font-size:11px;font-weight:900;text-transform:uppercase}.giftReceiptTitle{padding:28px 0}.giftReceiptTitle p{margin:0;color:#745037;font-size:10px;font-weight:900;letter-spacing:.1em}.giftReceiptTitle h1{margin:7px 0 0}.giftReceipt dl{display:grid;margin:0;border:1px solid #e0d9d0;border-radius:13px;overflow:hidden}.giftReceipt dl>div{display:grid;grid-template-columns:160px 1fr;gap:15px;padding:13px 15px}.giftReceipt dl>div+div{border-top:1px solid #eae4dd}.giftReceipt dt{color:#70675f;font-size:11px}.giftReceipt dd{display:grid;gap:3px;margin:0;font-weight:850}.giftReceipt dd small{color:#777;font-weight:400}.giftReceiptId{font-family:monospace;font-size:11px;overflow-wrap:anywhere}.giftReceipt section{margin-top:22px;padding:16px;border-radius:12px;background:#faf7f2;font-size:12px;line-height:1.55}.giftReceipt section p{margin:7px 0 0}.giftReceipt footer{display:grid;gap:3px;margin-top:25px;color:#70675f;font-size:11px}.supportGiftLedger{display:grid;gap:12px;padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff}.supportGiftLedger .financeTableHead p{margin:3px 0 0;color:var(--muted);font-size:10px}.supportGiftRows{display:grid;gap:8px}.supportGiftRow{display:grid;grid-template-columns:minmax(180px,1.3fr) repeat(3,minmax(105px,.65fr));gap:10px;padding:13px;border:1px solid #ddd6cd;border-radius:12px;background:#faf8f5}.supportGiftRow>div{display:grid;align-content:start;gap:3px}.supportGiftRow>div>span{color:#6c645c;font-size:9px}.supportGiftRow>div>strong{font-size:13px}.supportGiftDonor a{font-size:10px;color:#5a4335}.supportGiftDonor small{color:#777;font-size:9px}.supportGiftRow details{grid-column:1/-1;padding-top:8px;border-top:1px solid #e2dbd3;font-size:10px}.supportGiftRow summary{cursor:pointer;font-weight:850}.supportGiftRow details p{margin:7px 0 0;line-height:1.45}
 @media(max-width:700px){.supportGiftCheckoutCta{align-items:stretch;flex-direction:column}.supportGiftCheckoutCta a{text-align:center}.giftTrust,.giftFormGrid{grid-template-columns:1fr}.giftReceipt{padding:24px 18px}.giftReceipt dl>div{grid-template-columns:1fr;gap:4px}.supportGiftRow{grid-template-columns:1fr 1fr}.supportGiftDonor{grid-column:1/-1}.supportGiftRow details{grid-column:1/-1}}@media print{.giftReceiptPage{padding:0;background:#fff}.giftReceipt{border:0}.giftReceiptPage header,.giftReceiptPage footer{display:flex}}
+.starterGarment3d{position:relative;min-height:520px;border-radius:28px;overflow:hidden;background:#f4f0e9;border:1px solid rgba(65,52,42,.12)}
+.starterGarment3dCanvas{width:100%;height:520px;touch-action:pan-y;cursor:default}
+.starterGarment3d.isRotateEnabled .starterGarment3dCanvas{touch-action:none;cursor:grab}
+.starterGarment3d.isDragging .starterGarment3dCanvas{cursor:grabbing}
+.starterGarment3dControls{position:absolute;left:18px;right:18px;bottom:18px;display:flex;justify-content:space-between;gap:12px;pointer-events:none}
+.starterGarment3dControls>div,.starterGarment3dControls>button{pointer-events:auto;background:rgba(255,255,255,.92);box-shadow:0 10px 30px rgba(32,25,18,.13);border-radius:999px;padding:5px;border:1px solid rgba(65,52,42,.12)}
+.starterGarment3dControls button{border:0;background:transparent;border-radius:999px;padding:10px 16px;font:inherit;font-weight:800;color:#3d342e;cursor:pointer}
+.starterGarment3dControls button.active{background:#392e28;color:white}
+.starterGarment3dBadge{position:absolute;left:18px;top:18px;border-radius:999px;background:rgba(57,46,40,.88);color:white;padding:7px 11px;font-size:.72rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.starterGarment3dEditHint{position:absolute;right:18px;top:18px;border-radius:999px;background:rgba(255,255,255,.92);color:#554941;padding:7px 11px;font-size:.68rem;font-weight:800;box-shadow:0 5px 18px rgba(32,25,18,.08)}
+@media(max-width:720px){.starterGarment3d,.starterGarment3dCanvas{min-height:430px;height:430px}.starterGarment3dControls{left:10px;right:10px;bottom:10px}.starterGarment3dControls button{padding:9px 11px;font-size:.78rem}}
+.customerPreviewModeSwitch{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:166px;padding:5px;border:1px solid #d8cfc4;border-radius:999px;background:#f7f4ef}.customerPreviewModeSwitch button{min-width:0;border:0;border-radius:999px;padding:8px 12px;background:transparent;color:#675d55;font:inherit;font-size:11px;font-weight:900;cursor:pointer}.customerPreviewModeSwitch button.active{background:#332923;color:#fff}.customerPrintQuality{display:grid;gap:4px;margin-top:12px;padding:13px 15px;border:1px solid #cfd9ce;border-radius:13px;background:#f6fbf6}.customerPrintQuality strong{color:#2f633c;font-size:13px}.customerPrintQuality span{color:#5f695f;font-size:10px;line-height:1.45}.customerPrintQuality.is-fair{border-color:#dfc57a;background:#fff9e9}.customerPrintQuality.is-fair strong{color:#76580e}.customerPrintQuality.is-poor{border-color:#d9a09a;background:#fff4f2}.customerArtworkRequests{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}.customerArtworkRequests>div{grid-column:1/-1;display:grid;gap:3px}.customerArtworkRequests>div>span{color:#6c645c;font-size:10px}.customerArtworkRequests label{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:8px;padding:11px;border:1px solid #ddd4c9;border-radius:11px;background:#fff;cursor:pointer}.customerArtworkRequests label.isChecked{border-color:#75977c;background:#f2f8f3}.customerArtworkRequests label input{margin-top:3px}.customerArtworkRequests label span{display:grid;gap:3px}.customerArtworkRequests label strong{font-size:11px}.customerArtworkRequests label small{color:#6c645c;font-size:9px}.customerDrawingToolChoices{display:flex;gap:6px;flex-wrap:wrap}.customerDrawingToolChoices button{padding:8px 13px;border:1px solid #d7cec3;border-radius:999px;background:#fff;font:inherit;font-size:11px;font-weight:900;cursor:pointer}.customerDrawingToolChoices button.active{border-color:#382d27;background:#382d27;color:#fff}.customerDrawingSurface.is-eraser{cursor:cell}.customerPlacementPreset{margin-top:12px}.customerEditorHead>div:last-child{display:flex;gap:6px}.customerEditorHead>div:last-child button{position:static}
+/* Keep the editable 2D mockup in the same visual shell as the 3D inspector. */
+.customerMockupStage { position:relative; min-height:520px; padding:18px; border-radius:28px; background:#f4f0e9; }
+.customerMockupStage .customerProductVisual { width:min(100%,620px); max-height:100%; transform:translateY(-14px); }
+.customerEditorSideSwitch { left:18px; bottom:18px; transform:none; }
+@media(max-width:720px){.customerPreviewToolbar{align-items:flex-start;flex-wrap:wrap}.customerPreviewModeSwitch{order:3;width:100%;display:grid;grid-template-columns:1fr 1fr}.customerArtworkRequests{grid-template-columns:1fr}.customerArtworkRequests>div{grid-column:1}.customerArtworkRequests label{min-height:60px}.customerMockupStage{min-height:430px;padding:10px;border-radius:0}.customerMockupStage .customerProductVisual{transform:translateY(-10px)}.customerEditorSideSwitch{left:10px;bottom:10px}.customerEditorSideSwitch button{padding:9px 11px;font-size:.78rem}}
+.adminProductionManifest{display:grid;gap:9px;padding:13px;border:1px solid #b8cfbd;border-radius:13px;background:#f4faf5}.adminProductionManifestHead{display:flex;align-items:start;justify-content:space-between;gap:10px}.adminProductionManifestHead>div{display:grid;gap:2px}.adminProductionManifestHead span{color:#607063;font-size:9px}.adminProductionManifestHead>b{padding:5px 7px;border-radius:999px;background:#315d3c;color:#fff;font-size:9px}.adminProductionFacts{display:grid;grid-template-columns:1fr 1fr;gap:5px}.adminProductionFacts>span{display:grid;gap:2px;padding:7px;border:1px solid #d5e1d7;border-radius:8px;background:#fff}.adminProductionFacts small{color:#68736a;font-size:8px}.adminProductionFacts strong{font-size:10px}.adminProductionLayer{display:grid;gap:7px;padding:9px;border:1px solid #d3ddd4;border-radius:9px;background:#fff}.adminProductionLayer>div{display:grid;gap:2px}.adminProductionLayer>div strong{font-size:10px}.adminProductionLayer>div span{color:#667068;font-size:8px;line-height:1.35}.adminProductionLayer ul{display:flex;gap:4px;flex-wrap:wrap;margin:0;padding:0;list-style:none}.adminProductionLayer li{padding:4px 6px;border-radius:999px;background:#fff2d7;color:#73530f;font-size:8px;font-weight:900}
+.customerColorDisclaimer{margin:9px 0 0;color:#716960;font-size:10px;line-height:1.45}
+.adminProductionLayer>a{width:max-content;color:#315d3c;font-size:9px;font-weight:900;text-decoration:underline}
+
+/* Paper worksheet: landscape grid with continuation pages. */
+.orderWorksheetPrintSheet{display:none}
+@media print{
+  @page{size:landscape;margin:.42in}
+  body{background:#fff!important;color:#111!important}
+  .siteHeader,.siteFooter,.orderWorksheetHero,.orderWorksheetCard{display:none!important}
+  .orderWorksheetPage{display:block!important;width:100%!important;max-width:none!important;padding:0!important;margin:0!important}
+  .orderWorksheetPrintSheet{display:block!important;font-family:Arial,Helvetica,sans-serif;color:#111}
+  .orderWorksheetPrintPage{break-after:page;page-break-after:always}.orderWorksheetPrintPage:last-child{break-after:auto;page-break-after:auto}
+  .orderWorksheetPrintPage header{display:flex;justify-content:space-between;align-items:end;padding:0 0 12px;border-bottom:3px solid #6f421b}.orderWorksheetPrintPage header>div{display:grid;gap:3px}.orderWorksheetPrintPage header span{color:#6f421b;font-size:9pt;font-weight:800;letter-spacing:.12em}.orderWorksheetPrintPage header strong{font-size:20pt;line-height:1.1}
+  .orderWorksheetPrintPage>p{margin:10px 0 14px;font-size:9pt}.orderWorksheetPrintPage table{width:100%;border-collapse:collapse;table-layout:fixed}.orderWorksheetPrintPage th{padding:8px 7px;border:1px solid #999;background:#e8e8e8;font-size:9pt;text-align:left}.orderWorksheetPrintPage th:first-child,.orderWorksheetPrintPage td:first-child{width:30px;text-align:center}.orderWorksheetPrintPage td{height:29px;padding:3px 7px;border:1px solid #b7b7b7;font-size:10pt}.orderWorksheetPrintPage tbody tr:nth-child(even) td{background:#fafafa}.orderWorksheetPrintPage footer{display:flex;justify-content:space-between;gap:16px;margin-top:10px;color:#555;font-size:8pt}.orderWorksheetPrintPage footer strong{white-space:nowrap;color:#333}
+}

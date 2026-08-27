@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type NotificationType = "order_received" | "payment_receipt" | "production_update" | "ready" | "shipped" | "general";
+type NotificationType = "order_received" | "reviewing" | "payment_receipt" | "production_update" | "ready" | "shipped" | "general";
 type LogRow = {
   id: string;
   notification_type: string;
@@ -24,6 +24,7 @@ type Props = {
 
 const LABELS: Record<NotificationType, string> = {
   order_received: "Order received confirmation",
+  reviewing: "Order is being reviewed",
   payment_receipt: "Payment receipt / confirmation",
   production_update: "Production update",
   ready: "Ready for pickup",
@@ -58,7 +59,7 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
   }), [isLocalDelivery]);
 
   const available = useMemo(() => {
-    const rows: NotificationType[] = ["order_received"];
+    const rows: NotificationType[] = ["order_received", "reviewing"];
     if (paymentStatus !== "unpaid") rows.push("payment_receipt");
     if (["in_production", "ready", "shipped", "completed"].includes(orderStatus)) rows.push("production_update");
     if (orderStatus === "ready" || (orderStatus === "completed" && !isShipping)) rows.push("ready");
@@ -126,12 +127,12 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
         {error ? <div className="formError">{error}</div> : null}
 
         <div className="notificationHistory">
-          <div className="notificationHistoryHead"><strong>Recent email history</strong><span>{requestNumber}</span></div>
+          <div className="notificationHistoryHead"><strong>Customer email activity</strong><span>{requestNumber}</span></div>
           {!logReady ? <div className="requestWarning">Run the Phase 6.29 Supabase migration to save resend history. Sending still works.</div> : null}
           {logs.length ? logs.slice(0, 12).map((row) => <div className="notificationHistoryRow" key={row.id}>
             <div><strong>{row.subject}</strong><span>{row.recipient_email} · {localDateTime(row.sent_at)}</span>{row.status === "failed" && row.error_message ? <small>{row.error_message}</small> : null}</div>
             <span className={row.status === "sent" ? "notificationSent" : "notificationFailed"}>{row.status === "sent" ? "Sent" : "Failed"}</span>
-          </div>) : <p className="muted">No notification resend history yet.</p>}
+          </div>) : <p className="muted">No customer emails have been recorded here yet.</p>}
         </div>
       </div> : null}
     </div>

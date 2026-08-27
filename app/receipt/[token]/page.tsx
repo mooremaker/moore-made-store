@@ -17,6 +17,7 @@ type ReceiptQuote = {
   shipping_cents: number;
   tax_cents: number;
   discount_cents: number;
+  applied_discount_code: string | null;
   subtotal_cents: number;
   total_cents: number;
   payment_terms: "full" | "deposit";
@@ -51,7 +52,7 @@ export default async function ReceiptPage({ params }: Props) {
 
   const [{ data: order }, { data: quoteData }, { data: paidRows }] = await Promise.all([
     supabase.from("custom_requests").select("request_number,customer_name,product,quantity,delivery").eq("id", payment.request_id).single(),
-    supabase.from("quotes").select("public_token,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents").eq("id", payment.quote_id).single(),
+    supabase.from("quotes").select("public_token,line_items,setup_fee_cents,shipping_cents,tax_cents,discount_cents,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents").eq("id", payment.quote_id).single(),
     supabase.from("payments").select("amount_cents,paid_at,status").eq("request_id", payment.request_id).eq("status", "paid"),
   ]);
   if (!order || !quoteData) notFound();
@@ -113,7 +114,7 @@ export default async function ReceiptPage({ params }: Props) {
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {receiptTaxCents ? <div><span>Sales tax</span><strong>{money(receiptTaxCents)}</strong></div> : null}
-            {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>{quote.applied_discount_code === "MOOREMADE15" ? "Moore Made New Customer Appreciation Discount (15%)" : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="receiptOrderGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
           </div>
           <div className="receiptTermsNote">
@@ -188,7 +189,7 @@ export default async function ReceiptPage({ params }: Props) {
             <div><span>Items subtotal</span><strong>{money(quote.subtotal_cents)}</strong></div>
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
-            {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>{quote.applied_discount_code === "MOOREMADE15" ? "Moore Made New Customer Appreciation Discount (15%)" : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             {receiptTaxCents ? <div><span>Sales tax</span><strong>{money(receiptTaxCents)}</strong></div> : null}
             <div className="receiptPrintGrandTotal"><span>Order total</span><strong>{money(totalCents)}</strong></div>
           </div>

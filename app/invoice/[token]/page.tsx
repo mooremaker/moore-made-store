@@ -22,6 +22,7 @@ type InvoiceQuote = {
   tax_mode: "automatic" | "manual" | "exempt";
   stripe_tax_transaction_id: string | null;
   discount_cents: number;
+  applied_discount_code: string | null;
   subtotal_cents: number;
   total_cents: number;
   payment_terms: "full" | "deposit";
@@ -51,7 +52,7 @@ export default async function InvoicePage({ params }: Props) {
   const { token } = await params;
   if (!token) notFound();
   const supabase = getSupabaseAdmin();
-  const { data: quoteData } = await supabase.from("quotes").select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_transaction_id,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,responded_at,sent_at,created_at").eq("public_token", token).maybeSingle();
+  const { data: quoteData } = await supabase.from("quotes").select("id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,stripe_tax_transaction_id,discount_cents,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,responded_at,sent_at,created_at").eq("public_token", token).maybeSingle();
   if (!quoteData || quoteData.status !== "approved") notFound();
   const quote = quoteData as unknown as InvoiceQuote;
   const [{ data: order }, { data: paymentData }] = await Promise.all([
@@ -101,7 +102,7 @@ export default async function InvoicePage({ params }: Props) {
             {quote.setup_fee_cents ? <div><span>Setup fee</span><strong>{money(quote.setup_fee_cents)}</strong></div> : null}
             {quote.shipping_cents ? <div><span>{fulfillmentChargeLabel}</span><strong>{money(quote.shipping_cents)}</strong></div> : null}
             {quote.tax_cents ? <div><span>{quote.tax_mode === "automatic" && !quote.stripe_tax_transaction_id ? "Estimated sales tax" : "Sales tax"}</span><strong>{money(quote.tax_cents)}</strong></div> : null}
-            {quote.discount_cents ? <div><span>Discount</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
+            {quote.discount_cents ? <div><span>{quote.applied_discount_code === "MOOREMADE15" ? "Moore Made New Customer Appreciation Discount (15%)" : "Discount"}</span><strong>−{money(quote.discount_cents)}</strong></div> : null}
             <div className="invoiceGrandTotal"><span>Invoice total</span><strong>{money(totalCents)}</strong></div>
           </div>
         </section>

@@ -14,6 +14,8 @@ import { paymentMethodLabel, receiptLabel } from "@/lib/finance-types";
 import { SavedMockupPreview } from "@/components/mockups/SavedMockupPreview";
 import { signMockupDocumentForDisplay } from "@/lib/mockup-display-server";
 import type { MockupDocument } from "@/lib/mockup-types";
+import { OrderWorksheetPublicPage } from "@/components/OrderWorksheetPublicPage";
+import { MockupApprovalPage } from "@/components/MockupApprovalPage";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -25,6 +27,7 @@ type QuoteRow = { id: string; request_id: string; public_token: string; status: 
 type ShowcaseRow = { id:string; product:string; rating:number; status:string; created_at:string; published_snapshot:unknown|null; updated_at:string; };
 type ReceiptRow = { id:string; request_id:string; amount_cents:number; payment_method:string; paid_at:string|null; created_at:string; receipt_number:number|null; receipt_token:string|null; receipt_order_number:number|null; receipt_payment_sequence:number|null; status:string; };
 type MockupProjectRow = { request_id:string; document:unknown; status:string; updated_at:string; };
+type OrderWorksheetRow = { request_id:string; public_token:string; title:string; is_open:boolean; completed_at:string|null; };
 type FinishedPhotoRow = { id:string; request_id:string; storage_path:string; original_filename:string; sort_order:number; created_at:string; };
 
 function dateLabel(value: string | null) {
@@ -33,10 +36,11 @@ function dateLabel(value: string | null) {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ admin?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ admin?: string; order?: string; panel?: string }> }) {
   const params = await searchParams;
   const user = await getCurrentUser();
-  if (!user) redirect("/account/login?next=/account");
+  const requestedAccountPath = `/account${params.order ? `?order=${encodeURIComponent(params.order)}${params.panel ? `&panel=${encodeURIComponent(params.panel)}` : ""}` : ""}`;
+  if (!user) redirect(`/account/login?next=${encodeURIComponent(requestedAccountPath)}`);
 
   await claimVerifiedGuestRecords(user);
   const supabase = await createSupabaseServerClient();
@@ -64,6 +68,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     : { data: [] as QuoteRow[] };
   const quotes = (quoteData ?? []) as QuoteRow[];
   const quoteByRequest = new Map(quotes.map((quote) => [quote.request_id, quote]));
+  const { data: worksheetData } = requestIds.length
+    ? await admin.from("order_worksheets").select("request_id,public_token,title,is_open,completed_at").in("request_id", requestIds)
+    : { data: [] as OrderWorksheetRow[] };
+  const worksheetByRequest = new Map(((worksheetData ?? []) as OrderWorksheetRow[]).map((worksheet) => [worksheet.request_id, worksheet]));
   const { data: paymentData } = requestIds.length
     ? await supabase.from("payments").select("id,request_id,amount_cents,payment_method,paid_at,created_at,receipt_number,receipt_token,receipt_order_number,receipt_payment_sequence,status").in("request_id", requestIds).eq("status", "paid").order("paid_at", { ascending: false })
     : { data: [] as ReceiptRow[] };
@@ -144,9 +152,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               const files = artworkLinks.get(request.id) ?? [];
               const receipts = receiptsByRequest.get(request.id) ?? [];
               const savedMockup = mockupsByRequest.get(request.id) ?? null;
+              const worksheet = worksheetByRequest.get(request.id) ?? null;
               const finishedPhotos = finishedPhotosByRequest.get(request.id) ?? [];
               return (
-                <details className="accountOrderCard" key={request.id}>
+                <details className="accountOrderCard" id={`order-${request.id}`} key={request.id} open={params.order === request.id ? true : undefined}>
                   <summary>
                     <div className="accountOrderMain"><strong>{formatRequestNumber(request.request_number)}</strong><span>{request.product}</span></div>
                     <div className="accountOrderMeta"><span className={`statusPill status-${request.status}`}>{request.status === "ready" && String(request.delivery || "").toLowerCase().includes("delivery") ? "Ready for delivery" : REQUEST_STATUS_LABELS[request.status]}</span><span>Qty {request.quantity}</span><span>{dateLabel(request.created_at)}</span></div>
@@ -162,6 +171,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     <div className="accountOrderActions">
                       {quote && ["sent","changes_requested","approved"].includes(quote.status) ? <Link className="btn" href={`/quote/${quote.public_token}`}>{quote.status === "approved" && request.payment_status !== "paid" ? "Open payment" : "Review proof + quote"}</Link> : null}
                       {quote?.status === "approved" ? <Link className="btn secondary" href={`/invoice/${quote.public_token}`} target="_blank">Invoice</Link> : null}
+                      {savedMockup ? <Link className="btn secondary" href={`/account?order=${request.id}&panel=mockups#mockup-${request.id}`}>View mockups</Link> : null}
+                      {worksheet ? <Link className="btn secondary" href={`/account?order=${request.id}&panel=roster#order-${request.id}`}>{worksheet.is_open ? "Open roster" : "View roster"}</Link> : null}
                       <Link className="btn secondary" href={`/account/messages?order=${request.id}`}>Message Moore Made</Link>
                       {request.status === "completed" ? <ReorderRequestButton requestId={request.id} /> : null}
                       {role === "admin" && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
@@ -173,7 +184,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       {request.estimated_fulfillment_note ? <p>{request.estimated_fulfillment_note}</p> : null}
                       <small>{(request.delivery || "").toLowerCase().includes("ship") ? "Estimated only and not guaranteed. This is the date Moore Made expects to hand the package to the carrier, not a guaranteed delivery date. Carrier transit and delivery timing are outside Moore Made’s control." : (request.delivery || "").toLowerCase().includes("delivery") ? "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for local delivery." : "Estimated only and not guaranteed. Moore Made will notify you again when the order is officially ready for pickup."}</small>
                     </div> : null}
-                    {savedMockup ? <SavedMockupPreview document={savedMockup} compact title="Your saved mockup" className="accountSavedMockup" /> : null}
+                    {params.order === request.id && params.panel === "approve" && worksheet ? <MockupApprovalPage token={worksheet.public_token} rosterHref={`/account?order=${request.id}&panel=roster#order-${request.id}`} embedded /> : null}
+                    {params.order === request.id && params.panel === "roster" && worksheet ? <OrderWorksheetPublicPage token={worksheet.public_token} embedded /> : null}
+                    {savedMockup ? <div id={`mockup-${request.id}`}><SavedMockupPreview document={savedMockup} compact title="Your saved mockup" className="accountSavedMockup" /></div> : null}
                     {finishedPhotos.length ? <div className="accountFinishedPhotos">
                       <div><strong>Finished product photos</strong><span>Your completed Moore Made order.</span></div>
                       <div className="accountFinishedPhotoGrid">{finishedPhotos.map((photo, index) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt={`Finished product photo ${index + 1}`} /><span>Photo {index + 1}</span></a>)}</div>

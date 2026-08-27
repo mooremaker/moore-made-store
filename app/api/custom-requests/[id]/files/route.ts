@@ -3,12 +3,24 @@ import type {
   MockupAssetBucket,
   MockupDocument,
   MockupLayer,
+  MockupVectorLayer,
   MockupView,
 } from "@/lib/mockup-types";
-import { expandMockupVariants, reconnectCustomerArtwork } from "@/lib/mockup-variants";
+import {
+  expandMockupVariants,
+  reconnectCustomerArtwork,
+} from "@/lib/mockup-variants";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getProduct } from "@/lib/catalog";
+import { buildDesignDocumentFromViews } from "@/lib/design-engine/legacy-adapter";
+import { defaultProductDesignConfiguration } from "@/lib/design-engine/product-config";
+import { calculatePrintQuality } from "@/lib/design-engine/quality";
+import type { ArtworkImprovementRequest } from "@/lib/design-engine/types";
 
-const ALLOWED_ASSET_BUCKETS = new Set<MockupAssetBucket>(["custom-request-files", "mockup-studio-files"]);
+const ALLOWED_ASSET_BUCKETS = new Set<MockupAssetBucket>([
+  "custom-request-files",
+  "mockup-studio-files",
+]);
 
 function text(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -16,10 +28,91 @@ function text(value: unknown, max = 500) {
 
 function finite(value: unknown, fallback: number, min: number, max: number) {
   const number = Number(value);
-  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+  return Number.isFinite(number)
+    ? Math.min(max, Math.max(min, number))
+    : fallback;
 }
 
-function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allowedPaths: string[]): MockupDocument | null {
+function safeColor(value: unknown, fallback = "#171717") {
+  const color = text(value, 24);
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
+}
+
+function sanitizeVectorLayer(
+  value: unknown,
+  fallbackId: string,
+  zIndex: number,
+): MockupVectorLayer | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const kind = row.kind === "text" || row.kind === "drawing" ? row.kind : null;
+  if (!kind) return null;
+  const base = {
+    id: text(row.id, 100) || fallbackId,
+    kind,
+    name:
+      text(row.name, 100) ||
+      (kind === "text" ? "Customer text" : "Customer drawing"),
+    x: finite(row.x, 50, -30, 130),
+    y: finite(row.y, 50, -30, 130),
+    width: finite(row.width, 30, 2, 120),
+    height: finite(row.height, 14, 2, 120),
+    rotation: finite(row.rotation, 0, -360, 360),
+    opacity: finite(row.opacity, 1, 0.05, 1),
+    zIndex: Math.max(0, Math.floor(finite(row.zIndex, zIndex, 0, 100))),
+  };
+  if (kind === "text") {
+    const fontWeight = Number(row.fontWeight);
+    return {
+      ...base,
+      kind,
+      text: text(row.text, 500),
+      fontFamily: text(row.fontFamily, 180) || "Arial, sans-serif",
+      fontLabel: text(row.fontLabel, 80) || "Arial",
+      fontWeight: fontWeight === 400 || fontWeight === 900 ? fontWeight : 700,
+      color: safeColor(row.color),
+      textAlign:
+        row.textAlign === "left" || row.textAlign === "right"
+          ? row.textAlign
+          : "center",
+      letterSpacingEm: finite(row.letterSpacingEm, 0, -0.1, 0.5),
+      fontSizePt: finite(row.fontSizePt, 36, 4, 1000),
+    };
+  }
+  const strokes = Array.isArray(row.strokes)
+    ? row.strokes
+        .slice(0, 250)
+        .map((rawStroke) => {
+          const stroke = (rawStroke || {}) as Record<string, unknown>;
+          const points = Array.isArray(stroke.points)
+            ? stroke.points.slice(0, 2500).map((rawPoint) => {
+                const point = (rawPoint || {}) as Record<string, unknown>;
+                return {
+                  x: finite(point.x, 0, 0, 1000),
+                  y: finite(point.y, 0, 0, 600),
+                };
+              })
+            : [];
+          return {
+            color: safeColor(stroke.color),
+            width: finite(stroke.width, 10, 1, 60),
+            tool: (stroke.tool === "marker" || stroke.tool === "eraser"
+              ? stroke.tool
+              : "pen") as "pen" | "marker" | "eraser",
+            opacity: finite(stroke.opacity, 1, 0.05, 1),
+            points,
+          };
+        })
+        .filter((stroke) => stroke.points.length > 1)
+    : [];
+  return { ...base, kind, strokes };
+}
+
+function sanitizeCustomerMockupDocument(
+  value: unknown,
+  requestId: string,
+  allowedPaths: string[],
+): MockupDocument | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   const rawViews = Array.isArray(raw.views) ? raw.views.slice(0, 120) : [];
@@ -29,49 +122,128 @@ function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allow
   const views: MockupView[] = rawViews.map((rawView, viewIndex) => {
     const view = (rawView || {}) as Record<string, unknown>;
     const id = text(view.id, 100) || `view-${viewIndex + 1}`;
-    const rawLayers = Array.isArray(view.layers) ? view.layers.slice(0, 12) : [];
-    const layers = rawLayers.map((rawLayer, layerIndex) => {
-      const layer = (rawLayer || {}) as Record<string, unknown>;
-      const rawAsset = layer.asset && typeof layer.asset === "object" ? layer.asset as Record<string, unknown> : {};
-      const path = text(rawAsset.path, 1000);
-      const bucket = text(rawAsset.bucket, 80) as MockupAssetBucket;
-      if (!path || !pathSet.has(path) || !path.startsWith(`${requestId}/`) || !ALLOWED_ASSET_BUCKETS.has(bucket)) return null;
-      return {
-        id: text(layer.id, 100) || `${id}-layer-${layerIndex + 1}`,
-        asset: {
-          path,
-          originalName: text(rawAsset.originalName, 300) || path.split("/").pop() || "Customer artwork",
-          bucket,
-        },
-        x: finite(layer.x, 50, -30, 130),
-        y: finite(layer.y, 50, -30, 130),
-        width: finite(layer.width, 30, 2, 120),
-        height: finite(layer.height, 14, 2, 120),
-        rotation: finite(layer.rotation, 0, -360, 360),
-        opacity: finite(layer.opacity, 1, 0.05, 1),
-        zIndex: Math.max(0, Math.floor(finite(layer.zIndex, layerIndex + 1, 0, 100))),
-      } satisfies MockupLayer;
-    }).filter(Boolean) as MockupLayer[];
+    const rawLayers = Array.isArray(view.layers)
+      ? view.layers.slice(0, 12)
+      : [];
+    const layers = rawLayers
+      .map((rawLayer, layerIndex) => {
+        const layer = (rawLayer || {}) as Record<string, unknown>;
+        const rawAsset =
+          layer.asset && typeof layer.asset === "object"
+            ? (layer.asset as Record<string, unknown>)
+            : {};
+        const path = text(rawAsset.path, 1000);
+        const bucket = text(rawAsset.bucket, 80) as MockupAssetBucket;
+        if (
+          !path ||
+          !pathSet.has(path) ||
+          !path.startsWith(`${requestId}/`) ||
+          !ALLOWED_ASSET_BUCKETS.has(bucket)
+        )
+          return null;
+        return {
+          id: text(layer.id, 100) || `${id}-layer-${layerIndex + 1}`,
+          asset: {
+            path,
+            originalName:
+              text(rawAsset.originalName, 300) ||
+              path.split("/").pop() ||
+              "Customer artwork",
+            bucket,
+          },
+          x: finite(layer.x, 50, -30, 130),
+          y: finite(layer.y, 50, -30, 130),
+          width: finite(layer.width, 30, 2, 120),
+          height: finite(layer.height, 14, 2, 120),
+          rotation: finite(layer.rotation, 0, -360, 360),
+          opacity: finite(layer.opacity, 1, 0.05, 1),
+          zIndex: Math.max(
+            0,
+            Math.floor(finite(layer.zIndex, layerIndex + 1, 0, 100)),
+          ),
+        } satisfies MockupLayer;
+      })
+      .filter(Boolean) as MockupLayer[];
+    const vectorLayers = Array.isArray(view.vectorLayers)
+      ? (view.vectorLayers
+          .slice(0, 20)
+          .map((layer, layerIndex) =>
+            sanitizeVectorLayer(
+              layer,
+              `${id}-vector-${layerIndex + 1}`,
+              layers.length + layerIndex + 1,
+            ),
+          )
+          .filter(Boolean) as MockupVectorLayer[])
+      : [];
 
-    const rawIntent = view.customerIntent && typeof view.customerIntent === "object" ? view.customerIntent as Record<string, unknown> : {};
+    const rawIntent =
+      view.customerIntent && typeof view.customerIntent === "object"
+        ? (view.customerIntent as Record<string, unknown>)
+        : {};
     const rawSource = text(rawIntent.source, 30);
-    const source = rawSource === "upload" || rawSource === "idea" ? rawSource : "example";
-    const rawTemplate = view.template && typeof view.template === "object" ? view.template as Record<string, unknown> : {};
+    const source =
+      rawSource === "upload" ||
+      rawSource === "idea" ||
+      rawSource === "text" ||
+      rawSource === "drawing" ||
+      rawSource === "mixed"
+        ? rawSource
+        : "example";
+    const rawTemplate =
+      view.template && typeof view.template === "object"
+        ? (view.template as Record<string, unknown>)
+        : {};
+    const requests = Array.isArray(rawIntent.artworkImprovementRequests)
+      ? rawIntent.artworkImprovementRequests
+          .filter(
+            (item): item is ArtworkImprovementRequest =>
+              item === "remove-background" ||
+              item === "improve-artwork" ||
+              item === "recreate-vectorize-if-appropriate",
+          )
+          .slice(0, 3)
+      : [];
+    const sourceWidthPx = finite(rawIntent.sourceWidthPx, 0, 0, 100000);
+    const sourceHeightPx = finite(rawIntent.sourceHeightPx, 0, 0, 100000);
+    const intendedWidthIn = finite(rawIntent.intendedWidthIn, 0, 0, 1000);
+    const intendedHeightIn = finite(rawIntent.intendedHeightIn, 0, 0, 1000);
 
     return {
       id,
       name: text(view.name, 100) || `View ${viewIndex + 1}`,
       base: null,
       layers,
+      vectorLayers,
       customerIntent: {
         enabled: Boolean(rawIntent.enabled),
         source,
         placement: text(rawIntent.placement, 100) || "custom",
         placementLabel: text(rawIntent.placementLabel, 160) || undefined,
-        idea: source === "idea" ? text(rawIntent.idea, 3000) || undefined : undefined,
+        idea:
+          source === "idea"
+            ? text(rawIntent.idea, 3000) || undefined
+            : undefined,
         details: text(rawIntent.details, 2000) || undefined,
-        artworkFileName: source === "upload" ? text(rawIntent.artworkFileName, 300) || undefined : undefined,
-        backgroundRemovalRequested: source === "upload" ? Boolean(rawIntent.backgroundRemovalRequested) : false,
+        artworkFileName:
+          source === "upload" || source === "mixed"
+            ? text(rawIntent.artworkFileName, 300) || undefined
+            : undefined,
+        backgroundRemovalRequested:
+          source === "upload" || source === "mixed"
+            ? Boolean(rawIntent.backgroundRemovalRequested)
+            : false,
+        artworkImprovementRequests: requests,
+        sourceWidthPx,
+        sourceHeightPx,
+        intendedWidthIn,
+        intendedHeightIn,
+        printQuality: calculatePrintQuality(
+          sourceWidthPx,
+          sourceHeightPx,
+          intendedWidthIn,
+          intendedHeightIn,
+        ),
         x: finite(rawIntent.x, 50, -30, 130),
         y: finite(rawIntent.y, 50, -30, 130),
         width: finite(rawIntent.width, 30, 2, 120),
@@ -89,35 +261,98 @@ function sanitizeCustomerMockupDocument(value: unknown, requestId: string, allow
     };
   });
 
-  return {
+  const document: MockupDocument = {
     version: 1,
     source: "customer",
     productSlug: text(raw.productSlug, 160) || null,
     productName: text(raw.productName, 300) || null,
     colorName: text(raw.colorName, 120) || null,
     previewKind: text(raw.previewKind, 80) || null,
-    activeViewId: text(raw.activeViewId, 100) || views.find((view) => view.customerIntent?.enabled)?.id || views[0]?.id || null,
+    activeViewId:
+      text(raw.activeViewId, 100) ||
+      views.find((view) => view.customerIntent?.enabled)?.id ||
+      views[0]?.id ||
+      null,
     views,
   };
+  const product = getProduct(document.productSlug || "");
+  if (product) {
+    const firstTemplate = views.find((view) => view.template)?.template;
+    document.designEngine = buildDesignDocumentFromViews(
+      product,
+      {
+        name: document.colorName || firstTemplate?.colorName || "Default",
+        value: firstTemplate?.colorValue || "#e6e0d8",
+      },
+      defaultProductDesignConfiguration(product),
+      views,
+    );
+    document.designDocuments = [document.designEngine];
+  } else {
+    const productSlugs = Array.from(
+      new Set(
+        views
+          .map((view) => view.template?.productSlug)
+          .filter((slug): slug is string => Boolean(slug)),
+      ),
+    );
+    document.designDocuments = productSlugs.flatMap((slug) => {
+      const groupedProduct = getProduct(slug);
+      if (!groupedProduct) return [];
+      const groupedViews = views.filter(
+        (view) => view.template?.productSlug === slug,
+      );
+      const firstTemplate = groupedViews[0]?.template;
+      return [
+        buildDesignDocumentFromViews(
+          groupedProduct,
+          {
+            name: firstTemplate?.colorName || "Default",
+            value: firstTemplate?.colorValue || "#e6e0d8",
+          },
+          defaultProductDesignConfiguration(groupedProduct),
+          groupedViews,
+        ),
+      ];
+    });
+    if (document.designDocuments.length === 1)
+      document.designEngine = document.designDocuments[0];
+  }
+  return document;
 }
 
-function mockupTableMissing(error: { message?: string; code?: string } | null | undefined) {
+function mockupTableMissing(
+  error: { message?: string; code?: string } | null | undefined,
+) {
   const message = (error?.message || "").toLowerCase();
-  return message.includes("mockup_projects") || error?.code === "42P01" || error?.code === "PGRST205";
+  return (
+    message.includes("mockup_projects") ||
+    error?.code === "42P01" ||
+    error?.code === "PGRST205"
+  );
 }
 
 export async function PATCH(
   request: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const submissionToken = typeof body.submissionToken === "string" ? body.submissionToken : "";
+    const submissionToken =
+      typeof body.submissionToken === "string" ? body.submissionToken : "";
     const paths: string[] = Array.isArray(body.paths)
-      ? body.paths.filter((path: unknown): path is string => typeof path === "string" && path.startsWith(`${id}/`)).slice(0, 20)
+      ? body.paths
+          .filter(
+            (path: unknown): path is string =>
+              typeof path === "string" && path.startsWith(`${id}/`),
+          )
+          .slice(0, 20)
       : [];
-    const expectedUploadCount = Math.max(0, Math.min(20, Math.floor(Number(body.expectedUploadCount) || 0)));
+    const expectedUploadCount = Math.max(
+      0,
+      Math.min(20, Math.floor(Number(body.expectedUploadCount) || 0)),
+    );
 
     if (!id || !submissionToken) {
       return NextResponse.json({ error: "Invalid request." }, { status: 400 });
@@ -132,15 +367,33 @@ export async function PATCH(
       .maybeSingle();
 
     if (orderError || !order) {
-      return NextResponse.json({ error: "Invalid or expired request link." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Invalid or expired request link." },
+        { status: 403 },
+      );
     }
 
     // A filename in the mockup is not an upload. Confirm every expected file
     // exists in storage before allowing it to become a customer-artwork view.
-    const { data: storedFiles, error: storedFilesError } = await supabase.storage.from("custom-request-files").list(id, { limit: 25 });
-    const storedPaths = new Set((storedFiles || []).map((file) => `${id}/${file.name}`));
-    if (storedFilesError || paths.length !== expectedUploadCount || paths.some((path) => !storedPaths.has(path))) {
-      return NextResponse.json({ error: "The artwork file did not finish uploading. It was not attached to the mockup or marked ready for quote. Please retry the upload or send the file directly to Moore Made." }, { status: 409 });
+    const { data: storedFiles, error: storedFilesError } =
+      await supabase.storage
+        .from("custom-request-files")
+        .list(id, { limit: 25 });
+    const storedPaths = new Set(
+      (storedFiles || []).map((file) => `${id}/${file.name}`),
+    );
+    if (
+      storedFilesError ||
+      paths.length !== expectedUploadCount ||
+      paths.some((path) => !storedPaths.has(path))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The artwork file did not finish uploading. It was not attached to the mockup or marked ready for quote. Please retry the upload or send the file directly to Moore Made.",
+        },
+        { status: 409 },
+      );
     }
 
     const { error: updateError } = await supabase
@@ -151,13 +404,23 @@ export async function PATCH(
 
     if (updateError) {
       console.error("Artwork path update failed", updateError);
-      return NextResponse.json({ error: "Could not attach artwork files." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Could not attach artwork files." },
+        { status: 500 },
+      );
     }
 
     let mockupWarning = false;
-    const sanitizedDocument = sanitizeCustomerMockupDocument(body.mockupDocument, id, paths);
+    const sanitizedDocument = sanitizeCustomerMockupDocument(
+      body.mockupDocument,
+      id,
+      paths,
+    );
     const document = sanitizedDocument
-      ? expandMockupVariants(reconnectCustomerArtwork(sanitizedDocument, paths), order.order_items)
+      ? expandMockupVariants(
+          reconnectCustomerArtwork(sanitizedDocument, paths),
+          order.order_items,
+        )
       : null;
     if (document) {
       const title = `MM-${String(order.request_number).padStart(6, "0")} · ${order.product}`;
@@ -173,7 +436,10 @@ export async function PATCH(
       } else if (existingError) {
         console.error("Customer mockup lookup failed", existingError);
         mockupWarning = true;
-      } else if (existing?.id && (existing.status !== "draft" || existing.created_by)) {
+      } else if (
+        existing?.id &&
+        (existing.status !== "draft" || existing.created_by)
+      ) {
         // Never let the original customer submission overwrite later admin work.
         mockupWarning = true;
       } else {
@@ -186,7 +452,11 @@ export async function PATCH(
           created_by: null,
         };
         const query = existing?.id
-          ? supabase.from("mockup_projects").update({ title, document, status: "draft" }).eq("id", existing.id).is("created_by", null)
+          ? supabase
+              .from("mockup_projects")
+              .update({ title, document, status: "draft" })
+              .eq("id", existing.id)
+              .is("created_by", null)
           : supabase.from("mockup_projects").insert(payload);
         const { error: saveError } = await query;
         if (saveError) {
@@ -199,6 +469,9 @@ export async function PATCH(
     return NextResponse.json({ ok: true, mockupWarning });
   } catch (error) {
     console.error("Artwork completion route error", error);
-    return NextResponse.json({ error: "Could not attach artwork files." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Could not attach artwork files." },
+      { status: 500 },
+    );
   }
 }

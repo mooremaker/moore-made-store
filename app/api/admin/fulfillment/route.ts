@@ -113,9 +113,11 @@ export async function POST(request: Request) {
     });
 
     if (!emailResult.ok) {
+      await supabase.from("notification_email_log").insert({ request_id: id, quote_id: null, notification_type: mode === "shipping" ? "shipped" : "ready", recipient_email: row.email, subject, status: "failed", provider_message_id: null, error_message: emailResult.error || "Email could not be sent.", created_by: auth.user.id, sent_at: new Date().toISOString() });
       return NextResponse.json({ error: "The order status was saved, but the customer email could not be sent. Fix the email issue and send this notification again.", saved: true }, { status: 502 });
     }
 
+    await supabase.from("notification_email_log").insert({ request_id: id, quote_id: null, notification_type: mode === "shipping" ? "shipped" : "ready", recipient_email: row.email, subject, status: "sent", provider_message_id: emailResult.id || null, error_message: null, created_by: auth.user.id, sent_at: new Date().toISOString() });
     await recordCustomerEmailNotification({ requestId: id, recipientEmails: row.email, subject, body: `${title}${trackingNumber ? ` Tracking: ${trackingNumber}.` : ""}${note ? ` ${note}` : ""}`, topic: "shipping", label: "Fulfillment email sent" });
 
     return NextResponse.json({ ok: true, status, delivery: deliveryLabel(mode) });

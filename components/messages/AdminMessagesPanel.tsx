@@ -7,7 +7,7 @@ import type { AdminMessageThread, AdminUserOption, MessageThreadStatus } from "@
 import { MESSAGE_STATUS_LABELS, MESSAGE_TOPIC_LABELS } from "@/lib/message-types";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 
-type Props = { threads: AdminMessageThread[]; adminUsers: AdminUserOption[]; currentAdminUserId: string };
+type Props = { threads: AdminMessageThread[]; adminUsers: AdminUserOption[]; currentAdminUserId: string; initialRequestId?: string | null };
 type InboxFilter = "unread" | "open" | "resolved" | "archived" | "all";
 
 function dateTime(value: string) {
@@ -19,7 +19,7 @@ function displayThreadSubject(subject: string) {
   return withoutRepeatedReference || subject;
 }
 
-export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: Props) {
+export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId, initialRequestId = null }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<InboxFilter>(threads.some((thread) => thread.adminUnreadCount > 0) ? "unread" : "open");
   const [query, setQuery] = useState("");
@@ -27,6 +27,15 @@ export function AdminMessagesPanel({ threads, adminUsers, currentAdminUserId }: 
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!initialRequestId) return;
+    const thread = threads.find((candidate) => candidate.requestId === initialRequestId);
+    if (thread) {
+      setFilter("all");
+      setSelectedId(thread.id);
+    }
+  }, [initialRequestId, threads]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();

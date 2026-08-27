@@ -76,8 +76,38 @@ export function reconnectCustomerArtwork(document: MockupDocument, artworkPaths:
   const usedPathIndexes = new Set<number>();
   let fallbackIndex = 0;
   const views = document.views.map((view) => {
-    if (view.layers.length || view.customerIntent?.source !== "upload") return view;
-    const fileName = view.customerIntent.artworkFileName || originalNameFromStoredPath(paths[Math.min(fallbackIndex, paths.length - 1)] || "");
+    const customerUploadedArtwork = view.customerIntent?.source === "upload" || view.customerIntent?.source === "mixed";
+    // A small number of early customer mockups saved the placement intent but
+    // not its source value. If that otherwise-empty view has an order upload,
+    // it is still safe to restore the customer artwork; never replace a view
+    // that already contains admin-created layers.
+    const incompleteLegacyCustomerView = Boolean(view.customerIntent?.enabled && view.layers.length === 0);
+    if (!customerUploadedArtwork && !incompleteLegacyCustomerView) return view;
+
+    // Some earlier customer mockups preserved the Storage path but omitted the
+    // bucket. The admin preview then signed the path from the Mockup Studio
+    // bucket, making the design appear blank even though its upload exists.
+    // The order's verified artwork paths are canonical for customer artwork.
+    const intentArtworkName = view.customerIntent?.artworkFileName || "";
+    const intentKey = normalizedFileKey(intentArtworkName);
+    const existingCustomerLayer = view.layers.find((layer) =>
+      paths.includes(layer.asset.path)
+      && (!intentKey || normalizedFileKey(layer.asset.path).includes(intentKey))
+    );
+    if (existingCustomerLayer) {
+      return {
+        ...view,
+        layers: view.layers.map((layer) => layer === existingCustomerLayer
+          ? { ...layer, asset: { ...layer.asset, bucket: "custom-request-files" as const } }
+          : layer
+        ),
+      };
+    }
+
+    // Leave admin-created artwork alone. If the only layers were stale customer
+    // references, rebuild them below from the verified order upload instead.
+    if (view.layers.length && !view.layers.every((layer) => paths.includes(layer.asset.path))) return view;
+    const fileName = view.customerIntent?.artworkFileName || originalNameFromStoredPath(paths[Math.min(fallbackIndex, paths.length - 1)] || "");
     const wanted = normalizedFileKey(fileName);
     const matchingIndex = wanted ? paths.findIndex((path, index) => !usedPathIndexes.has(index) && normalizedFileKey(path).includes(wanted)) : -1;
     while (fallbackIndex < paths.length && usedPathIndexes.has(fallbackIndex)) fallbackIndex += 1;
@@ -87,6 +117,7 @@ export function reconnectCustomerArtwork(document: MockupDocument, artworkPaths:
     fallbackIndex += 1;
     if (!path) return view;
     const intent = view.customerIntent;
+    if (!intent) return view;
     const layer: MockupLayer = {
       id: `${view.id}-recovered-customer-artwork`,
       asset: { path, originalName: fileName, bucket: "custom-request-files" },
@@ -107,7 +138,7 @@ export function reconnectCustomerArtwork(document: MockupDocument, artworkPaths:
 export function missingPreviewArtworkViews(document: MockupDocument): MockupView[] {
   return document.views.filter((view) => {
     const intent = view.customerIntent;
-    return Boolean(intent?.enabled && intent.source === "upload" && !view.layers.some((layer) => Boolean(layer.asset.path) && artworkCanPreview(layer.asset.originalName)));
+    return Boolean(intent?.enabled && (intent.source === "upload" || intent.source === "mixed") && intent.artworkFileName && !view.layers.some((layer) => Boolean(layer.asset.path) && artworkCanPreview(layer.asset.originalName)));
   });
 }
 
@@ -148,6 +179,7 @@ export function expandMockupVariants(document: MockupDocument, rawOrderItems: un
         id,
         name: `${item.productName} · ${item.colorName} · ${sideLabel}`,
         layers: source.layers.map((layer, index) => ({ ...layer, id: `${id}-layer-${index + 1}` })),
+        vectorLayers: (source.vectorLayers || []).map((layer, index) => ({ ...layer, id: `${id}-vector-${index + 1}` })),
         exportAsset: existing?.exportAsset || null,
         template: {
           ...source.template,

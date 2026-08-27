@@ -1,0 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { OrderWorksheetForm } from "@/components/OrderWorksheetForm";
+import type { OrderWorksheetColumn, OrderWorksheetRow } from "@/lib/order-worksheet-types";
+
+type Worksheet = { public_token:string; title:string; instructions:string|null; columns:OrderWorksheetColumn[]; rows:OrderWorksheetRow[]; is_open:boolean; order:{customer_name:string;product:string;request_number:number}|null };
+export function OrderWorksheetPublicPage({ token, embedded = false }: { token:string; embedded?:boolean }) { const [worksheet,setWorksheet]=useState<Worksheet|null>(null); const [error,setError]=useState(""); useEffect(()=>{void fetch(`/api/order-worksheet/${token}`).then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||"This worksheet link is unavailable.");setWorksheet(result.worksheet);}).catch((reason:unknown)=>setError(reason instanceof Error?reason.message:"This worksheet link is unavailable."));},[token]); const Wrap=embedded?"div":"main"; if(error)return <Wrap className={embedded?"orderWorksheetEmbedded":"shell orderWorksheetPage"}><section className="orderWorksheetCard"><h1>Worksheet unavailable</h1><p>{error}</p><p>Please message Moore Made so we can send a fresh link.</p></section></Wrap>; if(!worksheet)return <Wrap className={embedded?"orderWorksheetEmbedded":"shell orderWorksheetPage"}><section className="orderWorksheetCard"><p>Loading your order worksheet…</p></section></Wrap>; return <OrderWorksheetForm token={worksheet.public_token} title={worksheet.title} instructions={worksheet.instructions} columns={worksheet.columns} initialRows={worksheet.rows} isOpen={worksheet.is_open} order={worksheet.order}/>; }

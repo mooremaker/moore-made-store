@@ -50,7 +50,12 @@ p { line-height: 1.65; }
 .pageHero { padding: 60px 0 26px; }
 .empty { text-align: center; padding: 70px 24px; border: 1px dashed #bbb3a9; border-radius: 18px; background: rgba(255,255,255,.5); }
 .siteFooter { border-top: 1px solid var(--border); margin-top: 60px; padding: 38px 0 50px; color: var(--muted); }
-.footerInner { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.footerInner { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.footerBrand { display: grid; gap: 2px; }
+.footerBrand strong { color: var(--text); }
+.footerBrand a { width: fit-content; margin-top: 4px; }
+.footerLegal { display: flex; align-items: center; justify-content: flex-end; gap: 10px; text-align: right; white-space: nowrap; }
+@media (max-width: 680px) { .footerInner { align-items: flex-start; flex-direction: column; } .footerLegal { justify-content: flex-start; text-align: left; white-space: normal; flex-wrap: wrap; } }
 @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .productGrid { grid-template-columns: repeat(2,1fr); } .grid { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .headerInner { align-items: flex-start; padding: 16px 0; flex-direction: column; } .nav { margin-left: 0; gap: 12px 16px; } .hero { padding-top: 52px; } .productGrid { grid-template-columns: 1fr; } .twoCol { grid-template-columns: 1fr; } }
 
@@ -213,4 +218,3 @@ p { line-height: 1.65; }
     padding-inline: 6px;
   }
 }
-

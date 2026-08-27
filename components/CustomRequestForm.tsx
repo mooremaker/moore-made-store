@@ -154,10 +154,14 @@ export function CustomRequestForm({ initialName = "", initialEmail = "", initial
         const filesResponse = await fetch(`/api/custom-requests/${result.requestId}/files`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            submissionToken: result.submissionToken,
-            paths: uploadedPaths,
-          }),
+            body: JSON.stringify({
+              submissionToken: result.submissionToken,
+              paths: uploadedPaths,
+              // The server verifies every selected upload before it records
+              // artwork_paths. Without this count it treated any uploaded
+              // file as an incomplete upload and refused to attach it.
+              expectedUploadCount: files.length,
+            }),
         });
         if (!filesResponse.ok) uploadWarning = true;
       }

@@ -25,6 +25,8 @@ import { OrderNotificationControl } from "@/components/admin/OrderNotificationCo
 import { ArtworkRightsControl } from "@/components/admin/ArtworkRightsControl";
 import { FinishedProductPhotosManager } from "@/components/admin/FinishedProductPhotosManager";
 import { StripeTaxRecordingControl } from "@/components/admin/StripeTaxRecordingControl";
+import { OrderWorksheetControl } from "@/components/admin/OrderWorksheetControl";
+import { MockupReviewControl } from "@/components/admin/MockupReviewControl";
 import type { AdminMessageThread, AdminUserOption } from "@/lib/message-types";
 import type { BusinessExpenseRow, BusinessFinanceAuditRow, BusinessFundingRow, BusinessGoalRow, FinancialPaymentRow } from "@/lib/finance-types";
 import type { DiscountCodeRecord } from "@/lib/discount-types";
@@ -200,6 +202,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [openRequestId, setOpenRequestId] = useState<string | null>(null);
+  const [messageRequestId, setMessageRequestId] = useState<string | null>(null);
   const [showcaseFilter, setShowcaseFilter] = useState<ShowcaseFilter>("pending");
   const [openShowcaseId, setOpenShowcaseId] = useState<string | null>(null);
 
@@ -398,6 +401,9 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                       <button className="btn adminViewButton" type="button" onClick={() => setOpenRequestId(isOpen ? null : request.id)} aria-expanded={isOpen}>
                         {isOpen ? "Close details" : "View details"}
                       </button>
+                      <button className="btn secondary" type="button" onClick={() => { setMessageRequestId(request.id); setTab("messages"); }}>
+                        Message customer
+                      </button>
                       {request.is_admin_test_order && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
                   </div>
@@ -464,6 +470,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         <section className="adminDetailGroup adminDetailGroupWide">
                           <div className="adminDetailGroupTitle"><span>03</span><h4>Customer mockup & production breakdown</h4></div>
                           <AdminCustomerMockupSummary requestId={request.id} />
+                          <OrderWorksheetControl requestId={request.id} customerEmail={request.email} customerName={request.customer_name} product={request.product} />
                           {request.order_items?.length ? <ProductionChecklist requestNumber={formatRequestNumber(request.request_number)} customerName={request.customer_name} items={request.order_items} printSides={request.print_sides} /> : null}
                           <details className="adminTechnicalDetails">
                             <summary>Technical placement data</summary>
@@ -498,6 +505,11 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                       <section className="adminQuoteSection adminMockupSection">
                         <div className="adminDetailGroupTitle"><span>✦</span><h4>Mockup Studio</h4></div>
                         <MockupStudio requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} />
+                      </section>
+
+                      <section className="adminQuoteSection">
+                        <div className="adminDetailGroupTitle"><span>✦</span><h4>Mockup review</h4></div>
+                        <MockupReviewControl requestId={request.id} customerName={request.customer_name} customerEmail={request.email} />
                       </section>
 
                       <section className="adminQuoteSection">
@@ -567,7 +579,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
           </div>
         </section>
       ) : tab === "messages" ? (
-        messagesReady ? <AdminMessagesPanel threads={messageThreads} adminUsers={adminUsers} currentAdminUserId={currentAdminUserId} /> : <section className="adminWorkspacePanel"><div className="formError">Messages are not set up in Supabase yet. Run supabase/moore_made_phase5_messages.sql.</div></section>
+        messagesReady ? <AdminMessagesPanel threads={messageThreads} adminUsers={adminUsers} currentAdminUserId={currentAdminUserId} initialRequestId={messageRequestId} /> : <section className="adminWorkspacePanel"><div className="formError">Messages are not set up in Supabase yet. Run supabase/moore_made_phase5_messages.sql.</div></section>
       ) : tab === "support" ? (
         <AdminSupportGiftsPanel />
       ) : tab === "financials" ? (
