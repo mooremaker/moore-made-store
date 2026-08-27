@@ -104,7 +104,7 @@ export function PaymentPolicyGate({ token, proofVersion, policyReady, initialAcc
 
           <div className="paymentPolicyChecks">
             {FINAL_SALE_POLICY_ACKNOWLEDGMENTS.map((item) => (
-              <label key={item.key}>
+              <label className="paymentPolicyCheck" key={item.key}>
                 <input
                   type="checkbox"
                   checked={checks[item.key] || false}

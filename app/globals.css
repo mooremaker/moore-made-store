@@ -2216,6 +2216,67 @@ p { line-height: 1.65; }
 .paymentCheckoutAction { display: grid; gap: 10px; align-items: start; }
 .paymentCheckoutAction > span { color: var(--muted); font-size: .82rem; }
 .paymentCheckoutButton { width: fit-content; min-width: 230px; }
+.paymentPolicyGate { display: grid; gap: 16px; }
+.paymentPolicyCard {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+}
+.paymentPolicyHeader,
+.paymentPolicyAccepted,
+.paymentPolicyActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.paymentPolicyHeader h3 { margin: 4px 0 6px; }
+.paymentPolicyHeader p,
+.paymentPolicyNotice p,
+.paymentPolicyAccepted p { margin: 0; color: var(--muted); line-height: 1.6; }
+.paymentPolicyVersion {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 800;
+}
+.paymentPolicyNotice {
+  padding: 14px 16px;
+  border-left: 3px solid #75543d;
+  background: var(--paper);
+}
+.paymentPolicyChecks {
+  display: grid;
+  gap: 10px;
+}
+.paymentPolicyCheck {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
+  cursor: pointer;
+  line-height: 1.5;
+}
+.paymentPolicyCheck input {
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--ink);
+}
+.paymentPolicyCheck span { min-width: 0; }
+.paymentPolicyAccepted {
+  padding: 16px;
+  border: 1px solid #cfe0d2;
+  border-radius: 14px;
+  background: #eef4ef;
+}
+.paymentPolicyAccepted > div { display: grid; gap: 5px; }
 
 @media (max-width: 680px) {
   .paymentTermsOptions,
@@ -2224,6 +2285,11 @@ p { line-height: 1.65; }
   .publicPaymentTermsSummary { align-items: flex-start; flex-direction: column; }
   .publicPaymentTermsSummary > div { text-align: left; }
   .paymentCheckoutButton { width: 100%; }
+  .paymentPolicyCard { padding: 16px; }
+  .paymentPolicyHeader,
+  .paymentPolicyAccepted,
+  .paymentPolicyActions { flex-direction: column; }
+  .paymentPolicyActions .btn { width: 100%; }
 }
 
 /* Phase 4A: Cash App + manual payment recording */

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { emailShell, escapeHtml, sendMooreMadeEmail, siteUrl } from "@/lib/email";
+import { emailShell, escapeHtml, publicSiteUrl, sendMooreMadeEmail, siteUrl } from "@/lib/email";
 import { formatRequestNumber } from "@/lib/custom-request-types";
 import { money } from "@/lib/quote-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { recalculateOrderPayment } from "@/lib/payment-server";
+import { recordCustomerEmailNotification } from "@/lib/message-server";
 
 type RouteProps = { params: Promise<{ token: string }> };
 
@@ -153,6 +154,49 @@ export async function POST(request: Request, { params }: RouteProps) {
 
     if (response === "approved") {
       try { await recalculateOrderPayment(quote.request_id, quote.id); } catch (paymentError) { console.error("Revised quote payment recalculation failed", paymentError); }
+
+      // A quote can only move from "sent" to "approved" once, so this is a
+      // single, distinct payment request—not a duplicate on later page visits.
+      const reference = formatRequestNumber(requestRow.request_number);
+      const paymentEmailSubject = `Your quote is approved — payment needed · ${reference}`;
+      const paymentEmail = await sendMooreMadeEmail({
+        to: requestRow.email,
+        replyTo: process.env.MOORE_MADE_ADMIN_EMAIL,
+        subject: paymentEmailSubject,
+        html: emailShell(
+          "Your quote is approved — payment needed",
+          `<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Hi ${escapeHtml(requestRow.customer_name)}, thank you for approving your proof and personalized quote for <strong>${escapeHtml(reference)}</strong>.</p>
+           <div style="background:#eef4ef;border:1px solid #cfe0d2;border-radius:12px;padding:15px 16px;margin:0 0 18px;">
+             <strong style="display:block;margin:0 0 6px;">Next step: complete payment</strong>
+             <p style="line-height:1.65;margin:0;">Your approved total is <strong>${escapeHtml(money(quote.total_cents))}</strong>. Open your secure order page to review the final terms and complete payment when you are ready.</p>
+           </div>
+           <p style="line-height:1.7;margin:0 0 22px;">Production begins after payment is received. If you need to change fulfillment, shipping, or any order detail, reply to this email before paying so we can confirm an updated total first.</p>
+           <a href="${publicSiteUrl()}/quote/${encodeURIComponent(token)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;padding:13px 20px;border-radius:999px;font-weight:800;">Review terms &amp; complete payment</a>
+           <p style="font-size:13px;line-height:1.6;color:#6b6b6b;margin:18px 0 0;">This email follows your quote approval. No charge has been made yet.</p>`
+        ),
+      });
+      await supabase.from("notification_email_log").insert({
+        request_id: quote.request_id,
+        quote_id: quote.id,
+        notification_type: "payment_request",
+        recipient_email: requestRow.email,
+        subject: paymentEmailSubject,
+        status: paymentEmail.ok ? "sent" : "failed",
+        provider_message_id: paymentEmail.ok ? paymentEmail.id || null : null,
+        error_message: paymentEmail.ok ? null : paymentEmail.error || "Email could not be sent.",
+        created_by: null,
+        sent_at: new Date().toISOString(),
+      });
+      if (paymentEmail.ok) {
+        await recordCustomerEmailNotification({
+          requestId: quote.request_id,
+          recipientEmails: requestRow.email,
+          subject: paymentEmailSubject,
+          body: `Your quote was approved. Approved total: ${money(quote.total_cents)}. Payment is the next step; no charge has been made yet.`,
+          topic: "payment",
+          label: "Payment needed email sent",
+        });
+      }
     }
 
     const adminEmail = process.env.MOORE_MADE_ADMIN_EMAIL;
