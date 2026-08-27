@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeWorksheetColumns, normalizeWorksheetRows } from "@/lib/order-worksheet-types";
 import { CUSTOM_REQUEST_BUCKET } from "@/lib/supabase-admin";
+import { emailShell, escapeHtml, sendMooreMadeEmail } from "@/lib/email";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -16,17 +17,24 @@ export async function GET(_: Request, { params }: Params) {
 export async function POST(request: Request, { params }: Params) {
   const { token } = await params;
   const form = await request.formData(); const file = form.get("file");
-  if (!(file instanceof File) || !file.size) return NextResponse.json({ error: "Choose an image first." }, { status: 400 });
-  if (!file.type.startsWith("image/") || file.size > 12 * 1024 * 1024) return NextResponse.json({ error: "Upload a JPG, PNG, or other image under 12 MB." }, { status: 400 });
+  if (!(file instanceof File) || !file.size) return NextResponse.json({ error: "Choose a completed roster file first." }, { status: 400 });
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  const acceptedExtensions = new Set(["pdf", "csv", "txt", "xls", "xlsx", "doc", "docx", "jpg", "jpeg", "png", "webp", "heic", "heif"]);
+  const acceptedMimeTypes = new Set(["application/pdf", "text/csv", "text/plain", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
+  if ((file.type && !file.type.startsWith("image/") && !acceptedMimeTypes.has(file.type)) || !acceptedExtensions.has(extension) || file.size > 12 * 1024 * 1024) return NextResponse.json({ error: "Upload a PDF, spreadsheet, Word document, CSV, text file, or image under 12 MB." }, { status: 400 });
   const supabase = getSupabaseAdmin();
   const { data: worksheet } = await supabase.from("order_worksheets").select("id,is_open,submitted_file_paths").eq("public_token", token).single();
   if (!worksheet || !worksheet.is_open) return NextResponse.json({ error: "This worksheet is no longer accepting uploads." }, { status: 409 });
-  const extension = file.name.split(".").pop()?.replace(/[^a-z0-9]/gi, "") || "jpg";
-  const path = `order-worksheets/${worksheet.id}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 120) || `completed-roster.${extension}`;
+  const path = `order-worksheets/${worksheet.id}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
   const { error: uploadError } = await supabase.storage.from(CUSTOM_REQUEST_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
   if (uploadError) return NextResponse.json({ error: "Could not upload the worksheet image." }, { status: 500 });
   const previous = Array.isArray(worksheet.submitted_file_paths) ? worksheet.submitted_file_paths.filter((value): value is string => typeof value === "string") : [];
   await supabase.from("order_worksheets").update({ submitted_file_paths: [...previous, path] }).eq("id", worksheet.id);
+  const { data: order } = await supabase.from("order_worksheets").select("custom_requests(customer_name,product,request_number)").eq("id", worksheet.id).single();
+  const customerOrder = Array.isArray(order?.custom_requests) ? order.custom_requests[0] : order?.custom_requests;
+  const adminEmail = process.env.MOORE_MADE_ADMIN_EMAIL;
+  if (adminEmail) await sendMooreMadeEmail({ to: adminEmail, subject: `Completed roster uploaded${customerOrder?.request_number ? ` — MM-${String(customerOrder.request_number).padStart(6, "0")}` : ""}`, attachments: [{ filename: file.name, content: Buffer.from(await file.arrayBuffer()), contentType: file.type || undefined }], html: emailShell("Completed roster uploaded", `<p><strong>${escapeHtml(customerOrder?.customer_name || "A customer")}</strong> uploaded <strong>${escapeHtml(file.name)}</strong>${customerOrder?.product ? ` for ${escapeHtml(customerOrder.product)}` : ""}.</p><p>The uploaded file is attached to this email and saved with the order worksheet.</p>`) });
   return NextResponse.json({ ok: true, filename: file.name });
 }
 
