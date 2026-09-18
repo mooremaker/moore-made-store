@@ -69,7 +69,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const quotes = (quoteData ?? []) as QuoteRow[];
   const quoteByRequest = new Map(quotes.map((quote) => [quote.request_id, quote]));
   const { data: worksheetData } = requestIds.length
-    ? await admin.from("order_worksheets").select("request_id,public_token,title,is_open,completed_at").in("request_id", requestIds)
+    ? await admin.from("order_worksheets").select("request_id,public_token,title,is_open,completed_at").in("request_id", requestIds).eq("is_open", true)
     : { data: [] as OrderWorksheetRow[] };
   const worksheetByRequest = new Map(((worksheetData ?? []) as OrderWorksheetRow[]).map((worksheet) => [worksheet.request_id, worksheet]));
   const { data: paymentData } = requestIds.length

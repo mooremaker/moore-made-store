@@ -8,7 +8,7 @@ type Params = { params: Promise<{ token: string }> };
 
 export async function GET(_: Request, { params }: Params) {
   const { token } = await params;
-  const { data } = await getSupabaseAdmin().from("order_worksheets").select("id,request_id,public_token,title,instructions,columns,rows,submitted_file_paths,is_open,completed_at,updated_at,custom_requests(customer_name,product,request_number)").eq("public_token", token).single();
+  const { data } = await getSupabaseAdmin().from("order_worksheets").select("id,request_id,public_token,title,instructions,columns,rows,submitted_file_paths,is_open,completed_at,updated_at,custom_requests(customer_name,product,request_number)").eq("public_token", token).eq("is_open", true).single();
   if (!data) return NextResponse.json({ error: "This worksheet link is unavailable." }, { status: 404 });
   const order = Array.isArray(data.custom_requests) ? data.custom_requests[0] : data.custom_requests;
   return NextResponse.json({ worksheet: { ...data, columns: normalizeWorksheetColumns(data.columns), rows: normalizeWorksheetRows(data.rows, normalizeWorksheetColumns(data.columns)), order } });
