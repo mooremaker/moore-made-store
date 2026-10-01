@@ -20,6 +20,7 @@ import { AdminSupportGiftsPanel } from "@/components/admin/AdminSupportGiftsPane
 import { PaymentShareLinkControl } from "@/components/PaymentShareLinkControl";
 import { AdminCustomerMockupSummary } from "@/components/admin/AdminCustomerMockupSummary";
 import { AdminCustomerIdeasPanel } from "@/components/admin/AdminCustomerIdeasPanel";
+import { AdminOrderDetailsEditor } from "@/components/admin/AdminOrderDetailsEditor";
 import { ProductionChecklist } from "@/components/admin/ProductionChecklist";
 import { OrderNotificationControl } from "@/components/admin/OrderNotificationControl";
 import { ArtworkRightsControl } from "@/components/admin/ArtworkRightsControl";
@@ -457,6 +458,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                             <div><dt>Needed by</dt><dd>{prettyDate(request.deadline)}</dd></div>
                             <div><dt>Payment</dt><dd>{request.payment_status === "paid" ? `Paid in full · ${money(request.amount_paid_cents)}` : request.payment_status === "deposit_paid" ? `Deposit paid · ${money(request.amount_paid_cents)} paid` : "Payment due"}</dd></div>
                           </dl>
+                          <AdminOrderDetailsEditor key={`${request.id}:${request.sizes ?? ""}:${request.colors ?? ""}:${request.print_sides ?? ""}`} requestId={request.id} quantity={request.quantity} sizes={request.sizes} colors={request.colors} printSides={request.print_sides} placements={request.placements} status={request.status} paymentStatus={request.payment_status} quoteStatus={quote?.status ?? null} structuredItemCount={request.order_items?.length ?? 0} />
                           {request.order_items?.length ? <div className="adminStructuredOrder">
                             <span className="eyebrow">Structured items</span>
                             {request.order_items.map((item) => <div className="adminStructuredOrderRow" key={item.id}>
@@ -475,7 +477,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                           <details className="adminTechnicalDetails">
                             <summary>Technical placement data</summary>
                             <div className="adminLongFields">
-                              {request.sizes ? <div><span>Original size summary</span><pre className="adminScrollableText">{request.sizes}</pre></div> : null}
+                              {request.sizes ? <div><span>Current size summary</span><pre className="adminScrollableText">{request.sizes}</pre></div> : null}
                               {request.placements?.length ? <div><span>Placement codes</span><p>{request.placements.map(prettyPlacement).join(" · ")}</p></div> : null}
                               {request.logo_size ? <div><span>Preview sizing</span><p className="adminScrollableText">{request.logo_size}</p></div> : null}
                               {request.artwork_instructions ? <div><span>Saved preview coordinates</span><p className="adminScrollableText">{request.artwork_instructions}</p></div> : null}
