@@ -37,6 +37,7 @@ type SendEmailInput = {
   html: string;
   replyTo?: string;
   attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
+  idempotencyKey?: string;
 };
 
 export async function sendMooreMadeEmail(input: SendEmailInput) {
@@ -61,7 +62,7 @@ export async function sendMooreMadeEmail(input: SendEmailInput) {
     replyTo: input.replyTo,
     attachments: input.attachments,
     bcc,
-  });
+  }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);
 
   if (error) {
     console.error("Resend email failed", error);

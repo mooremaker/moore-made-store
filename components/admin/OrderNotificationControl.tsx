@@ -48,6 +48,7 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
   const [logReady, setLogReady] = useState(true);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState("");
+  const [reviewed, setReviewed] = useState(false);
   const [error, setError] = useState("");
 
   const fulfillmentValue = String(delivery || "").toLowerCase();
@@ -68,6 +69,8 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
     return rows;
   }, [orderStatus, paymentStatus, isShipping]);
 
+  useEffect(() => { setReviewed(false); }, [type, recipientEmails, customSubject, customMessage]);
+
   async function load() {
     try {
       const response = await fetch(`/api/admin/notifications?requestId=${encodeURIComponent(requestId)}`);
@@ -83,6 +86,14 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
 
   useEffect(() => { void load(); }, [requestId]);
   useEffect(() => { if (!available.includes(type)) setType(available[0]); }, [available, type]);
+
+  function followUp(row: LogRow) {
+    setType("general");
+    setRecipientEmails(row.recipient_email);
+    setCustomSubject(`Following up: ${row.subject}`.slice(0, 180));
+    setCustomMessage("Just checking in on our previous message. Let us know if you have any questions or need anything from us. Thank you!");
+    setMessage(""); setError("");
+  }
 
   async function send() {
     if (!recipientEmails.trim()) return setError("Enter at least one email address.");
@@ -109,7 +120,7 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
   return (
     <div className="orderNotificationControl">
       <button className="orderNotificationToggle" type="button" onClick={() => setOpen((value) => !value)}>
-        <span><strong>Notifications & resend center</strong><small>Resend customer emails without changing the order or its status.</small></span>
+        <span><strong>Customer emails & follow-ups</strong><small>Send updates and follow-ups without changing the order status.</small></span>
         <span>{open ? "−" : "+"}</span>
       </button>
       {open ? <div className="orderNotificationBody">
@@ -120,9 +131,10 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
         </div>
         {type === "general" ? <div className="orderNotificationCustom">
           <label className="field"><span>Email subject</span><input value={customSubject} maxLength={180} onChange={(event) => setCustomSubject(event.target.value)} placeholder="Quick update on your order" /></label>
-          <label className="field"><span>Message</span><textarea value={customMessage} maxLength={4000} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Write the customer-friendly update here…" /></label>
+          <label className="field"><span>Message</span><textarea value={customMessage} maxLength={4000} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Write the customer-friendly update here…" /></label><small>Text-only follow-up. To include saved mockups and their approval link, use Send follow-up in Sent mockup history.</small>
         </div> : <div className="fieldHelp">This uses the order's current saved information. It sends an email only — it does not move the order backward, create a new quote, or duplicate a payment.</div>}
-        <button className="btn" type="button" disabled={working} onClick={send}>{working ? "Sending…" : `Send ${labels[type].toLowerCase()}`}</button>
+        {type === "general" && reviewed ? <div className="orderNotificationNotice"><strong>Review before sending</strong><span>To: {recipientEmails}</span><span>Subject: {customSubject}</span><p style={{whiteSpace: "pre-wrap"}}>{customMessage}</p><small>No attachments are included.</small></div> : null}
+        <button className="btn" type="button" disabled={working} onClick={() => type === "general" && !reviewed ? setReviewed(true) : void send()}>{working ? "Sending…" : type === "general" && !reviewed ? "Review email" : `Send ${labels[type].toLowerCase()}`}</button>
         {message ? <div className="formSuccess">{message}</div> : null}
         {error ? <div className="formError">{error}</div> : null}
 
@@ -131,7 +143,7 @@ export function OrderNotificationControl({ requestId, requestNumber, customerEma
           {!logReady ? <div className="requestWarning">Run the Phase 6.29 Supabase migration to save resend history. Sending still works.</div> : null}
           {logs.length ? logs.slice(0, 12).map((row) => <div className="notificationHistoryRow" key={row.id}>
             <div><strong>{row.subject}</strong><span>{row.recipient_email} · {localDateTime(row.sent_at)}</span>{row.status === "failed" && row.error_message ? <small>{row.error_message}</small> : null}</div>
-            <span className={row.status === "sent" ? "notificationSent" : "notificationFailed"}>{row.status === "sent" ? "Sent" : "Failed"}</span>
+            <span className={row.status === "sent" ? "notificationSent" : "notificationFailed"}>{row.status === "sent" ? "Sent" : "Failed"}</span>{row.status === "sent" ? <button type="button" className="btn secondary" disabled={working} onClick={() => followUp(row)}>Draft follow-up</button> : null}
           </div>) : <p className="muted">No customer emails have been recorded here yet.</p>}
         </div>
       </div> : null}
