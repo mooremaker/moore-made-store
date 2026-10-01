@@ -47,7 +47,7 @@ export function AdminOrderDetailsEditor({ requestId, quantity, sizes, colors, pr
   const hasStructuredItems = structuredItemCount > 0;
 
   async function save() {
-    if (saving || locked || hasStructuredItems) return;
+    if (saving || locked) return;
     setError("");
     if (count === null) { setError("Use one size per line, such as XL: 3."); return; }
     if (count !== quantity) { setError(`The sizes add up to ${count}, but this order has ${quantity} shirts. Correct the breakdown before saving.`); return; }
@@ -71,11 +71,10 @@ export function AdminOrderDetailsEditor({ requestId, quantity, sizes, colors, pr
 
   return <div className="adminOrderDetailsEditor">
     {locked ? <p className="fieldHelp">Order details are locked after the quote is sent or payment begins. Use a formal quote revision for changes.</p> :
-      hasStructuredItems ? <p className="fieldHelp">This order contains multiple structured product fields. Editing those sizes needs the full item editor so production quantities stay consistent.</p> :
       !editing ? <button type="button" className="btn secondary" onClick={() => setEditing(true)}>Edit order details</button> :
       <div className="adminOrderDetailsEditorForm">
         <strong>Correct the current order</strong>
-        <p className="fieldHelp">These details appear on the customer preview and Pro Forma. The total quantity and quote price stay unchanged.</p>
+        <p className="fieldHelp">These details appear on the customer preview and Pro Forma. The total quantity and quote price stay unchanged.{hasStructuredItems ? " For structured orders, the size breakdown must match the saved product items; individual item quantities cannot be changed here." : ""}</p>
         <label>Sizes and quantities
           <textarea value={sizeText} onChange={(event) => setSizeText(event.target.value)} placeholder={"18 months: 1\nMedium: 1\nLarge: 9\nXL: 3"} />
           <small className="fieldHelp">{count === null ? "Use one size per line (e.g. XL: 3)." : `${count} of ${quantity} shirts accounted for.`}</small>

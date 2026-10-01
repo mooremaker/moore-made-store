@@ -39,16 +39,43 @@ export async function PATCH(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const { data: current, error: currentError } = await supabase.from("custom_requests")
-    .select("id,quantity,status,payment_status,order_items").eq("id", id).single();
+    .select("id,quantity,status,payment_status,order_items,colors").eq("id", id).single();
   if (currentError || !current) return NextResponse.json({ error: "Order not found." }, { status: 404 });
   if (!["new", "reviewing"].includes(current.status) || current.payment_status !== "unpaid") {
     return NextResponse.json({ error: "Order details are locked after approval or payment begins." }, { status: 409 });
   }
-  if (Array.isArray(current.order_items) && current.order_items.length) {
-    return NextResponse.json({ error: "Structured product items need a separate item-by-item edit to avoid conflicting quantities." }, { status: 409 });
-  }
   if (parsed.count !== current.quantity) {
     return NextResponse.json({ error: `Size quantities total ${parsed.count}; the order quantity is ${current.quantity}. Correct the breakdown before saving.` }, { status: 400 });
+  }
+  // Do not allow the editable summary to contradict saved structured production items.
+  const items = Array.isArray(current.order_items) ? current.order_items : [];
+  if (items.length) {
+    const normalizeSize = (size: string) => {
+      const key = size.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return ({ medium: "m", large: "l", xlarge: "xl", xxl: "2xl", xxxl: "3xl", "3xltall": "3xlt", "18months": "18m", "18month": "18m" } as Record<string, string>)[key] || key;
+    };
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      if (!item || typeof item !== "object" || !item.quantities || typeof item.quantities !== "object") return NextResponse.json({ error: "Structured order items need to be reviewed separately." }, { status: 409 });
+      for (const [size, amount] of Object.entries(item.quantities as Record<string, unknown>)) {
+        const qty = Number(amount);
+        if (!Number.isSafeInteger(qty) || qty < 0) return NextResponse.json({ error: "Structured order quantities are invalid." }, { status: 409 });
+        const key = normalizeSize(size);
+        counts.set(key, (counts.get(key) || 0) + qty);
+      }
+    }
+    const summary = new Map<string, number>();
+    for (const line of parsed.normalized.split("\\n")) {
+      const [size, amount] = line.split(/:\\s*(?=\\d+$)/);
+      const key = normalizeSize(size);
+      summary.set(key, (summary.get(key) || 0) + Number(amount));
+    }
+    if (Array.from(counts).some(([size, qty]) => qty !== (summary.get(size) || 0)) || Array.from(summary).some(([size, qty]) => qty !== (counts.get(size) || 0))) {
+      return NextResponse.json({ error: "This size breakdown differs from the saved structured product quantities. Edit the individual products before changing the summary." }, { status: 409 });
+    }
+    if (items.length > 1 && body.colors.trim() !== (current.colors || "")) {
+      return NextResponse.json({ error: "Change individual product colors in the full item editor before updating a multi-product order." }, { status: 409 });
+    }
   }
   const { data: quotes, error: quoteError } = await supabase.from("quotes").select("status").eq("request_id", id);
   if (quoteError) return NextResponse.json({ error: "Could not verify quote status." }, { status: 500 });
@@ -61,6 +88,7 @@ export async function PATCH(request: Request) {
     colors: body.colors.trim() || null,
     print_sides: body.print_sides.trim() || null,
     placements,
+    ...(items.length === 1 && body.colors.trim() ? { order_items: [{ ...items[0], colorName: body.colors.trim() }] } : {}),
   }).eq("id", id);
   if (error) {
     console.error("Admin order detail correction failed", error);

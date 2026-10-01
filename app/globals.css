@@ -5927,7 +5927,6 @@ p { line-height: 1.65; }
   .proformaNotes { margin-top: 10px; padding: 10px 12px; }
   .proformaNotes p { font-size: .87rem; line-height: 1.4; }
   .proformaLogo { width: 165px !important; max-width: 165px !important; }
-  .proformaProofGrid img { height: 190px; }
 }
 
 /* Review photo load polish: keep the media frame stable while the refresh-randomized
