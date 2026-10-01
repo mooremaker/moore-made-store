@@ -206,9 +206,9 @@ export default async function QuotePage({ params, searchParams }: PageProps) {
         </section>
 
         <section className="publicProofSection">
-          <div className="publicProofSectionHead"><div><span className="eyebrow">02 · Original request</span><h2>Confirm the overall order details</h2></div></div>
+          <div className="publicProofSectionHead"><div><span className="eyebrow">02 · Order details</span><h2>Confirm the current order details</h2></div></div>
           <dl className="publicOrderDetails">
-            <div><dt>Original request</dt><dd>{request.product}</dd></div>
+            <div><dt>Product</dt><dd>{request.product}</dd></div>
             <div><dt>Total quantity</dt><dd>{request.quantity}</dd></div>
             <div><dt>Style / item</dt><dd>{request.item_type || "Not specified"}</dd></div>
             <div><dt>Color(s)</dt><dd>{request.colors || "Not specified"}</dd></div>

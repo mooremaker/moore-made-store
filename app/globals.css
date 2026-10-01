@@ -5919,7 +5919,13 @@ p { line-height: 1.65; }
   .proformaPage { width: 100% !important; max-width: none !important; padding: 0 !important; }
   .proformaPaper { page: proforma; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; }
   .proformaSectionHeading { break-after: avoid; }
-  .proformaFooter { break-inside: avoid; }
+  .proformaFooter { display: none !important; } /* Header and pricing already identify this as a preliminary document. */
+  .proformaRule { margin: 12px 0; }
+  .proformaMetaGrid > div { padding: 8px 10px; }
+  .proformaSection { margin-top: 12px; padding-top: 12px; }
+  .proformaProofGrid img { height: 145px; }
+  .proformaNotes { margin-top: 10px; padding: 10px 12px; }
+  .proformaNotes p { font-size: .87rem; line-height: 1.4; }
   .proformaLogo { width: 165px !important; max-width: 165px !important; }
   .proformaProofGrid img { height: 190px; }
 }
@@ -9990,3 +9996,14 @@ p { line-height: 1.65; }
   .orderWorksheetPrintPage header{display:flex;justify-content:space-between;align-items:end;padding:0 0 12px;border-bottom:3px solid #6f421b}.orderWorksheetPrintPage header>div{display:grid;gap:3px}.orderWorksheetPrintPage header span{color:#6f421b;font-size:9pt;font-weight:800;letter-spacing:.12em}.orderWorksheetPrintPage header strong{font-size:20pt;line-height:1.1}
   .orderWorksheetPrintPage>p{margin:10px 0 14px;font-size:9pt}.orderWorksheetPrintPage table{width:100%;border-collapse:collapse;table-layout:fixed}.orderWorksheetPrintPage th{padding:8px 7px;border:1px solid #999;background:#e8e8e8;font-size:9pt;text-align:left}.orderWorksheetPrintPage th:first-child,.orderWorksheetPrintPage td:first-child{width:30px;text-align:center}.orderWorksheetPrintPage td{height:29px;padding:3px 7px;border:1px solid #b7b7b7;font-size:10pt}.orderWorksheetPrintPage tbody tr:nth-child(even) td{background:#fafafa}.orderWorksheetPrintPage footer{display:flex;justify-content:space-between;gap:16px;margin-top:10px;color:#555;font-size:8pt}.orderWorksheetPrintPage footer strong{white-space:nowrap;color:#333}
 }
+
+/* Small, draft-safe admin corrections to current order details. */
+.adminOrderDetailsEditor { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #faf9f6; }
+.adminOrderDetailsEditor > button { width: 100%; }
+.adminOrderDetailsEditorForm { display: grid; gap: 10px; margin-top: 12px; }
+.adminOrderDetailsEditorForm label { display: grid; gap: 5px; font-size: .82rem; font-weight: 700; }
+.adminOrderDetailsEditorForm input, .adminOrderDetailsEditorForm textarea { width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; }
+.adminOrderDetailsEditorForm textarea { min-height: 135px; resize: vertical; }
+.adminOrderDetailsEditorForm .fieldHelp { font-weight: 400; }
+.adminOrderDetailsEditorActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.adminOrderDetailsEditorError { color: #9b2828; font-size: .82rem; }
