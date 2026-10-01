@@ -23,12 +23,13 @@ export async function POST(request: Request) {
     catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
     const supabase = getSupabaseAdmin();
     const [{ data: order, error: orderError }, { data: review, error: reviewError }, { data: logs, error: logError }] = await Promise.all([
-      supabase.from("custom_requests").select("id,request_number,customer_name,product").eq("id", requestId).single(),
+      supabase.from("custom_requests").select("id,request_number,customer_name,product,status").eq("id", requestId).single(),
       supabase.from("mockup_review_sends").select("id,public_token,files,approved_at,version").eq("request_id", requestId).order("version", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("notification_email_log").select("id").eq("request_id", requestId).limit(1),
     ]);
     if (orderError || !order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
     if (reviewError || logError || !logs) return NextResponse.json({ error: "Communication history is unavailable. Restore it before sending a follow-up." }, { status: 503 });
+    if (order.status === "cancelled") return NextResponse.json({ error: "This order has been cancelled." }, { status: 409 });
     if (!review || review.id !== reviewId || review.approved_at) return NextResponse.json({ error: "This proof is already approved or has been replaced. Refresh the order before following up." }, { status: 409 });
     const files = followUpProofFiles(review.files, requestId);
     const attachments: Array<{ filename: string; content: Buffer }> = [];

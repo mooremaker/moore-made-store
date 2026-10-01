@@ -8,7 +8,7 @@ const helper=moduleSource('lib/follow-up.ts');
 const uuid='11111111-1111-4111-8111-111111111111';
 function fixture(options={}){
  const sends=[],inserts=[],entries=[];
- const order={id:uuid,request_number:1,customer_name:'<Customer>',product:'shirts'};
+ const order={id:uuid,request_number:1,customer_name:'<Customer>',product:'shirts',status:options.cancelled?'cancelled':'reviewing'};
  const review={id:uuid,version:2,public_token:uuid,approved_at:options.approved?'today':null,files:[{path:uuid+'/mockup.png',originalName:'mockup.png'}]};
  const supabase={from(table){let filters={},insert=null;const q={select(){return q},eq(k,v){filters[k]=v;return q},order(){return q},limit(){return q},insert(v){insert=v;inserts.push(v);return q},single(){return q},maybeSingle(){return q},then(resolve,reject){let result=table==='custom_requests'?{data:order}:table==='mockup_review_sends'?{data:options.replaced?{...review,id:'other'}:review}:{data:filters.provider_message_id?(options.replay?{id:'existing'}:null):[]};if(options.logMissing&&table==='notification_email_log')result={error:{message:'missing'},data:null};if(insert)result={error:null};return Promise.resolve(result).then(resolve,reject)}};return q},storage:{from(){return {download:async()=>options.missingFile?{error:{message:'missing'}}:{data:new Blob(['image'])}}}}};
  const route=moduleSource('app/api/admin/follow-up/route.ts',name=>{
@@ -33,3 +33,5 @@ test('reattaches saved proof and preserves approval link without new review reco
 test('link-only follow-up needs no downloads',async()=>{const f=fixture({missingFile:true});assert.equal((await f.post({includeMockups:false})).status,200);assert.equal(f.sends[0].attachments.length,0);});
 test('partial failure logs correct recipients and records only successful messages',async()=>{const f=fixture({failed:true});const r=await f.post({recipientEmails:'client@example.com,failed@example.com'});assert.equal(r.data.sent.length,1);assert.equal(r.data.failed.length,1);assert.equal(f.entries.length,1);assert.equal(f.inserts.filter(x=>x.status==='failed').length,1);});
 test('retries use the same provider key and do not duplicate known history',async()=>{const f=fixture({replay:true});await f.post();await f.post();assert.equal(f.sends[0].idempotencyKey,f.sends[1].idempotencyKey);assert.equal(f.inserts.length,0);assert.equal(f.entries.length,0);});
+
+test('cancelled orders do not receive mockup follow-ups',async()=>{const f=fixture({cancelled:true});assert.equal((await f.post()).status,409);assert.equal(f.sends.length,0);});
