@@ -1088,6 +1088,8 @@ p { line-height: 1.65; }
 .quoteMetaGrid .field { align-content: start; }
 .quoteMetaGrid .field > span { font-weight: 800; }
 .quoteNotes textarea { min-height: 78px; resize: vertical; }
+.quoteEmailMessage { grid-column: 1 / -1; }
+.quoteEmailMessage textarea { min-height: 88px; resize: vertical; }
 .quoteTotals { margin-left: auto; width: min(100%, 380px); display: grid; gap: 7px; padding-top: 10px; border-top: 1px solid var(--border); }
 .quoteTotals > div { display: flex; justify-content: space-between; gap: 16px; }
 .quoteTotals span { color: var(--muted); }
@@ -5629,6 +5631,8 @@ p { line-height: 1.65; }
 .quoteDocumentActions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0 0 14px;
 }
 .receiptBreakdownSection {
@@ -5788,6 +5792,13 @@ p { line-height: 1.65; }
   letter-spacing: .055em;
   text-transform: uppercase;
 }
+.proformaOrderDetails { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; }
+.proformaOrderDetails h2 { margin: 0 0 9px; font-size: .92rem; }
+.proformaOrderDetails dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 16px; margin: 0; }
+.proformaOrderDetails dt { color: var(--muted); font-size: .7rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+.proformaOrderDetails dd { margin: 4px 0 0; font-weight: 700; }
+.proformaOrderDetails pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.proformaOrderDetails .wide { grid-column: 1 / -1; }
 .proformaSection {
   margin-top: 22px;
   padding-top: 22px;
@@ -5900,12 +5911,15 @@ p { line-height: 1.65; }
   .proformaTitle { text-align: left; }
   .proformaLogo { width: 154px !important; max-width: 154px !important; flex-basis: 154px; }
 }
+@page proforma { size: Letter portrait; margin: .45in; }
 @media print {
   .proformaActions,
   .siteHeader,
   .siteFooter { display: none !important; }
   .proformaPage { width: 100% !important; max-width: none !important; padding: 0 !important; }
-  .proformaPaper { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .proformaPaper { page: proforma; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .proformaSectionHeading { break-after: avoid; }
+  .proformaFooter { break-inside: avoid; }
   .proformaLogo { width: 165px !important; max-width: 165px !important; }
   .proformaProofGrid img { height: 190px; }
 }
@@ -9966,12 +9980,12 @@ p { line-height: 1.65; }
 
 /* Paper worksheet: landscape grid with continuation pages. */
 .orderWorksheetPrintSheet{display:none}
+@page orderWorksheet { size: Letter landscape; margin: .42in; }
 @media print{
-  @page{size:landscape;margin:.42in}
   body{background:#fff!important;color:#111!important}
   .siteHeader,.siteFooter,.orderWorksheetHero,.orderWorksheetCard{display:none!important}
   .orderWorksheetPage{display:block!important;width:100%!important;max-width:none!important;padding:0!important;margin:0!important}
-  .orderWorksheetPrintSheet{display:block!important;font-family:Arial,Helvetica,sans-serif;color:#111}
+  .orderWorksheetPrintSheet{page:orderWorksheet;display:block!important;font-family:Arial,Helvetica,sans-serif;color:#111}
   .orderWorksheetPrintPage{break-after:page;page-break-after:always}.orderWorksheetPrintPage:last-child{break-after:auto;page-break-after:auto}
   .orderWorksheetPrintPage header{display:flex;justify-content:space-between;align-items:end;padding:0 0 12px;border-bottom:3px solid #6f421b}.orderWorksheetPrintPage header>div{display:grid;gap:3px}.orderWorksheetPrintPage header span{color:#6f421b;font-size:9pt;font-weight:800;letter-spacing:.12em}.orderWorksheetPrintPage header strong{font-size:20pt;line-height:1.1}
   .orderWorksheetPrintPage>p{margin:10px 0 14px;font-size:9pt}.orderWorksheetPrintPage table{width:100%;border-collapse:collapse;table-layout:fixed}.orderWorksheetPrintPage th{padding:8px 7px;border:1px solid #999;background:#e8e8e8;font-size:9pt;text-align:left}.orderWorksheetPrintPage th:first-child,.orderWorksheetPrintPage td:first-child{width:30px;text-align:center}.orderWorksheetPrintPage td{height:29px;padding:3px 7px;border:1px solid #b7b7b7;font-size:10pt}.orderWorksheetPrintPage tbody tr:nth-child(even) td{background:#fafafa}.orderWorksheetPrintPage footer{display:flex;justify-content:space-between;gap:16px;margin-top:10px;color:#555;font-size:8pt}.orderWorksheetPrintPage footer strong{white-space:nowrap;color:#333}

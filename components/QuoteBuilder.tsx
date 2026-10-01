@@ -237,6 +237,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const [laborRate, setLaborRate] = useState(existingQuote?.labor_rate_cents ? (existingQuote.labor_rate_cents / 100).toFixed(2) : (defaultLaborRateCents / 100).toFixed(2));
   const [revisionReason, setRevisionReason] = useState("");
   const [notes, setNotes] = useState(existingQuote?.notes ?? "");
+  const [personalEmailMessage, setPersonalEmailMessage] = useState("");
   const [validUntil, setValidUntil] = useState(existingQuote?.valid_until ?? "");
   const [paymentTerms, setPaymentTerms] = useState<"full" | "deposit">(existingQuote?.payment_terms === "deposit" || (!existingQuote && isReorderPriceLocked && reorderPriceLock?.paymentTerms === "deposit") ? "deposit" : "full");
   const [depositAmount, setDepositAmount] = useState(dollars(existingQuote?.deposit_amount_cents ?? (isReorderPriceLocked ? lockedNumber(reorderPriceLock, "depositAmountCents") : 0)));
@@ -772,6 +773,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           paymentTerms,
           depositAmountCents: paymentTerms === "deposit" ? centsFromInput(depositAmount) : null,
           notes,
+          personalEmailMessage: action === "send" ? personalEmailMessage.trim() : "",
           proofItems: proofPayload,
           includeSavedMockup: savedMockupWillBeAttached,
           validUntil,
@@ -781,6 +783,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       if (!response.ok) throw new Error(result.error || "Could not save proof and quote.");
       setProofItems((current) => current.map((item) => ({ ...item, newFiles: [] })));
       setMessage(result.message || (action === "send" ? "Proof and quote sent." : "Draft saved."));
+      if (action === "send") setPersonalEmailMessage("");
       if (approvedQuote && revisionMode && action === "send") setRevisionMode(false);
       router.refresh();
       // The payment panel lives outside this client editor. Reload after a send so
@@ -811,7 +814,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           {existingQuote?.status === "approved" && !revisionMode ? <div className="quoteLocked quoteRevisionLocked"><span>This proof and quote have been approved. The approved version stays protected.</span><button className="btn secondary" type="button" onClick={() => { setRevisionMode(true); setRevisionReason(""); }}>Revise quote</button></div> : null}
           {existingQuote?.status === "approved" && revisionMode ? <div className="quoteRevisionMode"><div><strong>Creating quote revision {Number(existingQuote.revision_number || 1) + 1}</strong><span>The current approved quote will not change until you send this revision. Sending it will require the customer to approve the new total/details again.</span></div><button className="textButton" type="button" onClick={() => window.location.reload()}>Cancel revision</button></div> : null}
           {waitingOnCustomer ? <div className="quoteWaitingNotice"><strong>Sent to the customer for review</strong><span>The quote is protected while they review it. You can resend the approval email or copy the approval link below without changing anything.</span></div> : null}
-          {existingQuote?.public_token ? <div className="quoteDocumentActions"><a className="btn secondary" href={`/proforma/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Pro Forma + Proof ↗</a>{existingQuote.status === "approved" ? <a className="btn secondary" href={`/invoice/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Invoice ↗</a> : null}</div> : null}
+          {existingQuote?.public_token ? <div className="quoteDocumentActions"><a className="btn secondary" href={`/quote/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Preview as customer ↗</a><a className="btn secondary" href={`/proforma/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Pro Forma + Proof ↗</a>{existingQuote.status === "approved" ? <a className="btn secondary" href={`/invoice/${existingQuote.public_token}`} target="_blank" rel="noreferrer">Open Invoice ↗</a> : null}</div> : <p className="fieldHelp">Save a draft to unlock the customer preview. Drafts cannot be approved or paid.</p>}
           {latestChangeRequest ? (
             <div className="proofChangeRequest">
               <strong>Customer requested changes</strong>
@@ -1095,7 +1098,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
 
             <div className="quoteMetaGrid">
               <label className="field"><span>Approval valid until</span><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={locked} /></label>
-              <label className="field quoteNotes"><span>Quote / production notes</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Production timing, material notes, special conditions…" disabled={locked} /></label>
+              <label className="field quoteNotes"><span>Quote / production notes</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="List final colors, exact sizes and quantities, pickup, and production terms…" disabled={locked} /><small className="fieldHelp">Shown on the customer quote and Pro Forma. Include the exact size breakdown if it is not in the original request.</small></label>
+              {!locked ? <label className="field quoteEmailMessage"><span>Personal email message (optional)</span><textarea value={personalEmailMessage} onChange={(e) => setPersonalEmailMessage(e.target.value)} maxLength={1500} placeholder="Hi Taylor! I’m so glad your family likes the design…" /><small className="fieldHelp">Included only in the approval email when you send. Not shown on the quote or Pro Forma; not saved with a draft.</small></label> : null}
             </div>
 
             <div className="quoteFinalReview">
