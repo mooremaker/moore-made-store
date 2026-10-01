@@ -65,8 +65,8 @@ export async function PATCH(request: Request) {
       }
     }
     const summary = new Map<string, number>();
-    for (const line of parsed.normalized.split("\\n")) {
-      const [size, amount] = line.split(/:\\s*(?=\\d+$)/);
+    for (const line of parsed.normalized.split("\n")) {
+      const [size, amount] = line.split(/:\s*(?=\d+$)/);
       const key = normalizeSize(size);
       summary.set(key, (summary.get(key) || 0) + Number(amount));
     }
