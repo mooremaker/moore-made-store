@@ -113,6 +113,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const requestId = text(body.requestId, 100);
     const action = body.action === "send" ? "send" : "save";
+    const personalEmailMessage = action === "send" ? text(body.personalEmailMessage, 1500) : "";
     const lineItems = normalizeLineItems(body.lineItems);
     const proofItems = normalizeProofItems(body.proofItems, requestId);
     const internalSupplierCosts = normalizeSupplierCosts(body.internalSupplierCosts);
@@ -566,6 +567,9 @@ export async function POST(request: Request) {
       return `<li style="margin:0 0 5px;">${escapeHtml(item.title)} — ${escapeHtml(detail)}</li>`;
     }).join("");
 
+    const personalMessageHtml = personalEmailMessage
+      ? `<div style="margin:0 0 18px;padding:14px 16px;background:#fffaf3;border:1px solid #e5d9c8;border-radius:12px;"><strong>A note from Moore Made</strong><p style="margin:8px 0 0;line-height:1.65;">${escapeHtml(personalEmailMessage).replace(/\r?\n/g, "<br />")}</p></div>`
+      : "";
     const paymentSummary = paymentTerms === "deposit"
       ? `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Payment after approval</strong><p style="line-height:1.6;margin:7px 0 0;">Custom deposit due: <strong>${escapeHtml(money(depositAmountCents || 0))}</strong><br>Remaining balance: <strong>${escapeHtml(money(Math.max(0, finalTotalCents - (depositAmountCents || 0))))}</strong></p></div>`
       : `<div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Payment after approval</strong><p style="line-height:1.6;margin:7px 0 0;">Full payment of <strong>${escapeHtml(money(finalTotalCents))}</strong>${taxMode === "automatic" ? " (estimated until the final tax check at payment)" : ""} is required to begin production.</p></div>`;
@@ -577,6 +581,7 @@ export async function POST(request: Request) {
       html: emailShell(
         `Your proof + quote is ready — ${reference}`,
         `<p style="line-height:1.65;margin:0 0 16px;">Hi ${escapeHtml(customerRequest.customer_name)}, we&apos;ve prepared the mockups and pricing for your custom order.</p>
+         ${personalMessageHtml}
          <p style="line-height:1.65;margin:0 0 18px;">Review <strong>every product proof, the order details, and the quote together</strong>. If everything looks right, approve the entire order in one step. If something needs to change, you can identify the specific product from the same page.</p>
          <div style="background:#f7f5f0;border:1px solid #ded9d1;border-radius:12px;padding:14px 16px;margin:0 0 18px;"><strong>Proof set</strong><ul style="margin:8px 0 0;padding-left:20px;line-height:1.55;">${proofSummary}</ul></div>
          <table style="width:100%;border-collapse:collapse;margin:0 0 16px;">

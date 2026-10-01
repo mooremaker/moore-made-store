@@ -16,6 +16,9 @@ type RequestView = {
   customer_name: string;
   product: string;
   quantity: number;
+  colors: string | null;
+  sizes: string | null;
+  print_sides: string | null;
   delivery: string | null;
 };
 
@@ -69,7 +72,7 @@ export default async function ProFormaPage({ params }: Props) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("quotes")
-    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity,delivery)")
+    .select("id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,tax_mode,discount_cents,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,notes,valid_until,proof_paths,proof_notes,proof_version,mockup_snapshot,sent_at,created_at,custom_requests(request_number,customer_name,product,quantity,colors,sizes,print_sides,delivery)")
     .eq("public_token", token)
     .single();
 
@@ -146,6 +149,15 @@ export default async function ProFormaPage({ params }: Props) {
           <div><span>Requested quantity</span><strong>{request.quantity}</strong></div>
           <div><span>Fulfillment</span><strong>{request.delivery || "To be confirmed"}</strong></div>
         </section>
+
+        {(request.colors || request.sizes || request.print_sides) ? <section className="proformaOrderDetails">
+          <h2>Order details for approval</h2>
+          <dl>
+            {request.colors ? <div><dt>Color</dt><dd>{request.colors}</dd></div> : null}
+            {request.print_sides ? <div><dt>Print location</dt><dd>{request.print_sides}</dd></div> : null}
+            {request.sizes ? <div className="wide"><dt>Sizes / quantities</dt><dd><pre>{request.sizes}</pre></dd></div> : null}
+          </dl>
+        </section> : null}
 
         <section className="proformaSection">
           <div className="proformaSectionHeading"><div><span className="eyebrow">Pricing</span><h2>Complete quote</h2></div><small>Preliminary document for approval; not proof of payment.</small></div>
