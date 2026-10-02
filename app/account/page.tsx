@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { BusinessProfileForm, type BusinessLogoAsset } from "@/components/account/BusinessProfileForm";
 import { DeleteTestOrderButton } from "@/components/account/DeleteTestOrderButton";
+import { CancelOrderControl } from "@/components/account/CancelOrderControl";
 import { ReorderRequestButton } from "@/components/account/ReorderRequestButton";
 import { claimVerifiedGuestRecords, getCurrentUser, getUserRole } from "@/lib/auth";
 import { formatRequestNumber, REQUEST_STATUS_LABELS, type RequestStatus } from "@/lib/custom-request-types";
@@ -53,6 +54,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   ]);
 
   const requests = (requestData ?? []) as RequestRow[];
+  const { data: cancellationData } = await supabase.from("customer_order_cancellations").select("request_id,outcome").eq("customer_user_id", user.id);
+  const cancellationByRequest = new Map((cancellationData ?? []).map(item => [item.request_id, item.outcome]));
   const [{ data: businessProfileData }, { data: brandAssetData }] = await Promise.all([
     admin.from("customer_business_profiles").select("business_name,website,brand_colors,brand_notes").eq("customer_user_id", user.id).maybeSingle(),
     admin.from("client_brand_assets").select("id,label,storage_bucket,storage_path,original_filename,production_approved").eq("customer_user_id", user.id).eq("asset_kind", "logo").order("updated_at", { ascending: false }).limit(10),
@@ -174,6 +177,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                       {savedMockup ? <Link className="btn secondary" href={`/account?order=${request.id}&panel=mockups#mockup-${request.id}`}>View mockups</Link> : null}
                       {worksheet ? <Link className="btn secondary" href={`/account?order=${request.id}&panel=roster#order-${request.id}`}>{worksheet.is_open ? "Open roster" : "View roster"}</Link> : null}
                       <Link className="btn secondary" href={`/account/messages?order=${request.id}`}>Message Moore Made</Link>
+                      {cancellationByRequest.get(request.id) === "review_requested" && request.status !== "cancelled" ? <p className="fieldHelp">Cancellation requested. Moore Made will reply in your order messages. The order remains active until cancellation is confirmed.</p> : !["cancelled", "shipped", "completed"].includes(request.status) ? <CancelOrderControl requestId={request.id} direct={["new", "reviewing", "quote_sent"].includes(request.status) && request.payment_status === "unpaid" && request.amount_paid_cents === 0 && quote?.status !== "approved"} /> : null}
                       {request.status === "completed" ? <ReorderRequestButton requestId={request.id} /> : null}
                       {role === "admin" && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
