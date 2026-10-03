@@ -12,6 +12,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
+        {process.env.MOORE_MADE_PREVIEW === "1" ? (
+          <div role="note" style={{ background: "#173b57", color: "#fff", padding: "12px 20px", textAlign: "center", fontSize: "14px", lineHeight: 1.5 }}>
+            Moore Made test workspace · Live orders, payments and emails are disconnected.
+          </div>
+        ) : null}
         <Header />
         <main>{children}</main>
         <Footer />

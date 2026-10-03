@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 export type AppRole = "customer" | "admin";
 
 export async function getCurrentUser(): Promise<User | null> {
+  if (process.env.MOORE_MADE_PREVIEW === "1") return null;
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error) return null;
@@ -21,6 +22,7 @@ export async function getUserRole(userId: string): Promise<AppRole> {
 }
 
 export async function getAdminAuthState() {
+  if (process.env.MOORE_MADE_PREVIEW === "1") return { user: null, isAdmin: false, hasMfa: false, aal2: false };
   const supabase = await createSupabaseServerClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
   const user = userData.user ?? null;

@@ -28,7 +28,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const pathname = usePathname();
-  const leavingAdmin = pathname?.startsWith("/admin") ?? false;
+  const leavingAdmin = Boolean(pathname?.startsWith("/admin") || pathname?.startsWith("/workspace/admin"));
 
   useEffect(() => {
     setOpen(false);
@@ -50,6 +50,15 @@ export function Header() {
       width={190}
       height={63}
     />
+  );
+
+  if (leavingAdmin) return (
+    <header className="siteHeader compactAdminSiteHeader">
+      <div className="shell headerInner">
+        <a className="brand" href="/" aria-label="Moore Made home">{brand}</a>
+        <nav aria-label="Admin account navigation"><a href="/">View storefront</a><a href="/account">Account</a></nav>
+      </div>
+    </header>
   );
 
   return (

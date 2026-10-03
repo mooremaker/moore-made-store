@@ -103,7 +103,7 @@ function normalizeProofItems(value: unknown, requestId: string): NormalizedProof
   }).filter((item) => item.title);
 }
 
-const QUOTE_SELECT = "id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_supplier_costs,internal_supplier_shipping_cents,internal_supplier_tax_cents,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_overhead_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,is_outsourced_order,profitability_override_reason,profitability_warnings,pricing_settings_snapshot,revision_number,revision_reason,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at";
+const QUOTE_SELECT = "id,request_id,public_token,status,line_items,setup_fee_cents,shipping_cents,tax_cents,estimated_tax_cents,tax_code,tax_mode,stripe_tax_calculation_id,stripe_tax_transaction_id,tax_calculated_at,tax_exempt_reason,tax_breakdown,tax_input_fingerprint,discount_cents,manual_discount_cents,promo_discount_cents,discount_code_id,applied_discount_code,subtotal_cents,total_cents,payment_terms,deposit_amount_cents,internal_supply_cost_cents,internal_supplier_costs,internal_supplier_shipping_cents,internal_supplier_tax_cents,internal_print_cost_cents,internal_packaging_cost_cents,internal_shipping_cost_cents,internal_payment_fee_cents,internal_overhead_cents,internal_other_cost_cents,labor_hours,labor_rate_cents,labor_cost_cents,internal_total_cost_cents,estimated_profit_cents,estimated_margin_basis_points,is_outsourced_order,profitability_override_reason,profitability_warnings,pricing_settings_snapshot,revision_number,revision_reason,personal_email_message,notes,valid_until,proof_paths,proof_notes,proof_version,customer_change_request,mockup_snapshot,sent_at,responded_at,created_at,updated_at";
 
 export async function POST(request: Request) {
   const auth = await requireAdminApi();
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const requestId = text(body.requestId, 100);
     const action = body.action === "send" ? "send" : "save";
-    const personalEmailMessage = action === "send" ? text(body.personalEmailMessage, 1500) : "";
+    const personalEmailMessage = text(body.personalEmailMessage, 1500);
     const lineItems = normalizeLineItems(body.lineItems);
     const proofItems = normalizeProofItems(body.proofItems, requestId);
     const internalSupplierCosts = normalizeSupplierCosts(body.internalSupplierCosts);
@@ -465,6 +465,7 @@ export async function POST(request: Request) {
       pricing_settings_snapshot: pricingSettingsSnapshot,
       revision_number: action === "send" ? targetRevisionNumber : currentRevisionNumber,
       revision_reason: needsNewRevision ? revisionReason : existing?.revision_reason || null,
+      personal_email_message: personalEmailMessage || null,
       notes: text(body.notes, 5000) || null,
       valid_until: text(body.validUntil, 20) || null,
       proof_paths: flattenedProofPaths,

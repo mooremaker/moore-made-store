@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { effectiveOrderStatus, ORDER_SECTIONS, nextOrderAction, isOrderOverdue, easternToday, type OrderSection } from "@/lib/admin/order-workflow";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
 import { FulfillmentActions } from "@/components/FulfillmentActions";
 import { ManualPaymentControl } from "@/components/ManualPaymentControl";
@@ -197,8 +198,13 @@ function submittedDate(value: string) {
   });
 }
 
-export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, goals, financeAudit, financialsReady, fundingReady, goalsReady, auditReady, discountCodes, discountsReady, productPricing, businessSettings, pricingReady }: Props) {
-  const [tab, setTab] = useState<"orders" | "messages" | "financials" | "showcase" | "mockups" | "pricing" | "support">("orders");
+export function AdminWorkspace({ requests: storedRequests, quotes, showcasePosts, messageThreads, adminUsers, currentAdminUserId, quoteReady, showcaseReady, messagesReady, payments, expenses, funding, goals, financeAudit, financialsReady, fundingReady, goalsReady, auditReady, discountCodes, discountsReady, productPricing, businessSettings, pricingReady }: Props) {
+  const requests = useMemo(() => {
+    const quoteLookup = new Map(quotes.map(quote => [quote.request_id, quote]));
+    return storedRequests.map(request => ({ ...request, status: effectiveOrderStatus(request.status, quoteLookup.get(request.id) ?? null) }));
+  }, [storedRequests, quotes]);
+  const [orderSection, setOrderSection] = useState<OrderSection>("overview");
+  const [tab, setTab] = useState<"dashboard" | "orders" | "messages" | "financials" | "showcase" | "mockups" | "pricing" | "support">("dashboard");
   const [query, setQuery] = useState("");
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
@@ -281,71 +287,54 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
     setOrderFilter("all");
     setQuery("");
     setOpenRequestId(requestId);
+    setOrderSection("overview");
     window.setTimeout(() => document.getElementById(`order-${requestId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
+  const today = easternToday();
+  const activeOrders = [...requests].filter(request => !["completed", "cancelled"].includes(request.status)).sort((a, b) => {
+    const byDeadline = (a.deadline || "9999-12-31").localeCompare(b.deadline || "9999-12-31");
+    return byDeadline || a.created_at.localeCompare(b.created_at);
+  });
+
   return (
-    <>
-      <section className="adminStats adminStatsModern" aria-label="Dashboard overview">
-        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("new")}>
-          <span>New requests</span><strong>{counts.new}</strong><small>Needs attention</small>
-        </button>
-        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("review")}>
-          <span>Review / proof</span><strong>{counts.review}</strong><small>Preparing approval</small>
-        </button>
-        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("production")}>
-          <span>Production</span><strong>{counts.production}</strong><small>Approved to ready</small>
-        </button>
-        <button className="adminStat adminStatButton" type="button" onClick={() => jumpToOrders("completed")}>
-          <span>Completed</span><strong>{counts.completed}</strong><small>Finished orders</small>
-        </button>
-        <button className="adminStat adminStatButton adminStatMessages" type="button" onClick={() => setTab("messages")}>
-          <span>Messages</span><strong>{counts.messageUnread}</strong><small>Unread customer replies</small>
-        </button>
-        <button className="adminStat adminStatButton adminStatFinancials" type="button" onClick={() => setTab("financials")}>
-          <span>Financials</span><strong>{money(counts.receivedThisMonth)}</strong><small>Received this month</small>
-        </button>
-        <button className="adminStat adminStatButton adminStatShowcase" type="button" onClick={() => { setTab("showcase"); setShowcaseFilter("pending"); }}>
-          <span>Made by You</span><strong>{counts.showcasePending}</strong><small>Awaiting approval</small>
-        </button>
-      </section>
-
-      <nav className="adminWorkspaceSwitcher adminWorkspaceSwitcherFive" aria-label="Admin workspace area">
-        <button type="button" className={["orders","messages","showcase"].includes(tab) ? "active" : ""} onClick={() => setTab("orders")}>
-          <span className="adminWorkspaceSwitcherIcon">▣</span>
-          <span><strong>Orders & customers</strong><small>Requests, messages, production, showcase</small></span>
-        </button>
-        <button type="button" className={tab === "mockups" ? "active" : ""} onClick={() => setTab("mockups")}>
-          <span className="adminWorkspaceSwitcherIcon">✦</span>
-          <span><strong>Mockup templates</strong><small>Move, resize, and save Shop defaults</small></span>
-        </button>
-        <button type="button" className={tab === "pricing" ? "active" : ""} onClick={() => setTab("pricing")}>
-          <span className="adminWorkspaceSwitcherIcon">◇</span>
-          <span><strong>Products & pricing</strong><small>Private costs, labor, margins, pickup tax address</small></span>
-        </button>
-        <button type="button" className={tab === "financials" ? "active" : ""} onClick={() => setTab("financials")}>
-          <span className="adminWorkspaceSwitcherIcon">$</span>
-          <span><strong>Business & financials</strong><small>Money, goals, records, tax readiness</small></span>
-        </button>
-        <button type="button" className={tab === "support" ? "active" : ""} onClick={() => setTab("support")}>
-          <span className="adminWorkspaceSwitcherIcon">♥</span>
-          <span><strong>Support gifts</strong><small>Private link, interest, gift letters</small></span>
-        </button>
+    <div className="compactAdmin">
+      <nav className="compactAdminNav" aria-label="Admin navigation">
+        <button type="button" aria-current={tab === "dashboard" ? "page" : undefined} onClick={() => setTab("dashboard")}>Dashboard</button>
+        <button type="button" aria-current={["orders", "messages"].includes(tab) ? "page" : undefined} onClick={() => setTab("orders")}>Orders <span>{requests.length}</span></button>
+        <button type="button" aria-current={["financials", "pricing", "mockups", "support", "showcase"].includes(tab) ? "page" : undefined} onClick={() => setTab("financials")}>Business</button>
+        <button type="button" className="compactAdminMessages" aria-current={tab === "messages" ? "page" : undefined} onClick={() => setTab("messages")}>Messages {counts.messageUnread > 0 ? <span>{counts.messageUnread} unread</span> : null}</button>
       </nav>
+      {["financials", "pricing", "mockups", "support", "showcase"].includes(tab) ? <nav className="compactBusinessNav" aria-label="Business tools">
+        {([{value:"financials", label:"Financials"}, {value:"pricing", label:"Products & pricing"}, {value:"mockups", label:"Design templates"}, {value:"showcase", label:"Customer showcase"}, {value:"support", label:"Support gifts"}] as const).map(item => <button key={item.value} type="button" aria-current={tab === item.value ? "page" : undefined} onClick={() => setTab(item.value)}>{item.label}</button>)}
+      </nav> : null}
 
-      {["orders","messages","showcase"].includes(tab) ? <div className="adminWorkspaceTabs adminOperationsTabs" role="tablist" aria-label="Orders and customers">
-        <button type="button" className={tab === "orders" ? "active" : ""} onClick={() => setTab("orders")}>Orders <span>{requests.length}</span></button>
-        <button type="button" className={tab === "messages" ? "active" : ""} onClick={() => setTab("messages")}>Messages <span>{counts.messageUnread}</span></button>
-        <button type="button" className={tab === "showcase" ? "active" : ""} onClick={() => setTab("showcase")}>Made by You <span>{counts.showcasePending}</span></button>
-      </div> : null}
-
-      {tab === "orders" ? (
+      {tab === "dashboard" ? <section className="compactDashboard" aria-label="Dashboard">
+        <div className="compactSectionHeading"><h2>Today’s work</h2><button type="button" className="btn secondary" onClick={() => { setOpenRequestId(null); jumpToOrders("all"); }}>All orders</button></div>
+        <div className="compactDashboardCounts">
+          <button type="button" onClick={() => { setOpenRequestId(null); jumpToOrders("new"); }}><strong>{counts.new}</strong><span>New requests</span></button>
+          <button type="button" onClick={() => { setOpenRequestId(null); jumpToOrders("review"); }}><strong>{counts.review}</strong><span>Design & quotes</span></button>
+          <button type="button" onClick={() => { setOpenRequestId(null); jumpToOrders("production"); }}><strong>{counts.production}</strong><span>Production & fulfillment</span></button>
+          <button type="button" onClick={() => setTab("messages")}><strong>{counts.messageUnread}</strong><span>Unread messages</span></button>
+        </div>
+        <div className="compactQueueHeading"><h3>Active orders</h3><span>Due dates first</span></div>
+        <div className="compactWorkQueue">
+          {activeOrders.length === 0 ? <p className="muted">You’re caught up. New requests will appear here.</p> : activeOrders.slice(0, 8).map(request => {
+            const next = nextOrderAction(request, quoteByRequest.get(request.id) ?? null);
+            return <button type="button" key={request.id} className="compactQueueRow" onClick={() => { openOrderFromFinance(request.id); setOrderSection(next.section); }}>
+              <span><strong>{request.customer_name}</strong><small>{formatRequestNumber(request.request_number)} · {request.quantity} × {request.product}</small></span>
+              <span className={isOrderOverdue(request, today) ? "compactDue overdue" : "compactDue"}>{request.deadline ? `Due ${prettyDate(request.deadline)}` : "No deadline"}</span>
+              <span className="compactQueueAction">{next.waiting ? "Waiting · " : ""}{next.label}</span>
+            </button>;
+          })}
+        </div>
+        {activeOrders.length > 8 ? <button type="button" className="btn secondary" onClick={() => { setOpenRequestId(null); jumpToOrders("all"); }}>View all {activeOrders.length} active orders</button> : null}
+        <div className="compactDashboardFooter"><button type="button" onClick={() => setTab("financials")}>Received this month <strong>{money(counts.receivedThisMonth)}</strong></button><button type="button" onClick={() => { setTab("showcase"); setShowcaseFilter("pending"); }}>Customer showcase <strong>{counts.showcasePending} pending</strong></button></div>
+      </section> : tab === "orders" ? (
         <section className="adminWorkspacePanel">
-          <div className="adminSectionIntro">
-            <div><div className="eyebrow">Orders</div><h2>Custom request inbox</h2><p>Scan the essentials first. Open a request when you need the full details, proof + quote tools, or final fulfillment notification.</p></div>
-          </div>
+          <div className="compactSectionHeading"><h2>{openRequestId ? "Order workspace" : "Orders"}</h2>{openRequestId ? <button type="button" className="btn secondary" onClick={() => setOpenRequestId(null)}>Back to orders</button> : null}</div>
 
-          <div className="adminInboxToolbar">
+          <div className="adminInboxToolbar" hidden={Boolean(openRequestId)}>
             <label className="adminSearch">
               <span className="srOnly">Search orders</span>
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, MM number, email, product…" />
@@ -359,7 +348,7 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
             </label>
           </div>
 
-          <div className="adminFilterRow" aria-label="Filter orders by status">
+          <div className="adminFilterRow" hidden={Boolean(openRequestId)} aria-label="Filter orders by status">
             {orderFilters.map((filter) => (
               <button key={filter.value} type="button" className={orderFilter === filter.value ? "active" : ""} onClick={() => setOrderFilter(filter.value)}>
                 {filter.label}
@@ -368,14 +357,15 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
             ))}
           </div>
 
-          <div className="adminResultsMeta">Showing <strong>{visibleRequests.length}</strong> of {requests.length} requests</div>
+          <div className="adminResultsMeta" hidden={Boolean(openRequestId)}>Showing <strong>{visibleRequests.length}</strong> of {requests.length} requests</div>
 
           <div className="requestInbox requestInboxModern">
             {visibleRequests.length === 0 ? (
               <div className="empty adminEmptyState"><h2>No matching requests.</h2><p className="muted">Try another search or status filter.</p></div>
-            ) : visibleRequests.map((request) => {
+            ) : (openRequestId ? requests.filter(request => request.id === openRequestId) : visibleRequests).map((request) => {
               const isOpen = openRequestId === request.id;
               const quote = quoteByRequest.get(request.id) ?? null;
+              const next = nextOrderAction(request, quote);
               const requestPayments = paymentHistoryByRequest.get(request.id) ?? [];
               const latestReceipt = requestPayments.find((payment) => payment.status === "paid" && Boolean(payment.receipt_token)) ?? null;
               return (
@@ -387,29 +377,25 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         <span className={`statusBadge status-${request.status}`}>{request.status === "ready" && String(request.delivery || "").toLowerCase().includes("delivery") ? "Ready for delivery" : REQUEST_STATUS_LABELS[request.status]}</span>
                       </div>
                       <h3>{request.customer_name}</h3>
-                      <p>{request.product}{request.item_type ? ` · ${request.item_type}` : ""}</p>
+                      <p>{request.product}{request.item_type && request.item_type.toLowerCase() !== request.product.toLowerCase() ? ` · ${request.item_type}` : ""}</p>
                     </div>
 
                     <div className="adminRequestSummaryFacts">
                       <div><span>Qty</span><strong>{request.quantity}</strong></div>
                       <div><span>Needed by</span><strong>{prettyDate(request.deadline)}</strong></div>
-                      <div><span>Submitted</span><strong>{new Date(request.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</strong></div>
                       <div><span>Payment</span><strong>{request.payment_status === "paid" ? "Paid" : request.payment_status === "deposit_paid" ? "Deposit paid" : "Due"}</strong></div>
                     </div>
 
                     <div className="adminRequestQuickActions">
-                      <RequestStatusControl id={request.id} initialStatus={request.status} delivery={request.delivery} initialReviewRequestSentAt={request.review_request_sent_at} />
-                      <button className="btn adminViewButton" type="button" onClick={() => setOpenRequestId(isOpen ? null : request.id)} aria-expanded={isOpen}>
-                        {isOpen ? "Close details" : "View details"}
+                      <button className="btn adminViewButton" type="button" onClick={() => { setOpenRequestId(request.id); setOrderSection(next.section); }}>
+                        {next.label}
                       </button>
-                      <button className="btn secondary" type="button" onClick={() => { setMessageRequestId(request.id); setTab("messages"); }}>
-                        Message customer
-                      </button>
+                      {!isOpen ? <button className="btn secondary" type="button" onClick={() => { setOpenRequestId(request.id); setOrderSection("overview"); }}>Open order</button> : null}
                       {request.is_admin_test_order && request.status === "cancelled" ? <DeleteTestOrderButton requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} /> : null}
                     </div>
                   </div>
 
-                  <details className="adminOrderDocuments adminOrderDocumentsAlways" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
+                  <details hidden={!isOpen || orderSection !== "history"} className="adminOrderDocuments" aria-label={`Documents for ${formatRequestNumber(request.request_number)}`}>
                     <summary className="adminOrderDocumentsHeading">
                       <div><span className="eyebrow">Documents</span><strong>Quote, invoice & receipt</strong></div>
                       <small>Open shortcuts</small>
@@ -435,6 +421,12 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
 
                   {isOpen ? (
                     <div className="adminRequestExpanded">
+                      <div className="compactOrderNext"><strong>Next: {next.label}</strong><span>{next.note}</span></div>
+                      <nav className="compactOrderTabs" aria-label="Order sections">
+                        {ORDER_SECTIONS.map(section => <button key={section.value} type="button" aria-pressed={orderSection === section.value} onClick={() => setOrderSection(section.value)}>{section.label}</button>)}
+                      </nav>
+                      <details hidden={orderSection !== "overview" && orderSection !== "production"} className="compactStatusEditor"><summary>Change order status</summary><RequestStatusControl key={`${request.id}:${request.status}`} id={request.id} initialStatus={request.status} delivery={request.delivery} initialReviewRequestSentAt={request.review_request_sent_at} /></details>
+                      <div hidden={orderSection !== "overview"}>
                       <AdminCustomerIdeasPanel requestId={request.id} artworkInstructions={request.artwork_instructions} customerNotes={request.notes} />
                       <div className="adminDetailGrid">
                         <section className="adminDetailGroup">
@@ -451,8 +443,9 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                           <dl className="adminDefinitionList">
                             <div><dt>Product</dt><dd>{request.product}</dd></div>
                             <div><dt>Quantity</dt><dd>{request.quantity}</dd></div>
-                            <div><dt>Style</dt><dd className="adminWrapValue">{request.item_type || "Not specified"}</dd></div>
-                            <div><dt>Colors</dt><dd className="adminWrapValue">{request.colors || "Not specified"}</dd></div>
+                            {request.item_type && request.item_type.toLowerCase() !== request.product.toLowerCase() ? <div><dt>Style</dt><dd className="adminWrapValue">{request.item_type}</dd></div> : null}
+                            {request.colors ? <div><dt>Colors</dt><dd className="adminWrapValue">{request.colors}</dd></div> : null}
+                            {request.sizes ? <div><dt>Sizes</dt><dd className="adminWrapValue">{request.sizes}</dd></div> : null}
                             <div><dt>Front / back</dt><dd>{request.print_sides || "Not specified"}</dd></div>
                             <div><dt>Fulfillment</dt><dd>{request.delivery || "Not specified"}</dd></div>
                             <div><dt>Needed by</dt><dd>{prettyDate(request.deadline)}</dd></div>
@@ -470,12 +463,8 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         </section>
 
                         <section className="adminDetailGroup adminDetailGroupWide">
-                          <div className="adminDetailGroupTitle"><span>03</span><h4>Customer mockup & production breakdown</h4></div>
-                          <AdminCustomerMockupSummary requestId={request.id} />
-                          <OrderWorksheetControl requestId={request.id} customerEmail={request.email} customerName={request.customer_name} product={request.product} />
-                          {request.order_items?.length ? <ProductionChecklist requestNumber={formatRequestNumber(request.request_number)} customerName={request.customer_name} items={request.order_items} printSides={request.print_sides} /> : null}
                           <details className="adminTechnicalDetails">
-                            <summary>Technical placement data</summary>
+                            <summary>Advanced placement data</summary>
                             <div className="adminLongFields">
                               {request.sizes ? <div><span>Current size summary</span><pre className="adminScrollableText">{request.sizes}</pre></div> : null}
                               {request.placements?.length ? <div><span>Placement codes</span><p>{request.placements.map(prettyPlacement).join(" · ")}</p></div> : null}
@@ -486,11 +475,15 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         </section>
 
                       </div>
+                      </div>
 
+                      <div hidden={orderSection !== "design"}>
+                      <AdminCustomerMockupSummary requestId={request.id} />
+                      <details className="compactExtraDetails"><summary>Collect sizes with an order worksheet</summary><OrderWorksheetControl requestId={request.id} customerEmail={request.email} customerName={request.customer_name} product={request.product} /></details>
                       <div className="requestFiles adminFilesBlock">
                         <span>Artwork files</span>
                         {request.fileLinks.length ? (
-                          <><div className="fileLinkRow">{request.fileLinks.map((file, index) => <a className="fileChip" href={file.url} target="_blank" rel="noreferrer" key={file.path} title={`Open the original customer upload: ${customerArtworkFileName(file.path, index)}`}>Download original · {customerArtworkFileName(file.path, index)} ↗</a>)}</div><p className="muted adminArtworkQualityNote">Check resolution, transparency, and print readiness. Do not promise that low-resolution art can simply be enhanced. Vector redraw/vectorization is preferred for logos. For detailed artwork, send a recreated proof for customer approval because cleanup can change lettering, shapes, faces, or colors. Add all artwork-preparation work to the quote.</p></>
+                          <><div className="fileLinkRow">{request.fileLinks.map((file, index) => <a className="fileChip" href={file.url} target="_blank" rel="noreferrer" key={file.path} title={`Open the original customer upload: ${customerArtworkFileName(file.path, index)}`}>Download original · {customerArtworkFileName(file.path, index)} ↗</a>)}</div><details className="compactExtraDetails"><summary>Artwork preparation tips</summary><p className="muted">Check resolution, transparency and print readiness. Use vector redraw for logos where appropriate. Have the customer approve any recreated artwork, and include preparation work in the quote.</p></details></>
                         ) : <p className="muted">No artwork uploaded.</p>}
                       </div>
 
@@ -504,18 +497,20 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         initialNote={request.artwork_rights_review_note}
                       />
 
-                      <section className="adminQuoteSection adminMockupSection">
-                        <div className="adminDetailGroupTitle"><span>✦</span><h4>Mockup Studio</h4></div>
+                      <details className="adminQuoteSection adminMockupSection compactExtraDetails">
+                        <summary>Create or edit a mockup</summary>
                         <MockupStudio requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} />
-                      </section>
+                      </details>
 
                       <section className="adminQuoteSection">
                         <div className="adminDetailGroupTitle"><span>✦</span><h4>Mockup review</h4></div>
                         <MockupReviewControl requestId={request.id} customerName={request.customer_name} customerEmail={request.email} />
                       </section>
 
+                      </div>
+                      <div hidden={orderSection !== "quote"}>
                       <section className="adminQuoteSection">
-                        <div className="adminDetailGroupTitle"><span>$</span><h4>Proof + quote approval</h4></div>
+                        <div className="adminDetailGroupTitle"><h4>Quote & customer approval</h4></div>
                         {quoteReady ? (
                           <QuoteBuilder requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} product={request.product} quantity={request.quantity} orderItems={request.order_items} printSides={request.print_sides} customerIdeas={customerIdeaLines(request.artwork_instructions)} delivery={request.delivery} shippingAddress={request.shipping_address} existingQuote={quote} discountCodes={discountCodes} requestedDiscountCode={request.requested_discount_code} amountPaidCents={request.amount_paid_cents} pricingProfiles={productPricing} businessSettings={businessSettings} customerEmail={request.email} reorderPriceLock={request.reorder_price_lock} />
                         ) : <div className="requestWarning">Proof + quote data needs the latest database updates. If proofs were already working, run <code>supabase/moore_made_phase6_46_size_pricing_final_tax.sql</code>.</div>}
@@ -543,6 +538,9 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         </section>
                       ) : null}
 
+                      </div>
+                      <div hidden={orderSection !== "production"}>
+                      {request.order_items?.length ? <ProductionChecklist requestNumber={formatRequestNumber(request.request_number)} customerName={request.customer_name} items={request.order_items} printSides={request.print_sides} /> : <p className="muted">Use the products, sizes and placements in Overview to check this order.</p>}
                       <section className="adminQuoteSection adminFulfillmentSection">
                         <div className="adminDetailGroupTitle"><span>✓</span><h4>Fulfillment</h4></div>
                         <FulfillmentActions
@@ -567,12 +565,16 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
                         <FinishedProductPhotosManager requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} customerEmail={request.email} />
                       </section>
 
+                      </div>
+                      <div hidden={orderSection !== "history"}>
+                      <button className="btn secondary" type="button" onClick={() => { setMessageRequestId(request.id); setTab("messages"); }}>Open customer conversation</button>
                       <section className="adminQuoteSection adminNotificationSection">
                         <div className="adminDetailGroupTitle"><span>✉</span><h4>Email notifications</h4></div>
                         <OrderNotificationControl requestId={request.id} requestNumber={formatRequestNumber(request.request_number)} customerEmail={request.email} orderStatus={request.status} paymentStatus={request.payment_status} delivery={request.delivery} />
                       </section>
 
                       <div className="requestCreated">Submitted {submittedDate(request.created_at)}</div>
+                      </div>
                     </div>
                   ) : null}
                 </article>
@@ -644,6 +646,6 @@ export function AdminWorkspace({ requests, quotes, showcasePosts, messageThreads
           </div>
         </section>
       )}
-    </>
+    </div>
   );
 }

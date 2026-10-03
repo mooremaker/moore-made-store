@@ -135,10 +135,8 @@ export async function POST(request: Request, { params }: RouteProps) {
 
     await supabase.from("quote_revisions").update({ status: response, responded_at: respondedAt }).eq("quote_id", quote.id).eq("revision_number", Math.max(1, Number(quote.revision_number || 1)));
 
-    await supabase
-      .from("custom_requests")
-      .update({ status: response === "approved" ? "approved" : "reviewing" })
-      .eq("id", quote.request_id);
+    // The quote status trigger updates the order in the same database transaction.
+    // A failed order update now rolls back the quote response as well.
 
     if (response === "approved" && quote.discount_code_id && Number(quote.promo_discount_cents || 0) > 0) {
       const { error: redemptionError } = await supabase.from("discount_redemptions").upsert({

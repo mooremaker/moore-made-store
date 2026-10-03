@@ -112,6 +112,7 @@ export type QuoteRecord = {
   estimated_margin_basis_points?: number;
   revision_number?: number;
   revision_reason?: string | null;
+  personal_email_message?: string | null;
   notes: string | null;
   valid_until: string | null;
   proof_paths?: string[];

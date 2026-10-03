@@ -7,20 +7,25 @@ import type { MockupDocument } from "@/lib/mockup-types";
 export function AdminCustomerMockupSummary({ requestId }: { requestId: string }) {
   const [document, setDocument] = useState<MockupDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
     fetch(`/api/admin/mockups?requestId=${encodeURIComponent(requestId)}`, { cache: "no-store" })
-      .then(async (response) => response.ok ? response.json() : null)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load saved customer design.");
+        return response.json();
+      })
       .then((result) => { if (alive) setDocument(result?.document || null); })
-      .catch(() => {})
+      .catch(() => { if (alive) setLoadFailed(true); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [requestId]);
 
   if (loading) return <div className="adminMockupSummaryLoading">Checking customer mockup…</div>;
+  if (loadFailed) return <div className="adminMockupStatus"><strong>Saved design unavailable</strong><span>We couldn’t load this design. Check again before deciding whether a new mockup is needed.</span></div>;
   if (!document?.views?.length) {
-    return <div className="adminMockupStatus isMissing"><strong>No customer mockup completed</strong><span>The customer did not finish a saved mockup. Review their order notes, then create and send a proof before quoting.</span></div>;
+    return <div className="adminMockupStatus"><strong>No saved customer design</strong><span>Uploaded proofs and emailed mockups may still exist. Check the proof history before creating another design.</span></div>;
   }
 
   const requestedViews = document.views.filter((view) => view.customerIntent?.enabled);

@@ -200,6 +200,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const defaultShippingChargeCents = fulfillmentMode === "shipping" ? Math.max(0, Number(businessSettings?.default_shipping_charge_cents ?? 0)) : 0;
   const [revisionMode, setRevisionMode] = useState(false);
   const locked = waitingOnCustomer || (approvedQuote && !revisionMode);
+  const [quoteStep, setQuoteStep] = useState(0);
+  const quoteSteps = ["Proofs", "Price & tax", "Costs & profit", "Review & send"];
   const [open, setOpen] = useState(Boolean(existingQuote));
   const [lines, setLines] = useState<EditableLine[]>(
     existingQuote?.line_items?.length
@@ -237,7 +239,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
   const [laborRate, setLaborRate] = useState(existingQuote?.labor_rate_cents ? (existingQuote.labor_rate_cents / 100).toFixed(2) : (defaultLaborRateCents / 100).toFixed(2));
   const [revisionReason, setRevisionReason] = useState("");
   const [notes, setNotes] = useState(existingQuote?.notes ?? "");
-  const [personalEmailMessage, setPersonalEmailMessage] = useState("");
+  const [personalEmailMessage, setPersonalEmailMessage] = useState(existingQuote?.personal_email_message ?? "");
   const [validUntil, setValidUntil] = useState(existingQuote?.valid_until ?? "");
   const [paymentTerms, setPaymentTerms] = useState<"full" | "deposit">(existingQuote?.payment_terms === "deposit" || (!existingQuote && isReorderPriceLocked && reorderPriceLock?.paymentTerms === "deposit") ? "deposit" : "full");
   const [depositAmount, setDepositAmount] = useState(dollars(existingQuote?.deposit_amount_cents ?? (isReorderPriceLocked ? lockedNumber(reorderPriceLock, "depositAmountCents") : 0)));
@@ -662,7 +664,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       setError("Every quote line needs a description.");
       return;
     }
-    if (lineItems.some((item) => item.unitPriceCents <= 0)) {
+    if (action === "send" && lineItems.some((item) => item.unitPriceCents <= 0)) {
       setError("Enter a unit price for each quote line.");
       return;
     }
@@ -773,7 +775,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
           paymentTerms,
           depositAmountCents: paymentTerms === "deposit" ? centsFromInput(depositAmount) : null,
           notes,
-          personalEmailMessage: action === "send" ? personalEmailMessage.trim() : "",
+          personalEmailMessage: personalEmailMessage.trim(),
           proofItems: proofPayload,
           includeSavedMockup: savedMockupWillBeAttached,
           validUntil,
@@ -783,7 +785,6 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       if (!response.ok) throw new Error(result.error || "Could not save proof and quote.");
       setProofItems((current) => current.map((item) => ({ ...item, newFiles: [] })));
       setMessage(result.message || (action === "send" ? "Proof and quote sent." : "Draft saved."));
-      if (action === "send") setPersonalEmailMessage("");
       if (approvedQuote && revisionMode && action === "send") setRevisionMode(false);
       router.refresh();
       // The payment panel lives outside this client editor. Reload after a send so
@@ -810,7 +811,9 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
       </button>
 
       {open ? (
-        <div className="quoteBuilderBody">
+        <div className="quoteBuilderBody compactQuoteEditor">
+          <nav className="quoteStepNav" aria-label="Quote sections">{quoteSteps.map((label, index) => <button key={label} type="button" aria-current={quoteStep === index ? "step" : undefined} onClick={() => setQuoteStep(index)}><span>{index + 1}</span>{label}</button>)}</nav>
+          <div className="quoteProgressSummary"><span>Customer total <strong>{money(total)}</strong></span><span>Estimated profit <strong>{money(estimatedProfit)}</strong></span><button type="button" className="textButton" onClick={() => setQuoteStep(2)}>{profitabilityWarnings.length ? `${profitabilityWarnings.length} profitability warning${profitabilityWarnings.length === 1 ? "" : "s"} — review` : "Profit check passed"}</button></div>
           {existingQuote?.status === "approved" && !revisionMode ? <div className="quoteLocked quoteRevisionLocked"><span>This proof and quote have been approved. The approved version stays protected.</span><button className="btn secondary" type="button" onClick={() => { setRevisionMode(true); setRevisionReason(""); }}>Revise quote</button></div> : null}
           {existingQuote?.status === "approved" && revisionMode ? <div className="quoteRevisionMode"><div><strong>Creating quote revision {Number(existingQuote.revision_number || 1) + 1}</strong><span>The current approved quote will not change until you send this revision. Sending it will require the customer to approve the new total/details again.</span></div><button className="textButton" type="button" onClick={() => window.location.reload()}>Cancel revision</button></div> : null}
           {waitingOnCustomer ? <div className="quoteWaitingNotice"><strong>Sent to the customer for review</strong><span>The quote is protected while they review it. You can resend the approval email or copy the approval link below without changing anything.</span></div> : null}
@@ -828,7 +831,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
             <div className="proofChangeRequest"><strong>Customer requested changes</strong><p>{existingQuote.customer_change_request}</p></div>
           ) : null}
 
-          <section className="proofBuilderSection">
+          <section className="proofBuilderSection" hidden={quoteStep !== 0}>
             <div className="proofBuilderHeading scalableProofHeading">
               <div><span className="eyebrow">Product proofs</span><h5>Create or upload the customer proof</h5><p>Use a saved Shop/Mockup Studio design, or upload a mockup you created in Canva, Photoshop, or another program.</p></div>
               <div className="proofBuilderHeaderActions">
@@ -906,18 +909,10 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
             {!locked ? <button className="btn secondary addProofItemButton" type="button" onClick={() => setProofItems((current) => [...current, { clientKey: newClientKey(), title: "", notes: "", assets: [], newFiles: [] }])}>+ Add another product / proof item</button> : null}
           </section>
 
-          <section className="proofBuilderSection">
-            <div className="proofBuilderHeading"><div><span className="eyebrow">Quote setup</span><h5>Build the customer quote</h5><p>Start with the suggested price, check your private costs, then handle tax and send. Customers only see the finished quote—not your costs or profit.</p></div></div>
-
-            <div className="quoteAdminGuide" aria-label="Quote setup steps">
-              <div><span>1</span><strong>Set the price</strong></div>
-              <div><span>2</span><strong>Check private costs</strong></div>
-              <div><span>3</span><strong>Tax & discount</strong></div>
-              <div><span>4</span><strong>Send for approval</strong></div>
-            </div>
-
+          <section className="proofBuilderSection" hidden={quoteStep === 0}>
+            <div hidden={quoteStep !== 1}>
             <div className="manualQuoteNotice quotePriceStart">
-              <div><span>Step 1 · Customer price</span><strong>Start with a price, then adjust if you want</strong><small>The suggested price uses the private costs and your profit safeguard. Applying it updates the shirt prices below—saving a draft alone does not.</small></div>
+              <div><span>Customer price</span><strong>Start with a price, then adjust if you want</strong><small>The suggested price uses the private costs and your profit safeguard. Applying it updates the shirt prices below—saving a draft alone does not.</small></div>
               <div className="quotePriceStartNumbers">
                 <span>Suggested total before tax<strong>{money(recommendedRevenue)}</strong></span>
                 <span>Current total before tax<strong>{money(revenueBeforeTax)}</strong></span>
@@ -982,13 +977,15 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
               </div>
             </div>
 
-            <details className="internalCostPanel adminCostDisclosure">
-              <summary>
-                <div className="adminCostSummaryTitle"><span>2</span><div><strong>Check Moore Made&apos;s cost and profit</strong><small>Private—customers never see these numbers. Expand before tax to verify that the quote is profitable.</small></div></div>
+            </div>
+            <div hidden={quoteStep !== 2}>
+            <div className="internalCostPanel adminCostDisclosure">
+              <div className="quoteCostHeading">
+                <div className="adminCostSummaryTitle"><span>2</span><div><strong>Check Moore Made&apos;s cost and profit</strong><small>Private—customers never see these numbers. Review these estimates before sending.</small></div></div>
                 <div className="adminCostSummaryNumbers"><span>Estimated cost <strong>{money(internalTotalCost)}</strong></span><span>Estimated profit <strong className={estimatedProfit < 0 ? "profitLossText" : "profitPositiveText"}>{money(estimatedProfit)}</strong></span>{profitabilityWarnings.length ? <span className="profitabilityWarningCount">Pre-send check <strong>{profitabilityWarnings.length} warning{profitabilityWarnings.length === 1 ? "" : "s"}</strong></span> : <span className="profitabilityPassedCount">Pre-send check <strong>Passed</strong></span>}</div>
-              </summary>
+              </div>
               <div className="adminCostDisclosureBody">
-                <div className="proofBuilderHeading"><div><span className="eyebrow">Step 2 · Private cost check</span><h5>What will this entire order cost Moore Made?</h5><p>Enter totals for the whole order—not per-item amounts. Never count the same cost twice. Estimates are fine before production; your financial log can hold the final actual amounts.</p></div>{!locked ? <button className="btn secondary" type="button" onClick={applySuggestedJobCosts}>Use starter estimates</button> : null}</div>
+                <div className="proofBuilderHeading"><div><span className="eyebrow">Private cost check</span><h5>What will this entire order cost Moore Made?</h5><p>Enter totals for the whole order—not per-item amounts. Never count the same cost twice. Estimates are fine before production; your financial log can hold the final actual amounts.</p></div>{!locked ? <button className="btn secondary" type="button" onClick={applySuggestedJobCosts}>Use starter estimates</button> : null}</div>
                 <label className="outsourcedOrderToggle"><input type="checkbox" checked={isOutsourcedOrder} onChange={(event) => setIsOutsourcedOrder(event.target.checked)} disabled={locked} /><span><strong>This is an outsourced order</strong><small>Uses the configured outsourced minimum margin ({(Number(businessSettings?.outsourced_min_margin_basis_points ?? 3500) / 100).toFixed(0)}%).</small></span></label>
 
                 <div className="adminCostGroup">
@@ -1040,7 +1037,7 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
                   <p>This quote contributes <strong>{money(Math.max(0, estimatedProfit))}</strong>, or <strong>{quoteWeeklyProfitContribution.toFixed(1)}%</strong>, toward the {money(weeklyProfitGoalCents)} weekly profit goal.</p>
                 </div>
 
-                <details className="whyThisPrice" open>
+                <details className="whyThisPrice">
                   <summary>Why this price? · private breakdown</summary>
                   <div className="whyThisPriceRows">
                     <div><span>Customer revenue before tax</span><strong>{money(revenueBeforeTax)}</strong></div>
@@ -1074,12 +1071,14 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
                   </div>
                 </details>
               </div>
-            </details>
+            </div>
+            </div>
+            <div hidden={quoteStep !== 3}>
 
             {approvedQuote && revisionMode ? <div className="quoteRevisionReason"><label className="field"><span>Reason for revision *</span><input value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} maxLength={500} placeholder="Example: Quantity increased from 4 shirts to 7." /></label></div> : null}
 
             <div className="paymentTermsEditor">
-              <div className="proofBuilderHeading"><div><span className="eyebrow">Step 4 · Payment</span><h5>When should the customer pay?</h5><p>Use full payment for normal orders. Choose a deposit only when Moore Made intentionally wants to collect part now and the remaining balance later.</p></div></div>
+              <div className="proofBuilderHeading"><div><span className="eyebrow">Payment terms</span><h5>When should the customer pay?</h5><p>Use full payment for normal orders. Choose a deposit only when Moore Made intentionally wants to collect part now and the remaining balance later.</p></div></div>
               <div className="paymentTermsOptions">
                 <label className={`paymentTermOption ${paymentTerms === "full" ? "selected" : ""}`}>
                   <input type="radio" name={`paymentTerms-${requestId}`} value="full" checked={paymentTerms === "full"} onChange={() => setPaymentTerms("full")} disabled={locked || isReorderPriceLocked} />
@@ -1098,8 +1097,8 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
 
             <div className="quoteMetaGrid">
               <label className="field"><span>Approval valid until</span><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={locked} /></label>
-              <label className="field quoteNotes"><span>Quote / production notes</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="List final colors, exact sizes and quantities, pickup, and production terms…" disabled={locked} /><small className="fieldHelp">Shown on the customer quote and Pro Forma. Include the exact size breakdown if it is not in the original request.</small></label>
-              {!locked ? <label className="field quoteEmailMessage"><span>Personal email message (optional)</span><textarea value={personalEmailMessage} onChange={(e) => setPersonalEmailMessage(e.target.value)} maxLength={1500} placeholder="Hi Taylor! I’m so glad your family likes the design…" /><small className="fieldHelp">Included only in the approval email when you send. Not shown on the quote or Pro Forma; not saved with a draft.</small></label> : null}
+              <label className="field quoteNotes"><span>Customer quote notes</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="List final colors, exact sizes and quantities, pickup, and production terms…" disabled={locked} /><small className="fieldHelp">Shown on the customer quote and Pro Forma. Include the exact size breakdown if it is not in the original request.</small></label>
+              {!locked ? <label className="field quoteEmailMessage"><span>Personal email message (optional)</span><textarea value={personalEmailMessage} onChange={(e) => setPersonalEmailMessage(e.target.value)} maxLength={1500} placeholder="Hi Taylor! I’m so glad your family likes the design…" /><small className="fieldHelp">Saved with your draft and included in the approval email. Customer quote and Pro Forma use the separate quote notes.</small></label> : null}
             </div>
 
             <div className="quoteFinalReview">
@@ -1115,13 +1114,14 @@ export function QuoteBuilder({ requestId, requestNumber, product, quantity, exis
                 {amountPaidCents > 0 ? <><div><span>Already paid</span><strong>{money(amountPaidCents)}</strong></div><div><span>Still owed</span><strong>{money(remainingAfterPayments)}</strong></div>{overpaidCents > 0 ? <div className="quoteCreditWarning"><span>Credit / refund review</span><strong>{money(overpaidCents)}</strong></div> : null}</> : null}
               </div>
             </div>
+            </div>
           </section>
 
           {existingQuote?.revisions?.length ? <section className="quoteRevisionHistory"><div className="proofBuilderHeading"><div><span className="eyebrow">History</span><h5>Quote revisions</h5><p>Earlier sent/approved totals stay in the record instead of being overwritten.</p></div></div><div className="quoteRevisionList">{existingQuote.revisions.map((revision) => <div key={revision.id}><span>Revision {revision.revision_number}</span><strong>{money(revision.total_cents)}</strong><small>{QUOTE_STATUS_LABELS[revision.status]}{revision.revision_reason ? ` · ${revision.revision_reason}` : ""}</small></div>)}</div></section> : null}
 
-          {error ? <div className="formError">{error}</div> : null}
+          {error ? <div className="formError" role="alert">{error}</div> : null}
           {message ? <div className="quoteSuccess">{message}</div> : null}
-          {!locked ? <div className="quoteActions">{!(approvedQuote && revisionMode) ? <button className="btn secondary" type="button" disabled={saving} onClick={() => submit("save")}>{saving ? "Saving…" : "Save draft"}</button> : null}<button className="btn" type="button" disabled={saving} onClick={() => submit("send")}>{saving ? "Working…" : approvedQuote && revisionMode ? "Send revised price for approval" : existingQuote?.status === "changes_requested" ? "Send updated proof + price" : "Send proof + price for customer approval"}</button></div> : null}
+          {!locked ? <div className="quoteActions">{!(approvedQuote && revisionMode) ? <button className="btn secondary" type="button" disabled={saving} onClick={() => submit("save")}>{saving ? "Saving…" : "Save draft"}</button> : null}{quoteStep < 3 ? <button className="btn" type="button" onClick={() => setQuoteStep(quoteStep + 1)}>Continue · {quoteSteps[quoteStep + 1]}</button> : <button className="btn" type="button" disabled={saving} onClick={() => submit("send")}>{saving ? "Working…" : approvedQuote && revisionMode ? "Send revised price for approval" : existingQuote?.status === "changes_requested" ? "Send updated proof + price" : "Send proof + price for customer approval"}</button>}</div> : null}
           {waitingOnCustomer ? <ApprovalDeliveryControl requestId={requestId} customerEmail={customerEmail} /> : null}
         </div>
       ) : null}

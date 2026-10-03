@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "node scripts/dev-workspace.mjs --preview",
+    "dev:preview": "node scripts/dev-workspace.mjs --preview",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "qa": "node scripts/build-workspace.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "latest",
