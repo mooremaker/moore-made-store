@@ -19,3 +19,20 @@ export function dueReminders(today: string) {
     return [14, 7, 0].includes(days) ? [{ payment, days }] : [];
   });
 }
+
+export type BeachFrequency = "monthly" | "biweekly" | "weekly";
+
+// Each collection retains its exact total and deadline; alternative views split it up.
+export function beachPaymentBreakdown(frequency: BeachFrequency) {
+  const count = frequency === "weekly" ? 4 : frequency === "biweekly" ? 2 : 1;
+  return beachHousePayments.flatMap((payment) => Array.from({ length: count }, (_, index) => {
+    const date = new Date(`${payment.id}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - (count - 1 - index) * (frequency === "biweekly" ? 14 : 7));
+    const id = date.toISOString().slice(0, 10);
+    const format = (amount: string) => (Number(amount) / count).toFixed(2).replace(/\.00$/, "");
+    return { ...payment, id, collectionId: payment.id,
+      date: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date),
+      shortDate: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(date),
+      room: format(payment.room), person: format(payment.person) };
+  }));
+}

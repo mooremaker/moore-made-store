@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { beachHousePayments } from "@/lib/beach-house-payments";
+import { useEffect, useState } from "react";
+import { beachHousePayments, beachPaymentBreakdown, type BeachFrequency } from "@/lib/beach-house-payments";
 import styles from "./page.module.css";
 
 const storageKey = "beach-house-2027:checked:v1";
 
 export function PaymentSchedule({ savedEnabled = false }: { savedEnabled?: boolean }) {
+  const [frequency, setFrequency] = useState<BeachFrequency>("monthly");
   const [checked, setChecked] = useState<string[]>([]);
   const [savedProfile, setSavedProfile] = useState(false);
   const [savingCheck, setSavingCheck] = useState(false);
@@ -51,11 +52,16 @@ export function PaymentSchedule({ savedEnabled = false }: { savedEnabled?: boole
 
   return (
     <div className={styles.schedule}>
+      <div className={styles.frequencyTabs} role="group" aria-label="Payment frequency">
+        {(["monthly", "biweekly", "weekly"] as const).map((value) => <button type="button" aria-pressed={frequency === value} onClick={() => setFrequency(value)} key={value}>{value === "monthly" ? "Monthly" : value === "biweekly" ? "Every 2 weeks" : "Weekly"}</button>)}
+      </div>
+      <p className={styles.small}>{frequency === "monthly" ? "Five collection dates. Pay early or in smaller amounts if you prefer." : frequency === "biweekly" ? "Each monthly amount split into two payments, two weeks apart. Same totals and collection deadlines." : "Each monthly amount split into four weekly payments. Same totals and collection deadlines."}</p>
+      {frequency !== "monthly" ? <p className={styles.small}>These are optional planning dates. Use the Monthly tab to save your collection checklist. Email reminders follow the five collection dates.</p> : null}
       <div className={styles.scheduleHead} aria-hidden="true"><span /><span>Payment date</span><span>Room / person</span><span>Pool</span><span /></div>
-      {beachHousePayments.map((payment) => (
-        <div className={`${styles.paymentRow} ${checked.includes(payment.id) ? styles.checked : ""}`} key={payment.id}>
-          <input type="checkbox" checked={checked.includes(payment.id)} disabled={savingCheck} onChange={() => toggle(payment.id)} id={`payment-${payment.id}`} aria-label={`Mark ${payment.date} payment complete on your checklist`} />
-          <label htmlFor={`payment-${payment.id}`}><span className={styles.fullDate}>{payment.date}</span><span className={styles.shortDate}>{payment.shortDate}</span></label>
+      {beachPaymentBreakdown(frequency).map((payment) => (
+        <div className={`${styles.paymentRow} ${frequency === "monthly" && checked.includes(payment.id) ? styles.checked : ""}`} key={payment.id}>
+          {frequency === "monthly" ? <input type="checkbox" checked={checked.includes(payment.id)} disabled={savingCheck} onChange={() => toggle(payment.id)} id={`payment-${payment.id}`} aria-label={`Mark ${payment.date} payment complete on your checklist`} /> : <span aria-hidden="true" />}
+          <label htmlFor={frequency === "monthly" ? `payment-${payment.id}` : undefined}><span className={styles.fullDate}>{payment.date}</span><span className={styles.shortDate}>{payment.shortDate}</span></label>
           <span aria-label={`$${payment.room} per room, $${payment.person} per person`}>${payment.room}/{payment.person}</span>
           <span><span className={styles.fullPool}>{payment.pool}</span><span className={styles.shortPool}>{payment.pool.slice(0, 3)}</span></span>
           <a href={payment.href} aria-label={`Pay ${payment.date} in the ${payment.pool} Cash App pool`}>Pay now</a>
@@ -64,40 +70,5 @@ export function PaymentSchedule({ savedEnabled = false }: { savedEnabled?: boole
       {savedProfile ? <p className={styles.small}>Your checklist is saved to your account. Confirmed payment balances are shown below.</p> : null}
       {checkError ? <p role="alert" className={styles.formError}>{checkError}</p> : null}
     </div>
-  );
-}
-
-export function EmailUpdates({ enabled = false }: { enabled?: boolean }) {
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
-  async function subscribe(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true); setError(""); setMessage("");
-    try {
-      const response = await fetch("/api/beach-house-2027/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, consent: true, website: new FormData(event.currentTarget).get("website") }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Please try again shortly.");
-      setMessage(result.message || "Check your inbox to confirm your email and turn on reminders.");
-      setEmail("");
-    } catch (problem) { setError(problem instanceof Error ? problem.message : "Please try again shortly."); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <section className={styles.section} aria-labelledby="email-heading">
-      <h2 id="email-heading">Want email updates?</h2>
-      <p>Get payment reminders two weeks before, one week before, and on each payment date.</p>
-      <form onSubmit={subscribe} className={styles.emailForm}>
-        <label htmlFor="beach-email">Email address</label>
-        <div className={styles.emailFields}><input id="beach-email" type="email" autoComplete="email" maxLength={254} placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={busy || !enabled} /><button type="submit" disabled={busy || !enabled}>{busy ? "Sending…" : "Send me reminders"}</button></div>
-        <label className={styles.honeypot}>Website<input name="website" autoComplete="off" tabIndex={-1} /></label>
-        <p className={styles.small}>{enabled ? "Confirm your email to start. You can unsubscribe anytime." : "Email reminders are being set up. Check back soon."}</p>
-        {message ? <p role="status">{message}</p> : null}
-        {error ? <p role="alert" className={styles.formError}>{error}</p> : null}
-      </form>
-    </section>
   );
 }

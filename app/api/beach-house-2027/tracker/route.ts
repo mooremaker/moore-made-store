@@ -1,3 +1,4 @@
+import { setBeachReminderPreference } from "@/lib/beach-house-reminder-preferences";
 import { getCurrentUser, getUserRole } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { sameOrigin } from "@/lib/beach-house-email";
@@ -13,13 +14,14 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user || !user.email_confirmed_at) return reply({ error: "Sign in to save your payment progress." }, 401);
     const db = getSupabaseAdmin();
-    const [member, records, role] = await Promise.all([
+    const [member, records, role, reminders] = await Promise.all([
       db.from("beach_house_members").select("user_id,email,display_name,cash_app_name,room_number,share_people,status,checked_dates").eq("user_id", user.id).maybeSingle(),
       db.from("beach_house_contributions").select("id,member_id,pool_key,amount_cents,paid_date,reference,status,created_at,reviewed_at").eq("member_id", user.id).order("paid_date", { ascending: false }).order("created_at", { ascending: false }),
       getUserRole(user.id),
+      db.from("beach_house_subscribers").select("status").eq("email", (user.email || "").toLowerCase()).maybeSingle(),
     ]);
-    if (member.error || records.error) throw new Error("Tracker read failed.");
-    return reply({ email: user.email, member: member.data, records: records.data || [], organizer: role === "admin" });
+    if (member.error || records.error || reminders.error) throw new Error("Tracker read failed.");
+    return reply({ email: user.email, member: member.data, records: records.data || [], organizer: role === "admin", reminders: reminders.data?.status === "active" });
   } catch { console.error("Beach house tracker could not be loaded."); return reply({ error: "Your saved tracker could not be loaded. Please try again." }, 503); }
 }
 
@@ -32,13 +34,23 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object") return reply({ error: "Please check the form." }, 400);
     const db = getSupabaseAdmin();
+    if (body.action === "reminders") {
+      if (typeof body.enabled !== "boolean") return reply({ error: "Choose your reminder preference." }, 400);
+      await setBeachReminderPreference(user.email, body.enabled);
+      return reply({ ok: true });
+    }
     if (body.action === "join") {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       const cashAppName = typeof body.cashAppName === "string" ? body.cashAppName.trim() : "";
-      if (!name || name.length > 100 || !cashAppName || cashAppName.length > 100 || ![1,2,3,4].includes(body.room) || ![1,2].includes(body.sharePeople)) return reply({ error: "Enter your name, Cash App name, room, and room split." }, 400);
-      const result = await db.from("beach_house_members").insert({ user_id: user.id, email: user.email.toLowerCase(), display_name: name, cash_app_name: cashAppName, room_number: body.room, share_people: body.sharePeople });
+      if (!name || name.length > 100 || !cashAppName || cashAppName.length > 100 || ![1,2].includes(body.sharePeople)) return reply({ error: "Enter your name, Cash App name, and whether you’re sharing a room." }, 400);
+      const result = await db.from("beach_house_members").insert({ user_id: user.id, email: user.email.toLowerCase(), display_name: name, cash_app_name: cashAppName, room_number: 1, share_people: body.sharePeople });
       if (result.error?.code === "23505") return reply({ error: "You already have a trip profile. Refresh your tracker." }, 409);
       if (result.error) throw result.error;
+      // A pending profile has an internal placeholder until the organizer assigns a room.
+      if (typeof body.reminders === "boolean") {
+        try { await setBeachReminderPreference(user.email, body.reminders); }
+        catch { return reply({ ok: true, warning: "Your profile is saved, but reminders could not be updated. Use Save reminder preference below to try again." }); }
+      }
       return reply({ ok: true });
     }
     if (body.action === "check") {
@@ -59,7 +71,7 @@ export async function POST(request: Request) {
     if (!amount || !["january", "april"].includes(body.pool) || !validBeachDate(body.date, easternDate()) || reference.length > 120 || typeof body.id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.id)) return reply({ error: "Enter a valid amount, payment date, and pool." }, 400);
     const { data: member, error: memberError } = await db.from("beach_house_members").select("status").eq("user_id", user.id).maybeSingle();
     if (memberError) throw memberError;
-    if (member?.status !== "active") return reply({ error: "Sal needs to confirm your room before you can record payments." }, 403);
+    if (member?.status !== "active") return reply({ error: "Sal needs to confirm your share before you can record payments." }, 403);
     const payload = { id: body.id, member_id: user.id, pool_key: body.pool, amount_cents: amount, paid_date: body.date, reference: reference || null };
     const { error } = await db.from("beach_house_contributions").insert(payload);
     if (error?.code === "23505") {

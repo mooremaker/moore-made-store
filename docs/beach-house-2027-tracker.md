@@ -29,3 +29,11 @@ Every personal API derives the owner from the verified auth session. Client-supp
 Checks performed: TypeScript; exact-cent parsing; $50 installments and carry-forward; half/full room goals; pool separation; exclusion of pending/rejected records; signed-out and staff-MFA denial; ignored spoofed owner/status fields; owner-scoped record/checklist queries. These tests use isolated mocks and do not create real people, move money, or send emails. Actual database persistence and email sign-in require the migration and a real signed-in test after activation.
 
 Cash App's documented APIs cover Cash App Pay merchant integrations. This tracker uses manual confirmation of personal Pool contributions; it does not claim an automatic personal Pool webhook integration.
+
+
+## Unified profile and reminders
+Guests choose whether they share a room; they do not choose a room number. Pending records use an internal placeholder, and Sal assigns the room in the organizer view before activation. Sharing guests are reminded to coordinate with their roommate.
+
+The profile form includes email reminder consent. A verified signed-in user can activate or stop reminders for their own account email without a second confirmation email. Existing opt-in subscribers are preserved. Reminder status is visible and editable in the same progress section. No migration is required for these changes.
+
+Monthly, every-two-weeks, and weekly views retain the exact five collection totals and deadlines. Each monthly amount is divided into two payments 14 days apart, or four payments 7 days apart ending at that collection date. The first optional weekly payment is October 25, 2026. Monthly checklist dates and email reminder cadence remain the five collection dates; alternative rows are planning suggestions with Cash App links, not new obligations.
