@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { beachEmailPage, beachHouseEmailReady, emailLink, sendBeachEmail } from "@/lib/beach-house-email";
 import { dueReminders, easternDate } from "@/lib/beach-house-payments";
 import { publicSiteUrl, escapeHtml } from "@/lib/email";
+import { beachInstallmentCoverage } from "@/lib/beach-house-tracker";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const maxDuration = 60;
@@ -24,7 +25,20 @@ export async function GET(request: Request) {
       const { data: subscribers, error } = await db.from("beach_house_subscribers").select("id,email,unsubscribe_token").eq("status", "active").order("id").range(start, start + 99);
       if (error) throw error;
       for (const subscriber of subscribers || []) {
+        let coverage: ReturnType<typeof beachInstallmentCoverage> | null = null;
+        if (process.env.BEACH_HOUSE_TRACKER_ENABLED === "true") {
+          const member = await db.from("beach_house_members").select("user_id,share_people,status").eq("email", subscriber.email.toLowerCase()).maybeSingle();
+          if (member.error) throw member.error;
+          if (member.data?.status === "inactive") continue;
+          if (member.data?.status === "active") {
+            const records = await db.from("beach_house_contributions").select("pool_key,amount_cents,status").eq("member_id", member.data.user_id).eq("status", "confirmed");
+            if (records.error) throw records.error;
+            coverage = beachInstallmentCoverage(member.data.share_people === 1 ? 1 : 2, records.data || []);
+          }
+        }
         for (const { payment, days } of events) {
+          const installment = coverage?.find((item) => item.id === payment.id);
+          if (installment?.covered) continue;
           const now = new Date().toISOString();
           const lock = new Date(Date.now() + 5 * 60000).toISOString();
           const delivery = { subscriber_id: subscriber.id, payment_date: payment.id, days_before: days, locked_until: lock };

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import styles from "./page.module.css";
 import { EmailUpdates, PaymentSchedule } from "./PaymentTools";
+import SavedTracker from "./SavedTracker";
 
 export const metadata: Metadata = {
   title: "Beach House 2027 | Payment Plan",
@@ -32,7 +33,8 @@ export default function BeachHousePage() {
         <span className={styles.eyebrow}>Smaller payments, ahead of time</span>
         <h2 id="schedule-heading">Our monthly schedule</h2>
         <p>Amounts below are due by the listed date. You can pay early or cover your full share at once—just divide it between the two pools.</p>
-        <PaymentSchedule />
+        <PaymentSchedule savedEnabled={process.env.BEACH_HOUSE_TRACKER_ENABLED === "true"} />
+        <p className={styles.small}>Smaller payments are welcome. For example, $50 a week is fine—as long as your required total is covered by each collection date.</p>
         <p className={styles.small}>*Two people splitting equally. A room with one occupant owes the full room share.</p>
         <p className={styles.small}>Rounded payments collect $3 above the remaining house balance and will go towards payment processing fees from Fox Real Estate.</p>
       </section>
@@ -57,11 +59,12 @@ export default function BeachHousePage() {
         <p className={styles.small}>Both buttons open Cash App. Enter the amount you’re contributing and check the pool name and organizer before paying. Payments and contribution history are handled in Cash App.</p>
       </section>
 
+      <SavedTracker enabled={process.env.BEACH_HOUSE_TRACKER_ENABLED === "true"} />
       <EmailUpdates enabled={process.env.BEACH_HOUSE_REMINDERS_ENABLED === "true"} />
       <div className={styles.footerNotes}>
         <p>Coordinate with your roommate, set monthly reminders, and use your recognizable name in Cash App.</p>
         <p>Contact Sal early if you can’t make a payment or your plans change.</p>
-        <p>Contributions are tracked in Cash App. This page does not show live balances.</p>
+        <p>Cash App holds the money. Saved balances show payments confirmed by Sal; they do not sync automatically with Cash App.</p>
       </div>
     </div>
   );
