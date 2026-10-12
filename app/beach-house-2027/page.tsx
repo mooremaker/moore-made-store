@@ -34,7 +34,7 @@ export default function BeachHousePage() {
         <p>Amounts below are due by the listed date. You can pay early or cover your full share at once—just divide it between the two pools.</p>
         <PaymentSchedule />
         <p className={styles.small}>*Two people splitting equally. A room with one occupant owes the full room share.</p>
-        <p className={styles.small}>Rounded payments collect $3 above the remaining house balance.</p>
+        <p className={styles.small}>Rounded payments collect $3 above the remaining house balance and will go towards payment processing fees from Fox Real Estate.</p>
       </section>
 
       <section className={styles.section} aria-labelledby="pay-heading">
