@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/beach-house-2027/reminders", "schedule": "0 14 * * *" }
+  ]
+}
