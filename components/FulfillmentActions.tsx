@@ -95,9 +95,9 @@ export function FulfillmentActions({
   const addressComplete = Boolean(address.line1.trim() && address.city.trim() && address.state.trim() && address.postalCode.trim() && address.country.trim());
   const estimateLabel = mode === "shipping" ? "Estimated ship date" : mode === "delivery" ? "Estimated delivery-ready date" : "Estimated pickup-ready date";
   const finalLabel = mode === "shipping" ? "Shipped" : mode === "delivery" ? "Ready for delivery" : "Ready for pickup";
-  const noteLabel = mode === "shipping" ? "Shipping note" : mode === "delivery" ? "Delivery instructions / note" : "Pickup instructions / note";
+  const noteLabel = mode === "shipping" ? "Additional shipping note" : mode === "delivery" ? "Delivery instructions / note" : "Pickup instructions / note";
   const notePlaceholder = mode === "shipping"
-    ? "Anything the customer should know about this shipment."
+    ? "Example: Estimated delivery is expected by tomorrow night."
     : mode === "delivery"
       ? "Example: Your order is ready for local delivery. We’ll coordinate the drop-off time with you."
       : "Example: Your order is ready. Please call or text before pickup.";
@@ -260,7 +260,7 @@ export function FulfillmentActions({
           <label className="field"><span>Tracking number <small>(optional)</small></span><input value={trackingNumber} maxLength={200} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="1Z…" /></label>
           <label className="field"><span>Tracking link <small>(optional)</small></span><input value={trackingUrl} maxLength={1000} onChange={(e) => setTrackingUrl(e.target.value)} placeholder="https://…" /></label>
         </div> : null}
-        <label className="field"><span>{noteLabel} <small>(optional)</small></span><textarea value={note} maxLength={3000} onChange={(e) => setNote(e.target.value)} placeholder={notePlaceholder} /></label>
+        <label className="field"><span>{noteLabel} <small>(optional)</small></span><textarea value={note} maxLength={3000} onChange={(e) => setNote(e.target.value)} placeholder={notePlaceholder} />{mode === "shipping" ? <small className="fieldHelp">The email already says the order shipped, includes tracking, and thanks the customer. Add only extra details, such as the estimated delivery date.</small> : null}</label>
         {error ? <div className="formError">{error}</div> : null}
         {message ? <div className="quoteSuccess">{message}</div> : null}
         <button className="btn" type="button" disabled={working || methodWorking || paymentStatus !== "paid" || !savedMode} onClick={notifyCustomer}>{working ? "Sending…" : mode === "shipping" ? `Mark shipped + email ${requestNumber}` : mode === "delivery" ? `Mark ready for delivery + email ${requestNumber}` : `Mark ready for pickup + email ${requestNumber}`}</button>
