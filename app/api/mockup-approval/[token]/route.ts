@@ -9,12 +9,13 @@ export async function POST(_: Request, { params }: { params: Promise<{ token: st
   const supabase = getSupabaseAdmin();
   const { data: review } = await supabase
     .from("mockup_review_sends")
-    .select("id,request_id,version,approved_at,custom_requests(customer_name,product,request_number,email)")
+    .select("id,request_id,version,approved_at,custom_requests(customer_name,product,request_number,email,status)")
     .eq("public_token", token)
     .maybeSingle();
   if (!review) return NextResponse.json({ error: "This mockup approval link is unavailable." }, { status: 404 });
   const order = Array.isArray(review.custom_requests) ? review.custom_requests[0] : review.custom_requests;
   if (!order) return NextResponse.json({ error: "This order is unavailable." }, { status: 404 });
+  if (order.status === "cancelled") return NextResponse.json({ error: "This order has been cancelled." }, { status: 409 });
   if (!review.approved_at) {
     const approvedAt = new Date().toISOString();
     const { error } = await supabase.from("mockup_review_sends").update({ approved_at: approvedAt }).eq("id", review.id);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MockupFollowUp } from "./MockupFollowUp";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 const BUCKET = "quote-proof-files";
@@ -74,7 +75,7 @@ export function MockupReviewControl({ requestId, customerName, customerEmail }: 
     <label className="field"><span>Message to customer</span><textarea value={note} onChange={(event) => setNote(event.target.value)} /></label>
     <div className="mockupReviewActions"><input value={email} onChange={(event) => setEmail(event.target.value)} aria-label="Mockup review recipient" placeholder="customer@example.com"/><button className="btn" type="button" disabled={working} onClick={() => void send()}>{working ? "Sending…" : "Send mockups for review"}</button></div>
     <small>When an open employee roster exists, this email also includes its printable PDF and digital fill-out link.</small>
-    {history.length ? <div className="mockupReviewHistory"><strong>Sent mockup history</strong>{history.map((review) => <article key={review.id} className={"mockupReviewHistoryItem " + (review.approved_at ? "isApproved" : "")}><div><span className="eyebrow">{"Proof " + review.version}</span><strong>{review.approved_at ? "Approved by customer" : "Awaiting customer approval"}</strong><small>Sent {dateTime(review.sent_at)} to {review.recipient_emails.join(", ")}</small>{review.approved_at ? <small>Approved {dateTime(review.approved_at)}</small> : null}</div><div className="mockupReviewHistoryFiles">{review.files.map((file) => file.url ? <a key={file.path} href={file.url} target="_blank" rel="noreferrer">View {file.originalName}</a> : <span key={file.path}>{file.originalName}</span>)}</div></article>)}</div> : null}
+    {history.length ? <div className="mockupReviewHistory"><strong>Sent mockup history</strong>{history.map((review, index) => <article key={review.id} className={"mockupReviewHistoryItem " + (review.approved_at ? "isApproved" : "")}><div><span className="eyebrow">{"Proof " + review.version}</span><strong>{review.approved_at ? "Approved by customer" : "Awaiting customer approval"}</strong><small>Sent {dateTime(review.sent_at)} to {review.recipient_emails.join(", ")}</small>{review.approved_at ? <small>Approved {dateTime(review.approved_at)}</small> : null}</div><div className="mockupReviewHistoryFiles">{review.files.map((file) => file.url ? <a key={file.path} href={file.url} target="_blank" rel="noreferrer">View {file.originalName}</a> : <span key={file.path}>{file.originalName}</span>)}</div>{index === 0 && !review.approved_at ? <MockupFollowUp requestId={requestId} reviewId={review.id} version={review.version} recipients={review.recipient_emails.length ? review.recipient_emails : [customerEmail]} files={review.files} /> : null}</article>)}</div> : null}
     {message ? <div className="formSuccess">{message}</div> : null}
     {error ? <div className="formError">{error}</div> : null}
   </section>;

@@ -1,0 +1,37 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { PGlite } = require('@electric-sql/pglite');
+const fs = require('node:fs');
+const order='11111111-1111-4111-8111-111111111111';
+const owner='22222222-2222-4222-8222-222222222222';
+const other='33333333-3333-4333-8333-333333333333';
+let db;
+test('customer cancellations execute atomically and enforce lifecycle rules', async t => {
+ db = new PGlite();
+ await db.exec(`create role anon; create role authenticated; create role service_role;
+ create schema auth; create table auth.users(id uuid primary key);
+ create function auth.uid() returns uuid language sql as 'select null::uuid';
+ create table custom_requests(id uuid primary key,customer_user_id uuid,request_number int,customer_name text,product text,status text,payment_status text,amount_paid_cents int);
+ create table quotes(id uuid primary key default gen_random_uuid(),request_id uuid,status text);
+ create table mockup_review_sends(id uuid primary key default gen_random_uuid(),request_id uuid,approved_at timestamptz);
+ create table payments(id uuid primary key default gen_random_uuid(),request_id uuid,status text);
+ create table order_worksheets(id uuid primary key default gen_random_uuid(),request_id uuid,is_open boolean);
+ create table message_threads(id uuid primary key default gen_random_uuid(),customer_user_id uuid not null,request_id uuid,subject text,topic text,status text,admin_unread_count int default 0,last_message_at timestamptz default now());
+ create unique index one_order_thread on message_threads(request_id) where request_id is not null;
+ create table message_entries(id uuid primary key default gen_random_uuid(),thread_id uuid,sender_user_id uuid,sender_role text,sender_display_name text,body text,is_internal boolean);
+ insert into auth.users values ('${owner}'),('${other}');`);
+ const migration=fs.readFileSync('supabase/moore_made_phase6_66_customer_cancellations.sql','utf8');
+ await db.exec(migration); await db.exec(migration);
+ async function setup(status='new',payment='unpaid',paid=0){await db.exec(`truncate customer_order_cancellations,message_entries,message_threads,quotes,mockup_review_sends,payments,order_worksheets,custom_requests cascade;insert into custom_requests values('${order}','${owner}',1,'Customer','Shirts','${status}','${payment}',${paid});insert into quotes(request_id,status)values('${order}','sent');insert into order_worksheets(request_id,is_open)values('${order}',true);`);}
+ const cancel=async(customer=owner)=> (await db.query('select customer_cancel_order($1,$2,$3) as result',[order,customer,'No longer needed'])).rows[0].result;
+ await t.test('unpaid unapproved request cancels and closes its quote and worksheet',async()=>{await setup();assert.equal((await cancel()).outcome,'cancelled');assert.equal((await db.query('select status from custom_requests')).rows[0].status,'cancelled');assert.equal((await db.query('select status from quotes')).rows[0].status,'expired');assert.equal((await db.query('select is_open from order_worksheets')).rows[0].is_open,false);assert.equal((await db.query('select admin_unread_count from message_threads')).rows[0].admin_unread_count,1);});
+ await t.test('retries do not create duplicate messages',async()=>{await setup();await cancel();assert.equal((await cancel()).alreadyRecorded,true);assert.equal((await db.query('select count(*)::int as n from message_entries')).rows[0].n,1);});
+ await t.test('cross-account cancellation is denied',async()=>{await setup();await assert.rejects(cancel(other),/not available/);assert.equal((await db.query('select status from custom_requests')).rows[0].status,'new');});
+ await t.test('production and paid requests go to review without cancelling or refunding',async()=>{for(const stage of ['approved','in_production','ready']){await setup(stage,'paid',5000);assert.equal((await cancel()).outcome,'review_requested');assert.equal((await db.query('select status,amount_paid_cents from custom_requests')).rows[0].status,stage);assert.equal((await db.query('select amount_paid_cents from custom_requests')).rows[0].amount_paid_cents,5000);}});
+ await t.test('pending payment and either approval type prevent direct cancellation',async()=>{for(const table of ['payments','quotes','mockup_review_sends']){await setup();if(table==='mockup_review_sends')await db.exec(`insert into ${table}(request_id,approved_at)values('${order}',now())`);else if(table==='quotes')await db.exec("update quotes set status='approved'");else await db.exec(`insert into payments(request_id,status)values('${order}','pending')`);assert.equal((await cancel()).outcome,'review_requested');}});
+ await t.test('shipped and completed orders require contact',async()=>{for(const status of ['shipped','completed']){await setup(status);await assert.rejects(cancel(),/contact Moore Made/);}});
+ await t.test('old approval and payment actions are blocked after cancellation',async()=>{await setup();await cancel();await assert.rejects(db.exec("update quotes set status='approved'"),/cancelled/);await assert.rejects(db.exec(`insert into payments(request_id,status)values('${order}','pending')`),/cancelled/);await assert.rejects(db.exec(`insert into mockup_review_sends(request_id,approved_at)values('${order}',now())`),/cancelled/);});
+ await t.test('a message-write failure rolls back cancellation',async()=>{await setup();await db.exec("create function fail_message() returns trigger language plpgsql as $$begin raise exception 'message failed';end$$; create trigger fail_message before insert on message_entries for each row execute function fail_message();");await assert.rejects(cancel(),/message failed/);assert.equal((await db.query('select status from custom_requests')).rows[0].status,'new');await db.exec('drop trigger fail_message on message_entries');});
+ await t.test('customers cannot call the service-only RPC directly with another user ID',async()=>{await db.exec('set role authenticated');await assert.rejects(cancel(),/permission denied/);await db.exec('reset role');});
+ await db.close();
+});
